@@ -1,0 +1,6 @@
+interface:
+  display_name: "Clean Code AI Collaboration"
+  short_description: "Guide repository-aware Clean Code decisions for AI coding"
+  default_prompt: "Use $clean-code-ai-collaboration to plan, implement, and review this change with repository facts, behavior gates, alternatives, and explicit stop conditions."
+policy:
+  allow_implicit_invocation: true
