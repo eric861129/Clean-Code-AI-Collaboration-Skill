@@ -90,6 +90,25 @@ class EvalContractTests(unittest.TestCase):
         self.assertEqual(RESULT_REQUIRED_FIELDS, set(manifest["result_required_fields"]))
         self.assertIn("`result_required_fields`", benchmark)
 
+    def test_scenario_paths_match_fixture_snapshots(self) -> None:
+        allowed_prefixes = (
+            "src/WorkItems.Api/",
+            "tests/WorkItems.Api.Tests/",
+        )
+        retired_prefixes = ("src/AiCleanCode.", "tests/AiCleanCode.")
+
+        for scenario in self.load_manifest()["scenarios"]:
+            with self.subTest(scenario=scenario["id"]):
+                fixture_files = set(scenario["fixture_files"])
+                self.assertTrue(set(scenario["gold_files"]).issubset(fixture_files))
+                for path in [
+                    *fixture_files,
+                    *scenario["gold_files"],
+                    *scenario["allowed_diff"],
+                ]:
+                    self.assertTrue(path.startswith(allowed_prefixes))
+                    self.assertFalse(path.startswith(retired_prefixes))
+
     def test_rubric_files_exist_and_define_scoring(self) -> None:
         actual = {path.name for path in (EVAL_ROOT / "rubrics").glob("*.md")}
         self.assertEqual(RUBRIC_NAMES, actual)

@@ -71,14 +71,26 @@
         "通知、取消與儲存順序",
         "其他優先級工作項目的既有行為"
       ],
+      "fixture_files": [
+        "src/WorkItems.Api/Data/WorkItemsDbContext.cs",
+        "src/WorkItems.Api/Models/WorkItem.cs",
+        "src/WorkItems.Api/Notifications/NotificationGateway.cs",
+        "src/WorkItems.Api/WorkItemsController.cs",
+        "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs",
+        "tests/WorkItems.Api.Tests/WorkItemsContractTests.cs"
+      ],
       "gold_files": [
-        "src/AiCleanCode.Api/Controllers/WorkItemsController.cs",
-        "tests/AiCleanCode.Api.Tests/ProcessOverdueBehaviorTests.cs"
+        "src/WorkItems.Api/WorkItemsController.cs",
+        "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
       ],
       "allowed_diff": [
-        "src/AiCleanCode.Api/Controllers/WorkItemsController.cs",
-        "src/AiCleanCode.Application/WorkItems/OverdueWorkItemProcessor.cs",
-        "tests/AiCleanCode.Api.Tests/ProcessOverdueBehaviorTests.cs"
+        "src/WorkItems.Api/Data/WorkItemsDbContext.cs",
+        "src/WorkItems.Api/Models/WorkItem.cs",
+        "src/WorkItems.Api/Notifications/NotificationGateway.cs",
+        "src/WorkItems.Api/OverdueWorkItemProcessor.cs",
+        "src/WorkItems.Api/WorkItemsController.cs",
+        "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs",
+        "tests/WorkItems.Api.Tests/WorkItemsContractTests.cs"
       ],
       "oracle_commands": [
         "dotnet test AiCleanCode.sln --no-restore",
@@ -101,13 +113,21 @@
         "取消與儲存順序",
         "重跑不重複外部副作用"
       ],
+      "fixture_files": [
+        "src/WorkItems.Api/Data/WorkItemsDbContext.cs",
+        "src/WorkItems.Api/Models/WorkItem.cs",
+        "src/WorkItems.Api/Notifications/NotificationGateway.cs",
+        "src/WorkItems.Api/OverdueWorkItemProcessor.cs",
+        "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs",
+        "tests/WorkItems.Api.Tests/WorkItemsContractTests.cs"
+      ],
       "gold_files": [
-        "src/AiCleanCode.Application/WorkItems/OverdueWorkItemProcessor.cs",
-        "tests/AiCleanCode.Api.Tests/ProcessOverdueBehaviorTests.cs"
+        "src/WorkItems.Api/OverdueWorkItemProcessor.cs",
+        "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
       ],
       "allowed_diff": [
-        "src/AiCleanCode.Application/WorkItems/OverdueWorkItemProcessor.cs",
-        "tests/AiCleanCode.Api.Tests/ProcessOverdueBehaviorTests.cs"
+        "src/WorkItems.Api/OverdueWorkItemProcessor.cs",
+        "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
       ],
       "oracle_commands": [
         "dotnet test AiCleanCode.sln --no-restore",
@@ -130,18 +150,26 @@
         "Consumer 所需契約",
         "既有逾期處理行為"
       ],
+      "fixture_files": [
+        "src/WorkItems.Api/Notifications/NotificationGateway.cs",
+        "src/WorkItems.Api/OverdueWorkItemProcessor.cs",
+        "src/WorkItems.Api/Program.cs",
+        "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs",
+        "tests/WorkItems.Api.Tests/WorkItemsContractTests.cs"
+      ],
       "gold_files": [
-        "src/AiCleanCode.Application/Notifications/NotificationGateway.cs",
-        "src/AiCleanCode.Application/WorkItems/OverdueWorkItemProcessor.cs",
-        "tests/AiCleanCode.Api.Tests/NotificationGatewayContractTests.cs"
+        "src/WorkItems.Api/Notifications/NotificationGateway.cs",
+        "src/WorkItems.Api/OverdueWorkItemProcessor.cs",
+        "tests/WorkItems.Api.Tests/WorkItemsContractTests.cs"
       ],
       "allowed_diff": [
-        "src/AiCleanCode.Application/Notifications/NotificationGateway.cs",
-        "src/AiCleanCode.Application/Notifications/INotificationGateway.cs",
-        "src/AiCleanCode.Application/WorkItems/OverdueWorkItemProcessor.cs",
-        "src/AiCleanCode.Infrastructure/Notifications/",
-        "tests/AiCleanCode.Api.Tests/NotificationGatewayContractTests.cs",
-        "tests/AiCleanCode.Api.Tests/ProcessOverdueBehaviorTests.cs"
+        "src/WorkItems.Api/IWorkItemNotificationSender.cs",
+        "src/WorkItems.Api/Notifications/NotificationGateway.cs",
+        "src/WorkItems.Api/OverdueWorkItemProcessor.cs",
+        "src/WorkItems.Api/Program.cs",
+        "tests/WorkItems.Api.Tests/NotificationGatewayContractTests.cs",
+        "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs",
+        "tests/WorkItems.Api.Tests/WorkItemsContractTests.cs"
       ],
       "oracle_commands": [
         "dotnet test AiCleanCode.sln --no-restore",
@@ -165,19 +193,31 @@
         "取消與儲存順序",
         "每筆 Work Item 不重複通知"
       ],
+      "fixture_files": [
+        "src/WorkItems.Api/Data/WorkItemsDbContext.cs",
+        "src/WorkItems.Api/Models/WorkItem.cs",
+        "src/WorkItems.Api/OverdueProcessingOptions.cs",
+        "src/WorkItems.Api/OverdueProcessingWorker.cs",
+        "src/WorkItems.Api/OverdueWorkItemProcessor.cs",
+        "src/WorkItems.Api/Program.cs",
+        "tests/WorkItems.Api.Tests/OverdueProcessingWorkerTests.cs",
+        "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
+      ],
       "gold_files": [
-        "src/AiCleanCode.Application/WorkItems/OverdueWorkItemProcessor.cs",
-        "src/AiCleanCode.Worker/OverdueProcessingWorker.cs",
-        "src/AiCleanCode.Infrastructure/Persistence/WorkItemsDbContext.cs",
-        "tests/AiCleanCode.Api.Tests/ProcessOverdueBehaviorTests.cs"
+        "src/WorkItems.Api/OverdueWorkItemProcessor.cs",
+        "src/WorkItems.Api/OverdueProcessingWorker.cs",
+        "src/WorkItems.Api/Data/WorkItemsDbContext.cs",
+        "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
       ],
       "allowed_diff": [
-        "src/AiCleanCode.Application/WorkItems/OverdueWorkItemProcessor.cs",
-        "src/AiCleanCode.Worker/OverdueProcessingWorker.cs",
-        "src/AiCleanCode.Infrastructure/Persistence/WorkItemsDbContext.cs",
-        "src/AiCleanCode.Infrastructure/Persistence/WorkItem.cs",
-        "tests/AiCleanCode.Api.Tests/ProcessOverdueBehaviorTests.cs",
-        "tests/AiCleanCode.Api.Tests/OverdueProcessingWorkerTests.cs"
+        "src/WorkItems.Api/Data/WorkItemsDbContext.cs",
+        "src/WorkItems.Api/Models/WorkItem.cs",
+        "src/WorkItems.Api/OverdueProcessingOptions.cs",
+        "src/WorkItems.Api/OverdueProcessingWorker.cs",
+        "src/WorkItems.Api/OverdueWorkItemProcessor.cs",
+        "src/WorkItems.Api/Program.cs",
+        "tests/WorkItems.Api.Tests/OverdueProcessingWorkerTests.cs",
+        "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
       ],
       "oracle_commands": [
         "dotnet test AiCleanCode.sln --no-restore",
