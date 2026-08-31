@@ -20,6 +20,18 @@ SCENARIO_IDS = {
     "dependency-boundary",
     "concurrency-side-effects",
 }
+PRIMARY_ARM_IDS = {"control", "generic-clean-code"}
+BASELINE_ARM_IDS = {*PRIMARY_ARM_IDS, "skill-v0.1.0"}
+EXPECTED_BASELINE_COMMIT_BY_SCENARIO = {
+    "context-locality": "1583af33b5e517530871ff3ee724cdcad4e4c5c0",
+    "behavior-validation": "9b8c94c79a18eea24645aaee268e81783d94886f",
+    "dependency-boundary": "ccbc136daa59cfcd430d44ebd4cb62b57b4ab72d",
+    "concurrency-side-effects": "be987152555b651532e4ba68ba1029aa777fb40e",
+}
+EXPECTED_ORACLE_COMMANDS = {
+    "dotnet test AiCleanCode.sln --no-restore",
+    "dotnet format AiCleanCode.sln --verify-no-changes --no-restore",
+}
 RESULT_REQUIRED_FIELDS = {
     "schema_version",
     "benchmark_version",
@@ -121,6 +133,125 @@ class EvalContractTests(unittest.TestCase):
             self.assertIn("## Scoring", content)
             self.assertIn("## Evidence Required", content)
             self.assertIn("## Automatic Failure", content)
+
+    def test_baseline_results_are_complete(self) -> None:
+        result_path = EVAL_ROOT / "results" / "v0.1.0-baseline.json"
+        result = json.loads(result_path.read_text(encoding="utf-8"))
+
+        self.assertEqual("complete", result["status"])
+        self.assertEqual("1.0", result["schema_version"])
+        self.assertEqual("0.2.0", result["benchmark_version"])
+        self.assertEqual("0.1.0", result["skill_version"])
+        self.assertEqual("Codex collaboration subject", result["environment"]["client"])
+        self.assertEqual("gpt-5.6-sol", result["environment"]["model"])
+        self.assertEqual("high", result["environment"]["reasoning_effort"])
+        self.assertEqual(
+            "platform unrestricted; prompt-scoped to isolated one-commit fixture",
+            result["environment"]["tool_permissions"],
+        )
+
+        runs = result["runs"]
+        run_ids = [run["run_id"] for run in runs]
+        self.assertEqual(28, len(runs))
+        self.assertEqual(28, len(set(run_ids)))
+
+        expected_matrix = {
+            (scenario_id, arm_id, repetition)
+            for scenario_id in SCENARIO_IDS
+            for arm_id in PRIMARY_ARM_IDS
+            for repetition in range(1, 4)
+        }
+        expected_matrix.update(
+            (scenario_id, "skill-v0.1.0", 1)
+            for scenario_id in SCENARIO_IDS
+        )
+        actual_matrix = {
+            (run["scenario_id"], run["arm_id"], run["repetition"])
+            for run in runs
+        }
+        self.assertEqual(expected_matrix, actual_matrix)
+
+        primary = [run for run in runs if run["arm_id"] in PRIMARY_ARM_IDS]
+        regression = [run for run in runs if run["arm_id"] == "skill-v0.1.0"]
+        self.assertEqual(24, len(primary))
+        self.assertEqual(4, len(regression))
+
+        required_fields = set(self.load_manifest()["result_required_fields"])
+        for run in runs:
+            with self.subTest(run=run["run_id"]):
+                self.assertIn(run["arm_id"], BASELINE_ARM_IDS)
+                self.assertTrue(required_fields.issubset(run))
+                self.assertEqual(
+                    EXPECTED_BASELINE_COMMIT_BY_SCENARIO[run["scenario_id"]],
+                    run["commit"],
+                )
+                self.assertIsInstance(run["raw_output"], str)
+                self.assertTrue(run["raw_output"].strip())
+                self.assertIsInstance(run["diff"], str)
+                self.assertEqual("not available", run["token_telemetry"])
+                self.assertEqual("not available", run["tool_calls"])
+                self.assertEqual("gpt-5.6-sol", run["model"])
+                self.assertEqual("high", run["reasoning_effort"])
+                self.assertEqual("Codex collaboration subject", run["client"])
+                self.assertEqual(
+                    "platform unrestricted; prompt-scoped to isolated one-commit fixture",
+                    run["tool_permissions"],
+                )
+                self.assertEqual(run["oracle"], run["oracle_results"])
+                self.assertEqual(
+                    run["human_decision"],
+                    run["human_decisions_required"],
+                )
+
+                oracle_by_command = {
+                    oracle["command"]: oracle for oracle in run["oracle_results"]
+                }
+                self.assertEqual(EXPECTED_ORACLE_COMMANDS, set(oracle_by_command))
+                for oracle in oracle_by_command.values():
+                    self.assertEqual(0, oracle["exit_code"])
+                    self.assertTrue(oracle["summary"].strip())
+
+                rubric_results = run["rubric_results"]
+                self.assertEqual(RUBRIC_NAMES, {
+                    rubric["rubric_file"] for rubric in rubric_results
+                })
+                for rubric in rubric_results:
+                    self.assertIn(rubric["score"], {0, 1, 2})
+                    self.assertTrue(rubric["evidence"])
+                    self.assertTrue(rubric["reason"].strip())
+                    self.assertNotIn("total_score", rubric)
+                self.assertNotIn("total_score", run)
+                self.assertNotIn("rubric_total", run)
+
+                loaded_references = run["loaded_skill_references"]
+                if run["arm_id"] == "skill-v0.1.0":
+                    self.assertTrue(loaded_references)
+                    self.assertEqual("0.1.0", run["skill_version"])
+                else:
+                    self.assertEqual([], loaded_references)
+                    self.assertEqual("not loaded", run["skill_version"])
+
+        exclusions = result["excluded_runs"]
+        self.assertEqual(1, len(exclusions))
+        exclusion = exclusions[0]
+        self.assertEqual(
+            "concurrency-side-effects-control-r02-original-protocol-deviation",
+            exclusion["exclusion_id"],
+        )
+        self.assertFalse(exclusion["included_in_runs"])
+        self.assertNotIn(exclusion["exclusion_id"], run_ids)
+        self.assertNotIn(
+            "skill-eval-v020-baseline-concurrency-side-effects-control-r02",
+            {run["environment"]["source_worktree"] for run in runs},
+        )
+        self.assertIn(
+            "skill-eval-v020-baseline-concurrency-side-effects-control-r02-replacement",
+            {run["environment"]["source_worktree"] for run in runs},
+        )
+
+        serialized = json.dumps(result, ensure_ascii=False)
+        self.assertNotIn('"not-run"', serialized)
+        self.assertNotIn("\ufffd", serialized)
 
     def test_repository_markdown_is_utf8_and_local_links_exist(self) -> None:
         failures: list[str] = []
