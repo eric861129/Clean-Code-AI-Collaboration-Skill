@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
+import re
 import unittest
+from urllib.parse import unquote
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -54,6 +56,8 @@ RESULT_REQUIRED_FIELDS = {
     "elapsed_time",
     "generated_lines",
 }
+MARKDOWN_LINK_PATTERN = re.compile(r"!?\[[^\]]*\]\(([^)\n]+)\)")
+IGNORED_MARKDOWN_PARTS = {".git", ".superpowers"}
 
 
 class EvalContractTests(unittest.TestCase):
@@ -117,6 +121,60 @@ class EvalContractTests(unittest.TestCase):
             self.assertIn("## Scoring", content)
             self.assertIn("## Evidence Required", content)
             self.assertIn("## Automatic Failure", content)
+
+    def test_repository_markdown_is_utf8_and_local_links_exist(self) -> None:
+        failures: list[str] = []
+
+        for markdown_path in ROOT.rglob("*.md"):
+            relative_path = markdown_path.relative_to(ROOT)
+            if any(part in IGNORED_MARKDOWN_PARTS for part in relative_path.parts):
+                continue
+            if relative_path.parts[:2] == ("evals", "results"):
+                continue
+
+            try:
+                content = markdown_path.read_text(encoding="utf-8")
+            except UnicodeDecodeError as error:
+                failures.append(f"{relative_path}: invalid UTF-8 ({error})")
+                continue
+
+            if "\ufffd" in content:
+                failures.append(f"{relative_path}: contains Unicode replacement character")
+
+            for raw_target in MARKDOWN_LINK_PATTERN.findall(content):
+                target = raw_target.strip()
+                if target.startswith("<") and ">" in target:
+                    target = target[1 : target.index(">")]
+                else:
+                    target = target.split(maxsplit=1)[0]
+
+                lower_target = target.lower()
+                if lower_target.startswith(("http://", "https://", "mailto:")):
+                    continue
+                if target.startswith("#"):
+                    continue
+
+                path_only = unquote(target.split("#", maxsplit=1)[0])
+                candidate = (
+                    ROOT / path_only.lstrip("/")
+                    if path_only.startswith("/")
+                    else markdown_path.parent / path_only
+                ).resolve()
+
+                try:
+                    candidate.relative_to(ROOT)
+                except ValueError:
+                    failures.append(
+                        f"{relative_path}: local link escapes repository ({target})"
+                    )
+                    continue
+
+                if not candidate.exists():
+                    failures.append(
+                        f"{relative_path}: missing local link target ({target})"
+                    )
+
+        self.assertEqual([], failures, "\n".join(failures))
 
 
 if __name__ == "__main__":
