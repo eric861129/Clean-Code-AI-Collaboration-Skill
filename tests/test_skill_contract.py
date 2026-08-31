@@ -98,6 +98,46 @@ class SkillContractTests(unittest.TestCase):
         self.assertIn("## Validation Blind Spots", content)
         self.assertIn("## Human Decisions Required", content)
 
+    def test_review_contract_distinguishes_all_empty_sections_from_not_investigated(
+        self,
+    ) -> None:
+        content = (SKILL_ROOT / "references" / "review-output-contract.md").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("For every output heading with no item", content)
+        self.assertIn("`None; Sources checked: ...`", content)
+        self.assertIn("`Not investigated`", content)
+        self.assertIn("This rule applies to every output heading", content)
+
+    def test_common_misjudgments_are_traceable_experiment_observations(self) -> None:
+        names = {
+            "code-readability.md",
+            "testing-and-change-safety.md",
+            "design-and-dependency-boundaries.md",
+            "collaboration-and-estimation.md",
+        }
+        experiment_permalink = (
+            r"https://github\.com/eric861129/AI-CleanCode-API-Demo/blob/"
+            r"[0-9a-f]{40}/docs/evidence/"
+        )
+
+        for name in names:
+            content = (SKILL_ROOT / "references" / name).read_text(encoding="utf-8")
+            common_misjudgments = content.split("## Common Misjudgments", maxsplit=1)[1]
+            common_misjudgments = common_misjudgments.split("## Stop Conditions", maxsplit=1)[
+                0
+            ]
+            observation_blocks = common_misjudgments.split("### Observation ID: ")[1:]
+
+            with self.subTest(reference=name):
+                self.assertNotIn("observed", common_misjudgments.lower())
+                self.assertGreaterEqual(len(observation_blocks), 1)
+                for block in observation_blocks:
+                    self.assertIn("\n\nSource: [", block)
+                    self.assertRegex(block, experiment_permalink)
+                    self.assertIn("\n\nSupports: ", block)
+
     def test_entrypoint_has_lightweight_and_full_paths(self) -> None:
         content = SKILL_PATH.read_text(encoding="utf-8")
 

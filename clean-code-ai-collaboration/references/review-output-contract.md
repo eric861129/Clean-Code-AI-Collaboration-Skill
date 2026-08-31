@@ -2,13 +2,15 @@
 
 Use this contract on the Full Path. Return every heading below, including headings with no applicable item. Link conclusions with stable `F`, `A`, `U`, `O`, and `E` identifiers so a reviewer can trace evidence, uncertainty, options, and validation without inferring missing facts.
 
+For every output heading with no item, write `None; Sources checked: ...` only after named sources establish that the section has no applicable item. Write `Not investigated` when the relevant sources or decision were not investigated. This rule applies to every output heading; do not use a bare `None` or let an empty section imply that investigation happened.
+
 ## Outcome and Status
 
 State the outcome first and choose exactly one status: `planned`, `implemented`, `verified-within-scope`, `blocked`, or `not-investigated`. State the behavior and Diff boundary covered by that status. Do not use `done`, and do not imply that `verified-within-scope` covers behavior, environments, or authorization outside the recorded evidence.
 
 ## Applicable References
 
-List only the decision references that changed this review, such as legibility, readability, testing, design, collaboration, or repository context. For each, state the decision it informed. Write `None; Sources checked: ...` only after checking named sources. Distinguish that from `Not investigated`.
+List only the decision references that changed this review, such as legibility, readability, testing, design, collaboration, or repository context. For each, state the decision it informed.
 
 ## Repository Facts Used
 
@@ -64,4 +66,4 @@ State the exact condition that requires a stop, the Owner or authority needed, t
 
 ## Human Decisions Required
 
-List every unresolved scope, risk, compatibility, schedule, rollout, external commitment, or authorization decision that requires a responsible human. Write `None; Sources checked: ...` only when the named sources show that no human decision remains.
+List every unresolved scope, risk, compatibility, schedule, rollout, external commitment, or authorization decision that requires a responsible human.

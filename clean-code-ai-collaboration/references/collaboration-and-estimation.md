@@ -29,13 +29,23 @@ Token usage, tool calls, generated lines, and elapsed Agent time are execution o
 
 ## Common Misjudgments
 
-These are failure modes observed in Agent-assisted changes. They are review prompts, not a ranking of collaboration methods.
+The following are source-bounded experiment records. Each Observation ID reuses an existing public evidence coordinate; it is not a newly generated Failure ID. They are review prompts, not a ranking of collaboration methods.
 
-- Parallelizing by topic instead of by file and behavior ownership creates hidden overlap and late merge conflicts.
-- Reporting a handoff as complete without the current revision, actual Diff, command output, or unresolved unknown makes validation non-repeatable.
-- Treating generated lines, Token use, or apparent Agent speed as a delivery estimate ignores human review, access, rollout, and recovery.
-- Treating repository evidence as permission for an external commitment, deployment, data mutation, or provider call expands authority without approval.
-- Integrating a passing local slice as if it proves cross-boundary behavior when the contract consumer or environment was never exercised.
+### Observation ID: `day-27/small-cycles-improvement#cycle-choice`
+
+Source: [Day 27 small-cycles improvement at commit e860838](https://github.com/eric861129/AI-CleanCode-API-Demo/blob/e860838ee9a353a55ae6ff0eb661220c49dbb16a/docs/evidence/day-27/small-cycles-improvement/experiment-results.md)
+
+Supports: The one-shot batch passed its first complete Gate, so the experiment does not treat a batch as inherently unsafe. It accepted small cycles for the specific high-risk combination of Provider effects, persistence state, failure paths, and gradual enablement because the checkpoints narrowed investigation and rollback scope.
+
+Misjudgment to avoid: Treat the number of commits, Agents, or cycles as a universal quality signal. Choose sequential or parallel integration from ownership overlap, behavior risk, validation seams, and rollback needs.
+
+### Observation ID: `day-29/honest-estimation#independent-review`
+
+Source: [Day 29 honest estimation at commit e860838](https://github.com/eric861129/AI-CleanCode-API-Demo/blob/e860838ee9a353a55ae6ff0eb661220c49dbb16a/docs/evidence/day-29/honest-estimation/experiment-results.md)
+
+Supports: Three identical-session inputs produced 156, 84, and 48-hour single-point estimates. The independent review records that Token and execution time describe session activity, not delivery speed, and that a User-selected exploration budget is a decision rather than a calibrated prediction.
+
+Misjudgment to avoid: Convert generated lines, Token use, Agent elapsed time, or one point estimate into a delivery commitment without evidence for scope, access, integration, validation, rollout, and human decisions.
 
 ## Stop Conditions
 

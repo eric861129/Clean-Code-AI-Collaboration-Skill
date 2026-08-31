@@ -29,13 +29,31 @@ Apply SOLID as change analysis, not as a score. Project count does not prove the
 
 ## Common Misjudgments
 
-These are failure modes observed in Agent-assisted changes. They are review prompts, not a ranking of architecture patterns.
+The following are source-bounded experiment records. Each Observation ID reuses an existing public evidence coordinate; it is not a newly generated Failure ID. They are review prompts, not a ranking of architecture patterns.
 
-- Adding an interface, project, or mapper because the pattern appears clean without identifying the owner, volatile mechanism, or protected policy boundary.
-- Treating package or project count as evidence of Dependency Rule compliance while policy still imports provider detail.
-- Splitting interfaces without checking whether callers rely on combined operation ordering or shared failure meaning.
-- Treating database success as proof that an external notification, queue publish, or remote call also completed.
-- Choosing Outbox, idempotency, lease, or compensation by name without mapping the actual read, write, commit, retry, and acknowledgement sequence.
+### Observation ID: `day-22/architecture-boundary#current-boundary`
+
+Source: [Day 22 architecture boundary at commit e860838](https://github.com/eric861129/AI-CleanCode-API-Demo/blob/e860838ee9a353a55ae6ff0eb661220c49dbb16a/docs/evidence/day-22/architecture-boundary/experiment-results.md)
+
+Supports: With only a replaceable Provider requirement, the experiment kept the existing Consumer Port and Composition Root and made no Production Diff. It did not add an independent package, team, process, or deployment boundary without the pressure that would require one.
+
+Misjudgment to avoid: Add a Plugin, Package, Process, or extra project solely because a Provider exists, before identifying the contract, ownership, versioning, or operational boundary it must protect.
+
+### Observation ID: `day-22/architecture-boundary#deferred-decision-pressure`
+
+Source: [Day 22 architecture boundary at commit e860838](https://github.com/eric861129/AI-CleanCode-API-Demo/blob/e860838ee9a353a55ae6ff0eb661220c49dbb16a/docs/evidence/day-22/architecture-boundary/experiment-results.md)
+
+Supports: When a new fact introduced an independently versioned Provider owned by another team, the experiment then added Contract and Provider Class Libraries. The record explicitly limits the result: it does not establish that deferring a boundary is always cheaper.
+
+Misjudgment to avoid: Convert one boundary-timing result into a universal rule. Re-evaluate the direct dependency when a consumer contract, team, version, deployment, or failure-isolation requirement changes.
+
+### Observation ID: `day-08/function-heuristics#cqs-exception`
+
+Source: [Day 8 function heuristics at commit e860838](https://github.com/eric861129/AI-CleanCode-API-Demo/blob/e860838ee9a353a55ae6ff0eb661220c49dbb16a/docs/evidence/day-08/function-heuristics.md)
+
+Supports: The accepted CQS candidate preserved explicit exceptions where a strict split would have changed expected failure semantics or hidden a meaningful result. The source presents CQS after observable behavior and side-effect order, not as a fixed priority.
+
+Misjudgment to avoid: Apply an interface, split, or named Pattern before mapping the current failure meaning and side-effect order it must preserve.
 
 ## Stop Conditions
 

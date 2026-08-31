@@ -33,13 +33,39 @@ For each rejected option, state the condition that would reverse the choice and 
 
 ## Common Misjudgments
 
-These are failure modes observed in Agent-assisted changes. They are review prompts, not a ranking of patterns.
+The following are source-bounded experiment records. Each Observation ID reuses an existing public evidence coordinate; it is not a newly generated Failure ID. They are review prompts, not a pattern ranking.
 
-- Copying a nearby name or abstraction without checking its callers, owner, or current contract can spread an old misunderstanding.
-- Splitting methods or classes by line count can turn one readable workflow into a navigation chain with hidden shared state.
-- Treating a comment as proof can preserve stale behavior when the executable code, tests, or contract disagrees.
-- Extracting syntactic repetition can couple workflows that happened to look alike but have different failure meanings.
-- Introducing a DTO or interface because it appears cleaner can add mapping and synchronization work without a protected boundary.
+### Observation ID: `day-05/naming-comparison#human-review`
+
+Source: [Day 5 naming comparison at commit e860838](https://github.com/eric861129/AI-CleanCode-API-Demo/blob/e860838ee9a353a55ae6ff0eb661220c49dbb16a/docs/evidence/day-05/naming-comparison.md)
+
+Supports: The Human Review accepted a short local `outcome` and rejected `overdueResult` for that scope because the nearby helper and tuple already supplied context. It also accepted a more explicit helper name where the caller could not see the implementation.
+
+Misjudgment to avoid: Choose a name from its length or copy a reviewer-preferred string without checking scope, caller context, and the behavior the name must expose.
+
+### Observation ID: `day-06/comments-formatting#stale-comment-agent-impact`
+
+Source: [Day 6 comments and formatting at commit e860838](https://github.com/eric861129/AI-CleanCode-API-Demo/blob/e860838ee9a353a55ae6ff0eb661220c49dbb16a/docs/evidence/day-06/comments-formatting.md)
+
+Supports: The controlled stale-comment mutation left executable Gates green while the comment contradicted repeated-notification behavior. The follow-up Agent path stopped at the evidence conflict and did not produce a harmful Code Diff.
+
+Misjudgment to avoid: Treat a comment as behavior proof when executable code, tests, smoke evidence, or repository instructions conflict. Stop to resolve the conflict instead of silently preserving the text.
+
+### Observation ID: `day-07/function-levels#over-split-run-01`
+
+Source: [Day 7 function levels at commit e860838](https://github.com/eric861129/AI-CleanCode-API-Demo/blob/e860838ee9a353a55ae6ff0eb661220c49dbb16a/docs/evidence/day-07/function-levels.md)
+
+Supports: The over-split candidate lowered entry complexity by distributing it across more symbols, requiring readers to rebuild the call relationship. The accepted Stepdown candidate kept side-effect order and HTTP response visible at the entry point.
+
+Misjudgment to avoid: Split methods by line count or entry complexity alone when the extraction only relocates a cohesive calculation and adds navigation.
+
+### Observation ID: `day-08/function-heuristics#parameter-dry-run-02`
+
+Source: [Day 8 function heuristics at commit e860838](https://github.com/eric861129/AI-CleanCode-API-Demo/blob/e860838ee9a353a55ae6ff0eb661220c49dbb16a/docs/evidence/day-08/function-heuristics.md)
+
+Supports: The parameter and DRY candidate moved dependencies into a private processor, added three private types, and required extra navigation. The source records no second use case that justified making that structure the default.
+
+Misjudgment to avoid: Extract a shared result type, DTO-like mapping, or private processor solely because data shapes repeat when no independently changing boundary has been established.
 
 ## Stop Conditions
 
