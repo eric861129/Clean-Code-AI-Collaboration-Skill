@@ -191,6 +191,87 @@ class SkillContractTests(unittest.TestCase):
         self.assertIn("結構契約", readme)
         self.assertIn("Structural Contract", workflow)
 
+    def test_readme_documents_portability_evidence_and_limits(self) -> None:
+        readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
+        required = {
+            ".agents\\skills",
+            "Codex",
+            "GitHub Copilot",
+            "Claude Code",
+            "Clean Code 如何改善 AI Coding",
+            "CLEAN 五原則",
+            "Benchmark",
+            "不保證",
+            "規劃",
+            "實作",
+            "Review",
+            "貢獻",
+        }
+
+        for term in required:
+            with self.subTest(term=term):
+                self.assertIn(term, readme)
+
+        ordered_sections = [
+            "## 這個 Skill 解決什麼問題",
+            "## Clean Code 如何改善 AI Coding",
+            "## CLEAN 五原則",
+            "## Skill、Repository Policy 與自動化 Gate 的分工",
+            "## 安裝",
+            "## 使用方式",
+            "## Benchmark",
+            "## 已知限制與不保證事項",
+            "## Repository 結構",
+            "## 貢獻評測情境",
+            "## 來源、非官方聲明與授權",
+        ]
+        positions = [readme.index(section) for section in ordered_sections]
+
+        self.assertEqual(positions, sorted(positions))
+        usage_sections = ["### 規劃", "### 實作", "### Review"]
+        for index, section in enumerate(usage_sections):
+            start = readme.index(section)
+            end_marker = (
+                usage_sections[index + 1]
+                if index + 1 < len(usage_sections)
+                else "## Benchmark"
+            )
+            end = readme.index(end_marker, start + len(section))
+            with self.subTest(usage_section=section):
+                self.assertIn("$clean-code-ai-collaboration", readme[start:end])
+
+        self.assertIn(
+            '$skillSource = (Resolve-Path ".\\clean-code-ai-collaboration").Path',
+            readme,
+        )
+        self.assertIn("cd Clean-Code-AI-Collaboration-Skill", readme)
+        self.assertIn('$projectRoot = "C:\\path\\to\\your-project"', readme)
+        self.assertIn('project_root="/path/to/your-project"', readme)
+        self.assertIn('skill_source="$(pwd)/clean-code-ai-collaboration"', readme)
+        self.assertIn(
+            '$skillsRoot = Join-Path $projectRoot ".agents\\skills"',
+            readme,
+        )
+        self.assertIn(
+            '$skillsRoot = Join-Path $env:USERPROFILE ".agents\\skills"',
+            readme,
+        )
+        self.assertIn("Copy-Item -LiteralPath $skillSource", readme)
+        self.assertIn('cp -R "$skill_source" "$target"', readme)
+        self.assertIn("如果 Skill 清單沒有出現，再重新啟動 Codex", readme)
+        self.assertIn("請先確認內容，不要直接覆寫", readme)
+        self.assertIn("內容與格式", readme)
+        self.assertIn("尚未完成實機驗證", readme)
+        self.assertIn("預先宣告的四種 Repository 情境", readme)
+        self.assertIn("| 通用 Prompt 基準 | 12 | 2 | 6／12 | 7／12 | 1／12 |", readme)
+        self.assertIn("| v0.2.0 Skill | 12 | 0 | 9／12 | 12／12 | 12／12 |", readme)
+        self.assertIn("不保證一定節省 Token、時間或費用", readme)
+        self.assertIn(
+            "不是 Robert C. Martin、原出版商、OpenAI、GitHub 或 Anthropic 的官方作品",
+            readme,
+        )
+        self.assertIn("[LICENSE](LICENSE)", readme)
+
     def test_ui_prompt_explicitly_names_the_skill(self) -> None:
         content = (SKILL_ROOT / "agents" / "openai.yaml").read_text(encoding="utf-8")
 
