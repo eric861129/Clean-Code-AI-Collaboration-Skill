@@ -75,7 +75,7 @@
       "run_role": "primary",
       "repository_url": "https://github.com/eric861129/AI-CleanCode-API-Demo.git",
       "commit": "9b8c94c79a18eea24645aaee268e81783d94886f",
-      "working_tree_status": "M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n?? .benchmark-subject-report.json",
+      "working_tree_status": " M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n?? .benchmark-subject-report.json",
       "model": "gpt-5.6-sol",
       "reasoning_effort": "high",
       "client": "Codex collaboration subject",
@@ -345,6 +345,16 @@
       "generated_line_details": {
         "additions": 78,
         "deletions": 1
+      },
+      "comparison_eligibility": {
+        "eligible_for_quality_comparison": false,
+        "eligible_for_primary_effect_comparison": false,
+        "quality_comparison_reasons": [
+          "automatic_failure.triggered=true; quality comparison is excluded."
+        ],
+        "primary_effect_comparison_reasons": [
+          "automatic_failure.triggered=true; primary effect comparison is excluded."
+        ]
       }
     },
     {
@@ -707,6 +717,16 @@
       "generated_line_details": {
         "additions": 191,
         "deletions": 0
+      },
+      "comparison_eligibility": {
+        "eligible_for_quality_comparison": false,
+        "eligible_for_primary_effect_comparison": false,
+        "quality_comparison_reasons": [
+          "automatic_failure.triggered=true; quality comparison is excluded."
+        ],
+        "primary_effect_comparison_reasons": [
+          "automatic_failure.triggered=true; primary effect comparison is excluded."
+        ]
       }
     },
     {
@@ -1009,6 +1029,16 @@
       "generated_line_details": {
         "additions": 201,
         "deletions": 0
+      },
+      "comparison_eligibility": {
+        "eligible_for_quality_comparison": false,
+        "eligible_for_primary_effect_comparison": false,
+        "quality_comparison_reasons": [
+          "automatic_failure.triggered=true; quality comparison is excluded."
+        ],
+        "primary_effect_comparison_reasons": [
+          "automatic_failure.triggered=true; primary effect comparison is excluded."
+        ]
       }
     },
     {
@@ -1024,7 +1054,7 @@
       "run_role": "primary",
       "repository_url": "https://github.com/eric861129/AI-CleanCode-API-Demo.git",
       "commit": "9b8c94c79a18eea24645aaee268e81783d94886f",
-      "working_tree_status": "M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n?? .benchmark-subject-report.json",
+      "working_tree_status": " M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n?? .benchmark-subject-report.json",
       "model": "gpt-5.6-sol",
       "reasoning_effort": "high",
       "client": "Codex collaboration subject",
@@ -1286,6 +1316,16 @@
       "generated_line_details": {
         "additions": 49,
         "deletions": 2
+      },
+      "comparison_eligibility": {
+        "eligible_for_quality_comparison": false,
+        "eligible_for_primary_effect_comparison": false,
+        "quality_comparison_reasons": [
+          "automatic_failure.triggered=true; quality comparison is excluded."
+        ],
+        "primary_effect_comparison_reasons": [
+          "automatic_failure.triggered=true; primary effect comparison is excluded."
+        ]
       }
     },
     {
@@ -1301,7 +1341,7 @@
       "run_role": "primary",
       "repository_url": "https://github.com/eric861129/AI-CleanCode-API-Demo.git",
       "commit": "9b8c94c79a18eea24645aaee268e81783d94886f",
-      "working_tree_status": "M scripts/test-series-baseline-api.ps1\n M src/WorkItems.Api/OverdueWorkItemProcessor.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n?? .benchmark-subject-report.json",
+      "working_tree_status": " M scripts/test-series-baseline-api.ps1\n M src/WorkItems.Api/OverdueWorkItemProcessor.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n?? .benchmark-subject-report.json",
       "model": "gpt-5.6-sol",
       "reasoning_effort": "high",
       "client": "Codex collaboration subject",
@@ -1571,6 +1611,16 @@
       "generated_line_details": {
         "additions": 54,
         "deletions": 16
+      },
+      "comparison_eligibility": {
+        "eligible_for_quality_comparison": false,
+        "eligible_for_primary_effect_comparison": false,
+        "quality_comparison_reasons": [
+          "automatic_failure.triggered=true; quality comparison is excluded."
+        ],
+        "primary_effect_comparison_reasons": [
+          "automatic_failure.triggered=true; primary effect comparison is excluded."
+        ]
       }
     },
     {
@@ -1627,7 +1677,8 @@
           "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
         ],
         "actual_product_paths": [],
-        "outside_allowed_diff": []
+        "outside_allowed_diff": [],
+        "empty_diff_disposition": "stopped_for_human_decision"
       },
       "commands": [
         {
@@ -1877,6 +1928,12 @@
       "generated_line_details": {
         "additions": 0,
         "deletions": 0
+      },
+      "comparison_eligibility": {
+        "eligible_for_quality_comparison": true,
+        "eligible_for_primary_effect_comparison": true,
+        "quality_comparison_reasons": [],
+        "primary_effect_comparison_reasons": []
       }
     },
     {
@@ -1892,7 +1949,7 @@
       "run_role": "regression",
       "repository_url": "https://github.com/eric861129/AI-CleanCode-API-Demo.git",
       "commit": "9b8c94c79a18eea24645aaee268e81783d94886f",
-      "working_tree_status": "M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n?? .benchmark-subject-report.json",
+      "working_tree_status": " M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n?? .benchmark-subject-report.json",
       "model": "gpt-5.6-sol",
       "reasoning_effort": "high",
       "client": "Codex collaboration subject",
@@ -2181,6 +2238,17 @@
       "generated_line_details": {
         "additions": 48,
         "deletions": 4
+      },
+      "comparison_eligibility": {
+        "eligible_for_quality_comparison": false,
+        "eligible_for_primary_effect_comparison": false,
+        "quality_comparison_reasons": [
+          "automatic_failure.triggered=true; quality comparison is excluded."
+        ],
+        "primary_effect_comparison_reasons": [
+          "automatic_failure.triggered=true; primary effect comparison is excluded.",
+          "The skill-v0.1.0 arm is a historical reference and is not eligible for the primary v0.2.0 effect comparison."
+        ]
       }
     },
     {
@@ -2196,7 +2264,7 @@
       "run_role": "primary",
       "repository_url": "https://github.com/eric861129/AI-CleanCode-API-Demo.git",
       "commit": "be987152555b651532e4ba68ba1029aa777fb40e",
-      "working_tree_status": "M src/WorkItems.Api/OverdueWorkItemProcessor.cs\n M src/WorkItems.Api/Program.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n?? .benchmark-subject-report.json\n?? src/WorkItems.Api/OverdueProcessingCoordinator.cs",
+      "working_tree_status": " M src/WorkItems.Api/OverdueWorkItemProcessor.cs\n M src/WorkItems.Api/Program.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n?? .benchmark-subject-report.json\n?? src/WorkItems.Api/OverdueProcessingCoordinator.cs",
       "model": "gpt-5.6-sol",
       "reasoning_effort": "high",
       "client": "Codex collaboration subject",
@@ -2563,6 +2631,12 @@
       "generated_line_details": {
         "additions": 211,
         "deletions": 3
+      },
+      "comparison_eligibility": {
+        "eligible_for_quality_comparison": true,
+        "eligible_for_primary_effect_comparison": true,
+        "quality_comparison_reasons": [],
+        "primary_effect_comparison_reasons": []
       }
     },
     {
@@ -2578,7 +2652,7 @@
       "run_role": "primary",
       "repository_url": "https://github.com/eric861129/AI-CleanCode-API-Demo.git",
       "commit": "be987152555b651532e4ba68ba1029aa777fb40e",
-      "working_tree_status": "M src/WorkItems.Api/OverdueWorkItemProcessor.cs\n M src/WorkItems.Api/Program.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n M tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs\n?? .benchmark-subject-report.json\n?? src/WorkItems.Api/OverdueProcessingConcurrencyCoordinator.cs\n?? tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs",
+      "working_tree_status": " M src/WorkItems.Api/OverdueWorkItemProcessor.cs\n M src/WorkItems.Api/Program.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n M tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs\n?? .benchmark-subject-report.json\n?? src/WorkItems.Api/OverdueProcessingConcurrencyCoordinator.cs\n?? tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs",
       "model": "gpt-5.6-sol",
       "reasoning_effort": "high",
       "client": "Codex collaboration subject",
@@ -2933,6 +3007,12 @@
       "generated_line_details": {
         "additions": 393,
         "deletions": 7
+      },
+      "comparison_eligibility": {
+        "eligible_for_quality_comparison": true,
+        "eligible_for_primary_effect_comparison": true,
+        "quality_comparison_reasons": [],
+        "primary_effect_comparison_reasons": []
       }
     },
     {
@@ -2948,7 +3028,7 @@
       "run_role": "primary",
       "repository_url": "https://github.com/eric861129/AI-CleanCode-API-Demo.git",
       "commit": "be987152555b651532e4ba68ba1029aa777fb40e",
-      "working_tree_status": "M src/WorkItems.Api/OverdueWorkItemProcessor.cs\n M src/WorkItems.Api/Program.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n?? .benchmark-subject-report.json\n?? src/WorkItems.Api/OverdueProcessingCoordinator.cs",
+      "working_tree_status": " M src/WorkItems.Api/OverdueWorkItemProcessor.cs\n M src/WorkItems.Api/Program.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n?? .benchmark-subject-report.json\n?? src/WorkItems.Api/OverdueProcessingCoordinator.cs",
       "model": "gpt-5.6-sol",
       "reasoning_effort": "high",
       "client": "Codex collaboration subject",
@@ -3264,6 +3344,12 @@
       "generated_line_details": {
         "additions": 179,
         "deletions": 2
+      },
+      "comparison_eligibility": {
+        "eligible_for_quality_comparison": true,
+        "eligible_for_primary_effect_comparison": true,
+        "quality_comparison_reasons": [],
+        "primary_effect_comparison_reasons": []
       }
     },
     {
@@ -3279,7 +3365,7 @@
       "run_role": "primary",
       "repository_url": "https://github.com/eric861129/AI-CleanCode-API-Demo.git",
       "commit": "be987152555b651532e4ba68ba1029aa777fb40e",
-      "working_tree_status": "M src/WorkItems.Api/OverdueWorkItemProcessor.cs\n M src/WorkItems.Api/Program.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n?? .benchmark-subject-report.json\n?? src/WorkItems.Api/InFlightWorkItemNotificationRegistry.cs\n?? tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs",
+      "working_tree_status": " M src/WorkItems.Api/OverdueWorkItemProcessor.cs\n M src/WorkItems.Api/Program.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n?? .benchmark-subject-report.json\n?? src/WorkItems.Api/InFlightWorkItemNotificationRegistry.cs\n?? tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs",
       "model": "gpt-5.6-sol",
       "reasoning_effort": "high",
       "client": "Codex collaboration subject",
@@ -3643,6 +3729,12 @@
       "generated_line_details": {
         "additions": 260,
         "deletions": 13
+      },
+      "comparison_eligibility": {
+        "eligible_for_quality_comparison": true,
+        "eligible_for_primary_effect_comparison": true,
+        "quality_comparison_reasons": [],
+        "primary_effect_comparison_reasons": []
       }
     },
     {
@@ -3658,7 +3750,7 @@
       "run_role": "primary",
       "repository_url": "https://github.com/eric861129/AI-CleanCode-API-Demo.git",
       "commit": "be987152555b651532e4ba68ba1029aa777fb40e",
-      "working_tree_status": "M src/WorkItems.Api/OverdueWorkItemProcessor.cs\n M src/WorkItems.Api/Program.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n M tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs\n?? .benchmark-subject-report.json\n?? src/WorkItems.Api/OverdueProcessingExecutionCoordinator.cs\n?? tests/WorkItems.Api.Tests/OverdueProcessingConcurrencyTests.cs",
+      "working_tree_status": " M src/WorkItems.Api/OverdueWorkItemProcessor.cs\n M src/WorkItems.Api/Program.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n M tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs\n?? .benchmark-subject-report.json\n?? src/WorkItems.Api/OverdueProcessingExecutionCoordinator.cs\n?? tests/WorkItems.Api.Tests/OverdueProcessingConcurrencyTests.cs",
       "model": "gpt-5.6-sol",
       "reasoning_effort": "high",
       "client": "Codex collaboration subject",
@@ -3976,6 +4068,12 @@
       "generated_line_details": {
         "additions": 308,
         "deletions": 4
+      },
+      "comparison_eligibility": {
+        "eligible_for_quality_comparison": true,
+        "eligible_for_primary_effect_comparison": true,
+        "quality_comparison_reasons": [],
+        "primary_effect_comparison_reasons": []
       }
     },
     {
@@ -3991,7 +4089,7 @@
       "run_role": "primary",
       "repository_url": "https://github.com/eric861129/AI-CleanCode-API-Demo.git",
       "commit": "be987152555b651532e4ba68ba1029aa777fb40e",
-      "working_tree_status": "M src/WorkItems.Api/OverdueWorkItemProcessor.cs\n M src/WorkItems.Api/Program.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n?? .benchmark-subject-report.json\n?? src/WorkItems.Api/OverdueProcessingCoordinator.cs\n?? tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs",
+      "working_tree_status": " M src/WorkItems.Api/OverdueWorkItemProcessor.cs\n M src/WorkItems.Api/Program.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n?? .benchmark-subject-report.json\n?? src/WorkItems.Api/OverdueProcessingCoordinator.cs\n?? tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs",
       "model": "gpt-5.6-sol",
       "reasoning_effort": "high",
       "client": "Codex collaboration subject",
@@ -4353,6 +4451,12 @@
       "generated_line_details": {
         "additions": 292,
         "deletions": 3
+      },
+      "comparison_eligibility": {
+        "eligible_for_quality_comparison": true,
+        "eligible_for_primary_effect_comparison": true,
+        "quality_comparison_reasons": [],
+        "primary_effect_comparison_reasons": []
       }
     },
     {
@@ -4368,7 +4472,7 @@
       "run_role": "regression",
       "repository_url": "https://github.com/eric861129/AI-CleanCode-API-Demo.git",
       "commit": "be987152555b651532e4ba68ba1029aa777fb40e",
-      "working_tree_status": "M src/WorkItems.Api/OverdueWorkItemProcessor.cs\n M src/WorkItems.Api/Program.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n?? .benchmark-subject-report.json\n?? src/WorkItems.Api/WorkItemProcessingClaimRegistry.cs",
+      "working_tree_status": " M src/WorkItems.Api/OverdueWorkItemProcessor.cs\n M src/WorkItems.Api/Program.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n?? .benchmark-subject-report.json\n?? src/WorkItems.Api/WorkItemProcessingClaimRegistry.cs",
       "model": "gpt-5.6-sol",
       "reasoning_effort": "high",
       "client": "Codex collaboration subject",
@@ -4816,6 +4920,14 @@
       "generated_line_details": {
         "additions": 200,
         "deletions": 22
+      },
+      "comparison_eligibility": {
+        "eligible_for_quality_comparison": true,
+        "eligible_for_primary_effect_comparison": false,
+        "quality_comparison_reasons": [],
+        "primary_effect_comparison_reasons": [
+          "The skill-v0.1.0 arm is a historical reference and is not eligible for the primary v0.2.0 effect comparison."
+        ]
       }
     },
     {
@@ -4831,7 +4943,7 @@
       "run_role": "primary",
       "repository_url": "https://github.com/eric861129/AI-CleanCode-API-Demo.git",
       "commit": "1583af33b5e517530871ff3ee724cdcad4e4c5c0",
-      "working_tree_status": "M src/WorkItems.Api/WorkItemsController.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n?? .benchmark-subject-report.json",
+      "working_tree_status": " M src/WorkItems.Api/WorkItemsController.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n?? .benchmark-subject-report.json",
       "model": "gpt-5.6-sol",
       "reasoning_effort": "high",
       "client": "Codex collaboration subject",
@@ -5091,6 +5203,12 @@
       "generated_line_details": {
         "additions": 59,
         "deletions": 3
+      },
+      "comparison_eligibility": {
+        "eligible_for_quality_comparison": true,
+        "eligible_for_primary_effect_comparison": true,
+        "quality_comparison_reasons": [],
+        "primary_effect_comparison_reasons": []
       }
     },
     {
@@ -5106,7 +5224,7 @@
       "run_role": "primary",
       "repository_url": "https://github.com/eric861129/AI-CleanCode-API-Demo.git",
       "commit": "1583af33b5e517530871ff3ee724cdcad4e4c5c0",
-      "working_tree_status": "M src/WorkItems.Api/WorkItemsController.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n?? .benchmark-subject-report.json",
+      "working_tree_status": " M src/WorkItems.Api/WorkItemsController.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n?? .benchmark-subject-report.json",
       "model": "gpt-5.6-sol",
       "reasoning_effort": "high",
       "client": "Codex collaboration subject",
@@ -5428,6 +5546,12 @@
       "generated_line_details": {
         "additions": 58,
         "deletions": 3
+      },
+      "comparison_eligibility": {
+        "eligible_for_quality_comparison": true,
+        "eligible_for_primary_effect_comparison": true,
+        "quality_comparison_reasons": [],
+        "primary_effect_comparison_reasons": []
       }
     },
     {
@@ -5443,7 +5567,7 @@
       "run_role": "primary",
       "repository_url": "https://github.com/eric861129/AI-CleanCode-API-Demo.git",
       "commit": "1583af33b5e517530871ff3ee724cdcad4e4c5c0",
-      "working_tree_status": "M src/WorkItems.Api/WorkItemsController.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n?? .benchmark-subject-report.json",
+      "working_tree_status": " M src/WorkItems.Api/WorkItemsController.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n?? .benchmark-subject-report.json",
       "model": "gpt-5.6-sol",
       "reasoning_effort": "high",
       "client": "Codex collaboration subject",
@@ -5776,6 +5900,12 @@
       "generated_line_details": {
         "additions": 57,
         "deletions": 3
+      },
+      "comparison_eligibility": {
+        "eligible_for_quality_comparison": true,
+        "eligible_for_primary_effect_comparison": true,
+        "quality_comparison_reasons": [],
+        "primary_effect_comparison_reasons": []
       }
     },
     {
@@ -5791,7 +5921,7 @@
       "run_role": "primary",
       "repository_url": "https://github.com/eric861129/AI-CleanCode-API-Demo.git",
       "commit": "1583af33b5e517530871ff3ee724cdcad4e4c5c0",
-      "working_tree_status": "M src/WorkItems.Api/WorkItemsController.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n?? .benchmark-subject-report.json",
+      "working_tree_status": " M src/WorkItems.Api/WorkItemsController.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n?? .benchmark-subject-report.json",
       "model": "gpt-5.6-sol",
       "reasoning_effort": "high",
       "client": "Codex collaboration subject",
@@ -6061,6 +6191,12 @@
       "generated_line_details": {
         "additions": 58,
         "deletions": 3
+      },
+      "comparison_eligibility": {
+        "eligible_for_quality_comparison": true,
+        "eligible_for_primary_effect_comparison": true,
+        "quality_comparison_reasons": [],
+        "primary_effect_comparison_reasons": []
       }
     },
     {
@@ -6076,7 +6212,7 @@
       "run_role": "primary",
       "repository_url": "https://github.com/eric861129/AI-CleanCode-API-Demo.git",
       "commit": "1583af33b5e517530871ff3ee724cdcad4e4c5c0",
-      "working_tree_status": "M src/WorkItems.Api/WorkItemsController.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n?? .benchmark-subject-report.json",
+      "working_tree_status": " M src/WorkItems.Api/WorkItemsController.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n?? .benchmark-subject-report.json",
       "model": "gpt-5.6-sol",
       "reasoning_effort": "high",
       "client": "Codex collaboration subject",
@@ -6362,6 +6498,12 @@
       "generated_line_details": {
         "additions": 57,
         "deletions": 5
+      },
+      "comparison_eligibility": {
+        "eligible_for_quality_comparison": true,
+        "eligible_for_primary_effect_comparison": true,
+        "quality_comparison_reasons": [],
+        "primary_effect_comparison_reasons": []
       }
     },
     {
@@ -6377,7 +6519,7 @@
       "run_role": "primary",
       "repository_url": "https://github.com/eric861129/AI-CleanCode-API-Demo.git",
       "commit": "1583af33b5e517530871ff3ee724cdcad4e4c5c0",
-      "working_tree_status": "M src/WorkItems.Api/WorkItemsController.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n?? .benchmark-subject-report.json",
+      "working_tree_status": " M src/WorkItems.Api/WorkItemsController.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n?? .benchmark-subject-report.json",
       "model": "gpt-5.6-sol",
       "reasoning_effort": "high",
       "client": "Codex collaboration subject",
@@ -6674,6 +6816,12 @@
       "generated_line_details": {
         "additions": 61,
         "deletions": 3
+      },
+      "comparison_eligibility": {
+        "eligible_for_quality_comparison": true,
+        "eligible_for_primary_effect_comparison": true,
+        "quality_comparison_reasons": [],
+        "primary_effect_comparison_reasons": []
       }
     },
     {
@@ -6689,7 +6837,7 @@
       "run_role": "regression",
       "repository_url": "https://github.com/eric861129/AI-CleanCode-API-Demo.git",
       "commit": "1583af33b5e517530871ff3ee724cdcad4e4c5c0",
-      "working_tree_status": "M src/WorkItems.Api/WorkItemsController.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n?? .benchmark-subject-report.json",
+      "working_tree_status": " M src/WorkItems.Api/WorkItemsController.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n?? .benchmark-subject-report.json",
       "model": "gpt-5.6-sol",
       "reasoning_effort": "high",
       "client": "Codex collaboration subject",
@@ -7075,6 +7223,14 @@
       "generated_line_details": {
         "additions": 58,
         "deletions": 3
+      },
+      "comparison_eligibility": {
+        "eligible_for_quality_comparison": true,
+        "eligible_for_primary_effect_comparison": false,
+        "quality_comparison_reasons": [],
+        "primary_effect_comparison_reasons": [
+          "The skill-v0.1.0 arm is a historical reference and is not eligible for the primary v0.2.0 effect comparison."
+        ]
       }
     },
     {
@@ -7090,7 +7246,7 @@
       "run_role": "primary",
       "repository_url": "https://github.com/eric861129/AI-CleanCode-API-Demo.git",
       "commit": "ccbc136daa59cfcd430d44ebd4cb62b57b4ab72d",
-      "working_tree_status": "M src/WorkItems.Api/Notifications/NotificationGateway.cs\n M src/WorkItems.Api/OverdueWorkItemProcessor.cs\n M src/WorkItems.Api/Program.cs\n M tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs\n?? .benchmark-subject-report.json\n?? tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs",
+      "working_tree_status": " M src/WorkItems.Api/Notifications/NotificationGateway.cs\n M src/WorkItems.Api/OverdueWorkItemProcessor.cs\n M src/WorkItems.Api/Program.cs\n M tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs\n?? .benchmark-subject-report.json\n?? tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs",
       "model": "gpt-5.6-sol",
       "reasoning_effort": "high",
       "client": "Codex collaboration subject",
@@ -7418,6 +7574,12 @@
       "generated_line_details": {
         "additions": 121,
         "deletions": 18
+      },
+      "comparison_eligibility": {
+        "eligible_for_quality_comparison": true,
+        "eligible_for_primary_effect_comparison": true,
+        "quality_comparison_reasons": [],
+        "primary_effect_comparison_reasons": []
       }
     },
     {
@@ -7433,7 +7595,7 @@
       "run_role": "primary",
       "repository_url": "https://github.com/eric861129/AI-CleanCode-API-Demo.git",
       "commit": "ccbc136daa59cfcd430d44ebd4cb62b57b4ab72d",
-      "working_tree_status": "D src/WorkItems.Api/Notifications/NotificationGateway.cs\n M src/WorkItems.Api/Program.cs\n?? .benchmark-subject-report.json\n?? src/WorkItems.Api/Notifications/DemoNotificationProvider.cs\n?? src/WorkItems.Api/Notifications/INotificationGateway.cs\n?? tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs",
+      "working_tree_status": " D src/WorkItems.Api/Notifications/NotificationGateway.cs\n M src/WorkItems.Api/Program.cs\n?? .benchmark-subject-report.json\n?? src/WorkItems.Api/Notifications/DemoNotificationProvider.cs\n?? src/WorkItems.Api/Notifications/INotificationGateway.cs\n?? tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs",
       "model": "gpt-5.6-sol",
       "reasoning_effort": "high",
       "client": "Codex collaboration subject",
@@ -7737,6 +7899,12 @@
       "generated_line_details": {
         "additions": 169,
         "deletions": 68
+      },
+      "comparison_eligibility": {
+        "eligible_for_quality_comparison": true,
+        "eligible_for_primary_effect_comparison": true,
+        "quality_comparison_reasons": [],
+        "primary_effect_comparison_reasons": []
       }
     },
     {
@@ -7752,7 +7920,7 @@
       "run_role": "primary",
       "repository_url": "https://github.com/eric861129/AI-CleanCode-API-Demo.git",
       "commit": "ccbc136daa59cfcd430d44ebd4cb62b57b4ab72d",
-      "working_tree_status": "M src/WorkItems.Api/Notifications/NotificationGateway.cs\n M src/WorkItems.Api/OverdueWorkItemProcessor.cs\n M src/WorkItems.Api/Program.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n M tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs\n?? .benchmark-subject-report.json\n?? src/WorkItems.Api/OverdueNotificationProvider.cs\n?? tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs",
+      "working_tree_status": " M src/WorkItems.Api/Notifications/NotificationGateway.cs\n M src/WorkItems.Api/OverdueWorkItemProcessor.cs\n M src/WorkItems.Api/Program.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n M tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs\n?? .benchmark-subject-report.json\n?? src/WorkItems.Api/OverdueNotificationProvider.cs\n?? tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs",
       "model": "gpt-5.6-sol",
       "reasoning_effort": "high",
       "client": "Codex collaboration subject",
@@ -8077,6 +8245,12 @@
       "generated_line_details": {
         "additions": 143,
         "deletions": 58
+      },
+      "comparison_eligibility": {
+        "eligible_for_quality_comparison": true,
+        "eligible_for_primary_effect_comparison": true,
+        "quality_comparison_reasons": [],
+        "primary_effect_comparison_reasons": []
       }
     },
     {
@@ -8092,7 +8266,7 @@
       "run_role": "primary",
       "repository_url": "https://github.com/eric861129/AI-CleanCode-API-Demo.git",
       "commit": "ccbc136daa59cfcd430d44ebd4cb62b57b4ab72d",
-      "working_tree_status": "M src/WorkItems.Api/Contracts/WorkItemContracts.cs\n D src/WorkItems.Api/Notifications/NotificationGateway.cs\n M src/WorkItems.Api/OverdueWorkItemProcessor.cs\n M src/WorkItems.Api/Program.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n M tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs\n?? .benchmark-subject-report.json\n?? src/WorkItems.Api/Contracts/NotificationProviderContract.cs\n?? src/WorkItems.Api/Notifications/DemoNotificationProvider.cs\n?? tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs",
+      "working_tree_status": " M src/WorkItems.Api/Contracts/WorkItemContracts.cs\n D src/WorkItems.Api/Notifications/NotificationGateway.cs\n M src/WorkItems.Api/OverdueWorkItemProcessor.cs\n M src/WorkItems.Api/Program.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n M tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs\n?? .benchmark-subject-report.json\n?? src/WorkItems.Api/Contracts/NotificationProviderContract.cs\n?? src/WorkItems.Api/Notifications/DemoNotificationProvider.cs\n?? tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs",
       "model": "gpt-5.6-sol",
       "reasoning_effort": "high",
       "client": "Codex collaboration subject",
@@ -8407,6 +8581,12 @@
       "generated_line_details": {
         "additions": 199,
         "deletions": 97
+      },
+      "comparison_eligibility": {
+        "eligible_for_quality_comparison": true,
+        "eligible_for_primary_effect_comparison": true,
+        "quality_comparison_reasons": [],
+        "primary_effect_comparison_reasons": []
       }
     },
     {
@@ -8422,7 +8602,7 @@
       "run_role": "primary",
       "repository_url": "https://github.com/eric861129/AI-CleanCode-API-Demo.git",
       "commit": "ccbc136daa59cfcd430d44ebd4cb62b57b4ab72d",
-      "working_tree_status": "D src/WorkItems.Api/Notifications/NotificationGateway.cs\n M src/WorkItems.Api/OverdueWorkItemProcessor.cs\n M src/WorkItems.Api/Program.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n M tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs\n?? .benchmark-subject-report.json\n?? src/WorkItems.Api/Notifications/DemoNotificationProvider.cs\n?? src/WorkItems.Api/Notifications/NotificationProvider.cs\n?? tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs",
+      "working_tree_status": " D src/WorkItems.Api/Notifications/NotificationGateway.cs\n M src/WorkItems.Api/OverdueWorkItemProcessor.cs\n M src/WorkItems.Api/Program.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n M tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs\n?? .benchmark-subject-report.json\n?? src/WorkItems.Api/Notifications/DemoNotificationProvider.cs\n?? src/WorkItems.Api/Notifications/NotificationProvider.cs\n?? tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs",
       "model": "gpt-5.6-sol",
       "reasoning_effort": "high",
       "client": "Codex collaboration subject",
@@ -8750,6 +8930,12 @@
       "generated_line_details": {
         "additions": 196,
         "deletions": 93
+      },
+      "comparison_eligibility": {
+        "eligible_for_quality_comparison": true,
+        "eligible_for_primary_effect_comparison": true,
+        "quality_comparison_reasons": [],
+        "primary_effect_comparison_reasons": []
       }
     },
     {
@@ -8765,7 +8951,7 @@
       "run_role": "primary",
       "repository_url": "https://github.com/eric861129/AI-CleanCode-API-Demo.git",
       "commit": "ccbc136daa59cfcd430d44ebd4cb62b57b4ab72d",
-      "working_tree_status": "D src/WorkItems.Api/Notifications/NotificationGateway.cs\n M src/WorkItems.Api/OverdueWorkItemProcessor.cs\n M src/WorkItems.Api/Program.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n M tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs\n?? .benchmark-subject-report.json\n?? src/WorkItems.Api/Notifications/NotificationProvider.cs\n?? tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs",
+      "working_tree_status": " D src/WorkItems.Api/Notifications/NotificationGateway.cs\n M src/WorkItems.Api/OverdueWorkItemProcessor.cs\n M src/WorkItems.Api/Program.cs\n M tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs\n M tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs\n?? .benchmark-subject-report.json\n?? src/WorkItems.Api/Notifications/NotificationProvider.cs\n?? tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs",
       "model": "gpt-5.6-sol",
       "reasoning_effort": "high",
       "client": "Codex collaboration subject",
@@ -9051,6 +9237,12 @@
       "generated_line_details": {
         "additions": 212,
         "deletions": 96
+      },
+      "comparison_eligibility": {
+        "eligible_for_quality_comparison": true,
+        "eligible_for_primary_effect_comparison": true,
+        "quality_comparison_reasons": [],
+        "primary_effect_comparison_reasons": []
       }
     },
     {
@@ -9066,7 +9258,7 @@
       "run_role": "regression",
       "repository_url": "https://github.com/eric861129/AI-CleanCode-API-Demo.git",
       "commit": "ccbc136daa59cfcd430d44ebd4cb62b57b4ab72d",
-      "working_tree_status": "M src/WorkItems.Api/Notifications/NotificationGateway.cs\n M src/WorkItems.Api/Program.cs\n?? .benchmark-subject-report.json\n?? src/WorkItems.Api/Notifications/NotificationProvider.cs\n?? tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs",
+      "working_tree_status": " M src/WorkItems.Api/Notifications/NotificationGateway.cs\n M src/WorkItems.Api/Program.cs\n?? .benchmark-subject-report.json\n?? src/WorkItems.Api/Notifications/NotificationProvider.cs\n?? tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs",
       "model": "gpt-5.6-sol",
       "reasoning_effort": "high",
       "client": "Codex collaboration subject",
@@ -9424,6 +9616,14 @@
       "generated_line_details": {
         "additions": 208,
         "deletions": 10
+      },
+      "comparison_eligibility": {
+        "eligible_for_quality_comparison": true,
+        "eligible_for_primary_effect_comparison": false,
+        "quality_comparison_reasons": [],
+        "primary_effect_comparison_reasons": [
+          "The skill-v0.1.0 arm is a historical reference and is not eligible for the primary v0.2.0 effect comparison."
+        ]
       }
     }
   ]
