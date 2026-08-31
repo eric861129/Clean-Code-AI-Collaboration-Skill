@@ -15,7 +15,7 @@
   "harness_evidence": {
     "environment_repair": {
       "command": "dotnet restore AiCleanCode.sln --locked-mode",
-      "cwd": "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v020-baseline-context-locality-control-r01",
+      "cwd": "<fixture-root>/skill-eval-v020-baseline-context-locality-control-r01",
       "exit_code": 0,
       "observed_result": "Locked restore completed successfully; exit code 0.",
       "classification": "Harness environment repair; not a Subject quality result."
@@ -259,7 +259,7 @@
           "description": "Benchmark Run 報告；排除產品 Diff。"
         },
         {
-          "path": "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v020-baseline-behavior-validation-control-r01/.benchmark-subject-report.json",
+          "path": "<fixture-root>/skill-eval-v020-baseline-behavior-validation-control-r01/.benchmark-subject-report.json",
           "kind": "subject report source",
           "included_in_product_diff": false
         }
@@ -633,7 +633,7 @@
           "description": "本次隔離 control run 的執行與驗證紀錄。"
         },
         {
-          "path": "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v020-baseline-behavior-validation-control-r02/.benchmark-subject-report.json",
+          "path": "<fixture-root>/skill-eval-v020-baseline-behavior-validation-control-r02/.benchmark-subject-report.json",
           "kind": "subject report source",
           "included_in_product_diff": false
         }
@@ -956,7 +956,7 @@
         "tests/WorkItems.Api.Tests/ProcessOverdueAcceptanceTests.cs",
         ".benchmark-subject-report.json",
         {
-          "path": "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v020-baseline-behavior-validation-control-r03/.benchmark-subject-report.json",
+          "path": "<fixture-root>/skill-eval-v020-baseline-behavior-validation-control-r03/.benchmark-subject-report.json",
           "kind": "subject report source",
           "included_in_product_diff": false
         }
@@ -1257,7 +1257,7 @@
           "excluded_from_product_diff": true
         },
         {
-          "path": "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v020-baseline-behavior-validation-generic-clean-code-r01/.benchmark-subject-report.json",
+          "path": "<fixture-root>/skill-eval-v020-baseline-behavior-validation-generic-clean-code-r01/.benchmark-subject-report.json",
           "kind": "subject report source",
           "included_in_product_diff": false
         }
@@ -1561,7 +1561,7 @@
         "artifacts/runtime/series-baseline-smoke-a478a017.db-shm",
         "artifacts/runtime/series-baseline-smoke-a478a017.db-wal",
         {
-          "path": "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v020-baseline-behavior-validation-generic-clean-code-r02/.benchmark-subject-report.json",
+          "path": "<fixture-root>/skill-eval-v020-baseline-behavior-validation-generic-clean-code-r02/.benchmark-subject-report.json",
           "kind": "subject report source",
           "included_in_product_diff": false
         }
@@ -1883,7 +1883,7 @@
           "description": "正式隔離基準實驗 Subject 報告；保持未追蹤。"
         },
         {
-          "path": "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v020-baseline-behavior-validation-generic-clean-code-r03/.benchmark-subject-report.json",
+          "path": "<fixture-root>/skill-eval-v020-baseline-behavior-validation-generic-clean-code-r03/.benchmark-subject-report.json",
           "kind": "subject report source",
           "included_in_product_diff": false
         }
@@ -2016,10 +2016,10 @@
       "prompt": "補上可讀的驗收測試，覆蓋剛好到期、通知失敗仍儲存，以及重跑不產生重複副作用三種情境。測試必須保留既有 HTTP Contract、通知失敗語意、取消與儲存順序，並以獨立行為 Oracle 證明結果。\n\n額外指示：只允許讀取指定的 clean-code-ai-collaboration v0.1.0 Fixture 與其任務相關參考文件，並完整遵循該 Skill。",
       "prompt_provenance": "Manifest task plus documented arm instruction; the Collaboration API did not expose a byte-for-byte dispatch envelope.",
       "loaded_skill_references": [
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/SKILL.md",
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/references/repository-context-template.md",
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/references/testing-and-change-safety.md",
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/references/review-output-contract.md"
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/SKILL.md",
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/references/repository-context-template.md",
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/references/testing-and-change-safety.md",
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/references/review-output-contract.md"
       ],
       "raw_output": "## Applicable References\n\nclean-code-ai-collaboration/SKILL.md；repository-context-template.md；testing-and-change-safety.md；review-output-contract.md。\n\n## Repository Facts Used\n\nF1: Revision 9b8c94c79a18eea24645aaee268e81783d94886f 的 AGENTS.md 與 README.md 明定 POST /api/work-items/process-overdue、200 JSON Contract、通知先於儲存，以及重跑時已逾期項目仍再次通知。\nF2: src/WorkItems.Api/OverdueWorkItemProcessor.cs 使用 DueAtUtc <= currentUtc，通知完成後才 SaveChangesAsync；false 通知結果納入失敗摘要但不阻止儲存。\nF3: 既有 ProcessOverdueBehaviorTests 已保護取消傳遞、通知例外不儲存與通知先於儲存。\n\n## Assumptions\n\nA1: 工作單的『重跑不產生重複副作用』在既有重複通知契約下，解讀為不重複狀態轉換且不改變已持久化工作項目；以第一次與第二次執行後的 SQLite snapshot 相等驗證。若要禁止重複通知，會改變既有通知次數契約。\n\n## Unknowns\n\nU1: 未知未來是否要把重複通知改成冪等；本次非關鍵，Owner 為使用者，若需要應另立明列新舊行為與驗收方式的工作單。\n\n## Options Considered\n\nO1: 強化既有三個聚焦行為測試，以 HTTP 回應、Recording Gateway 與獨立 SQLite 讀回作 Oracle；成本低、無 Production Diff，符合目前授權，已採用。\nO2: 新增 SaveChanges interceptor 或新的測試 DSL；能觀察更多內部呼叫，但增加測試基礎設施與理解成本，現有 persisted snapshot 已足夠，故拒絕。\nO3: 修改 Production Code 讓重跑不再通知；會破壞 F1 的既有通知次數契約且超出純驗收測試範圍，故拒絕。\n\n## Selected Option and Reason\n\n採 O1。F1-F3 支持只修改測試；A1 讓重跑 Oracle 同時證明持久化不變與既有重複通知；U1 不影響本次可逆測試 Diff；E1-E7 均通過。\n\n## When Other Options Fit Better\n\n若未來必須確認 SaveChangesAsync 呼叫次數或 SQL UPDATE 次數，O2 較合適；若 Owner 明確核准新舊通知行為與相容策略，才考慮 O3。\n\n## Behavior That Must Not Change\n\nPOST Route、200 Status、四個 JSON 欄位、通知失敗摘要與仍儲存 Overdue、CancellationToken 傳遞、通知先於儲存，以及重跑仍再次通知。\n\n## Expected Diff Boundary\n\n只修改 tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs；不修改 Production Code、套件、Schema、外部資料、CI 或部署。\n\n## Actual Diff Boundary and Deviations\n\n只修改預期測試檔；另依實驗規約建立未追蹤 .benchmark-subject-report.json。無偏離。\n\n## Validation Plan\n\n執行聚焦行為測試、locked restore、Release build、完整測試、format verify、套件弱點檢查、baseline smoke 與 git diff --check。\n\n## Evidence Produced\n\nE0: 初次使用 --filter 的聚焦命令 exit 1，原因是此 Microsoft.Testing.Platform runner 不支援該選項；改用 --filter-class。\nE1: --filter-class ProcessOverdueBehaviorTests exit 0，7/7 通過。\nE2: 完整 dotnet test exit 0，13/13 通過，涵蓋既有取消與儲存順序 guardrails。\nE3: locked restore 與 Release build exit 0，0 warnings、0 errors。\nE4: dotnet format --verify-no-changes exit 0。\nE5: vulnerable package 檢查 exit 0，來源未回報弱點套件。\nE6: baseline smoke exit 0；第一次 processed=2、第二次 processed=0，兩次 notification attempts=2，knownDuplicateNotificationObserved=true。\nE7: git diff --check exit 0。限制：Green 僅證明目前 Oracle；snapshot 不計算無資料變更的 SaveChangesAsync 呼叫次數。\n\n## Stop or Escalation Conditions\n\n若必須禁止重複通知、改 Route/DTO/JSON/Status、改 Production Code 或無法維持取消與通知先儲存契約，應停止並由 Owner 決定。本次未觸發。\n\n## Human Decisions Required\n\n目前完成不需人工決策。若期望『重跑無重複副作用』包含禁止再次通知，需由使用者明確核准既有通知契約變更。",
       "files_inspected": [
@@ -2034,10 +2034,10 @@
         "src/WorkItems.Api/Models/WorkItem.cs",
         "src/WorkItems.Api/Data/WorkItemsDbContext.cs",
         "src/WorkItems.Api/Notifications/NotificationGateway.cs",
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/SKILL.md",
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/references/repository-context-template.md",
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/references/testing-and-change-safety.md",
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/references/review-output-contract.md"
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/SKILL.md",
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/references/repository-context-template.md",
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/references/testing-and-change-safety.md",
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/references/review-output-contract.md"
       ],
       "files_modified": [
         "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
@@ -2205,7 +2205,7 @@
           "description": "本次隔離基準實驗紀錄。"
         },
         {
-          "path": "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v020-baseline-behavior-validation-skill-v0.1.0-r01/.benchmark-subject-report.json",
+          "path": "<fixture-root>/skill-eval-v020-baseline-behavior-validation-skill-v0.1.0-r01/.benchmark-subject-report.json",
           "kind": "subject report source",
           "included_in_product_diff": false
         }
@@ -2623,7 +2623,7 @@
           "description": "Untracked benchmark subject execution report."
         },
         {
-          "path": "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v020-baseline-concurrency-side-effects-control-r01/.benchmark-subject-report.json",
+          "path": "<fixture-root>/skill-eval-v020-baseline-concurrency-side-effects-control-r01/.benchmark-subject-report.json",
           "kind": "subject report source",
           "included_in_product_diff": false
         }
@@ -3024,7 +3024,7 @@
         "artifacts/runtime/series-baseline-smoke-d6d27038.db-shm",
         "artifacts/runtime/series-baseline-smoke-d6d27038.db-wal",
         {
-          "path": "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v020-baseline-concurrency-side-effects-control-r02-replacement/.benchmark-subject-report.json",
+          "path": "<fixture-root>/skill-eval-v020-baseline-concurrency-side-effects-control-r02-replacement/.benchmark-subject-report.json",
           "kind": "subject report source",
           "included_in_product_diff": false
         }
@@ -3386,7 +3386,7 @@
         "artifacts/runtime/series-baseline-smoke-b42a5df3.db-shm",
         "artifacts/runtime/series-baseline-smoke-b42a5df3.db-wal",
         {
-          "path": "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v020-baseline-concurrency-side-effects-control-r03/.benchmark-subject-report.json",
+          "path": "<fixture-root>/skill-eval-v020-baseline-concurrency-side-effects-control-r03/.benchmark-subject-report.json",
           "kind": "subject report source",
           "included_in_product_diff": false
         }
@@ -3800,7 +3800,7 @@
           "description": "本次隔離基準實驗的忠實執行報告。"
         },
         {
-          "path": "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v020-baseline-concurrency-side-effects-generic-clean-code-r01/.benchmark-subject-report.json",
+          "path": "<fixture-root>/skill-eval-v020-baseline-concurrency-side-effects-generic-clean-code-r01/.benchmark-subject-report.json",
           "kind": "subject report source",
           "included_in_product_diff": false
         }
@@ -4159,7 +4159,7 @@
           "description": "本次隔離基準實驗的執行與驗證紀錄"
         },
         {
-          "path": "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v020-baseline-concurrency-side-effects-generic-clean-code-r02/.benchmark-subject-report.json",
+          "path": "<fixture-root>/skill-eval-v020-baseline-concurrency-side-effects-generic-clean-code-r02/.benchmark-subject-report.json",
           "kind": "subject report source",
           "included_in_product_diff": false
         }
@@ -4567,7 +4567,7 @@
         "artifacts/runtime/series-baseline-smoke-cdb5d6f0.db-wal",
         ".benchmark-subject-report.json",
         {
-          "path": "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v020-baseline-concurrency-side-effects-generic-clean-code-r03/.benchmark-subject-report.json",
+          "path": "<fixture-root>/skill-eval-v020-baseline-concurrency-side-effects-generic-clean-code-r03/.benchmark-subject-report.json",
           "kind": "subject report source",
           "included_in_product_diff": false
         }
@@ -4700,11 +4700,11 @@
       "prompt": "當 HTTP 與 Background Worker 同時處理同一筆 Work Item 時避免重複通知。必須保留 Retry 與 Lost ACK 語意，並維持既有 HTTP Contract、取消與儲存順序；需以測試或其他獨立 Oracle 驗證競態下的外部副作用不重複。\n\n額外指示：只允許讀取指定的 clean-code-ai-collaboration v0.1.0 Fixture 與其任務相關參考文件，並完整遵循該 Skill。",
       "prompt_provenance": "Manifest task plus documented arm instruction; the Collaboration API did not expose a byte-for-byte dispatch envelope.",
       "loaded_skill_references": [
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/SKILL.md",
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/references/repository-context-template.md",
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/references/testing-and-change-safety.md",
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/references/design-and-dependency-boundaries.md",
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/references/review-output-contract.md"
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/SKILL.md",
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/references/repository-context-template.md",
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/references/testing-and-change-safety.md",
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/references/design-and-dependency-boundaries.md",
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/references/review-output-contract.md"
       ],
       "raw_output": "## Applicable References\n\n- clean-code-ai-collaboration/SKILL.md\n- references/repository-context-template.md\n- references/testing-and-change-safety.md\n- references/design-and-dependency-boundaries.md\n- references/review-output-contract.md\n\n## Repository Facts Used\n\n- F1: Revision be987152555b651532e4ba68ba1029aa777fb40e. HTTP POST /api/work-items/process-overdue and Background Worker both resolve IOverdueWorkItemProcessor; sources: WorkItemsController.cs, OverdueProcessingWorker.cs, Program.cs.\n- F2: The query intentionally includes already-Overdue items, so a later run retries notification; source: OverdueWorkItemProcessor.cs and existing retry characterization test.\n- F3: Notification occurs before SaveChangesAsync; false results still save Overdue, while exceptions and cancellation do not save; sources: OverdueWorkItemProcessor.cs and ProcessOverdueBehaviorTests.cs.\n- F4: Before this change, two scoped processors can both read Open and each call the notification gateway before either saves. E1 reproduced two external notifications.\n- F5: HTTP route, response DTO fields, status code, cancellation token propagation, and notification-before-save order are covered by existing tests.\n\n## Assumptions\n\n- A1: HTTP and Background Worker run in the same application process and share the singleton DI container. Impact: the selected claim registry does not coordinate multiple replicas. Validate with deployment topology.\n\n## Unknowns\n\n- U1: Multi-instance deployment topology was not investigated. Critical only if more than one API process can process the same SQLite-backed work item. Responsible Owner: application/deployment owner. Next action: confirm topology before claiming cross-instance exactly-once behavior.\n\n## Options Considered\n\n- O1: Singleton per-Work-Item in-flight claim, held through SaveChanges and released in finally. Cost: one small registry and claim plumbing. Risk: process-local only. Fit: one API process with HTTP and hosted worker. Selected.\n- O2: Coalesce or serialize the whole ProcessAsync call. Cost: simpler keying but unrelated work items block or share a potentially stale summary. Rejected because the requirement is per Work Item and HTTP summaries could stop representing that invocation.\n- O3: Database claim/outbox/idempotency schema. Cost: migration, persistence-contract and operational changes. Fit: multiple replicas or durable delivery guarantees. Rejected because it exceeds the current schema/deployment boundary and could change the required notification-before-save semantics.\n\n## Selected Option and Reason\n\nO1 was selected using F1-F4 and A1: it closes the observed same-process race for the same Work Item without serializing unrelated items. Claims remain held until the existing SaveChanges completes and are released on success, false notification, exception, or cancellation, so F2/F3 Retry and Lost ACK behavior remains. E1-E6 validate the chosen boundary. U1 remains an explicit deployment limitation.\n\n## When Other Options Fit Better\n\nO3 is preferable if U1 confirms multiple application processes or if durable cross-restart deduplication becomes required. O2 could fit a tiny batch where all concurrent callers are intentionally required to share one batch result, which is not the current HTTP behavior.\n\n## Behavior That Must Not Change\n\n- POST route, 200 response, ProcessOverdueResponse JSON shape and existing statistics outside an overlapping claim.\n- Later sequential retries notify already-Overdue items again.\n- Lost ACK remains at-least-once: an ambiguous notification exception releases the claim and a later run retries.\n- Cancellation propagates to notification and SaveChanges; canceled/throwing notification does not persist status.\n- Notification stays before status persistence; false notification still persists Overdue.\n\n## Expected Diff Boundary\n\nProduction: in-memory claim registry, processor claim lifecycle, singleton registration. Tests: deterministic HTTP plus actual Background Worker overlap Oracle and Lost ACK retry Oracle. No route, DTO, schema, package, config, deployment, commit, push, or external data change.\n\n## Actual Diff Boundary and Deviations\n\nModified OverdueWorkItemProcessor.cs, Program.cs, ProcessOverdueBehaviorTests.cs; added WorkItemProcessingClaimRegistry.cs and this untracked report. Smoke created ignored runtime logs/databases. No functional deviation from the expected boundary. A public registry type was required by the existing public processor primary constructor and Microsoft DI construction; TryAcquire remains internal.\n\n## Validation Plan\n\nTDD red/green for the race, focused Lost ACK test, full locked restore/build/test, format verification, vulnerable package query, baseline smoke, diff check. Existing full suite serves as Oracles for HTTP contract, cancellation, retry, and persistence order.\n\n## Evidence Produced\n\n- E1: Targeted race test before implementation, exit 2: Expected 1, Actual 2 external notifications.\n- E2: Same targeted race test after implementation, exit 0: 1/1 passed.\n- E3: Lost ACK retry test, exit 0: 1/1 passed and two later-attempt observations.\n- E4: Release build, exit 0: 0 warnings, 0 errors.\n- E5: Full test suite, exit 0: 52 passed, 0 failed, 0 skipped.\n- E6: format verify, exit 0; vulnerable package query, exit 0 with none reported; git diff --check, exit 0.\n- E7: Baseline smoke on isolated port 5201, exit 0; first run on default port 5199 had a transport reset despite normal startup logs and empty stderr.\n\n## Stop or Escalation Conditions\n\nEscalate before claiming multi-instance safety, adding a durable claim/outbox/schema, changing notification provider contracts, changing HTTP response semantics, deploying, or mutating external data.\n\n## Human Decisions Required\n\nConfirm whether production can run multiple API replicas. If yes, choose and authorize a database/outbox/provider-idempotency design; the current implementation intentionally guarantees only same-process HTTP/Worker overlap.",
       "files_inspected": [
@@ -4727,11 +4727,11 @@
         "tests/WorkItems.Api.Tests/WorkItems.Api.Tests.csproj",
         "scripts/run-series-baseline-smoke.ps1",
         "scripts/test-series-baseline-api.ps1",
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/SKILL.md",
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/references/repository-context-template.md",
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/references/testing-and-change-safety.md",
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/references/design-and-dependency-boundaries.md",
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/references/review-output-contract.md"
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/SKILL.md",
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/references/repository-context-template.md",
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/references/testing-and-change-safety.md",
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/references/design-and-dependency-boundaries.md",
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/references/review-output-contract.md"
       ],
       "files_modified": [
         "src/WorkItems.Api/OverdueWorkItemProcessor.cs",
@@ -4814,7 +4814,7 @@
         },
         {
           "source": "subject",
-          "command": "Get-Content -Raw -Encoding UTF8 D:\\MySelf\\AI-CleanCode\\.worktrees\\skill-eval-v010-fixture\\clean-code-ai-collaboration\\SKILL.md",
+          "command": "Get-Content -Raw -Encoding UTF8 <fixture-root>/skill-eval-v010-fixture\\clean-code-ai-collaboration\\SKILL.md",
           "exit_code": 0,
           "observed_result": "Full Path selected"
         },
@@ -5058,7 +5058,7 @@
         "artifacts/runtime/series-baseline-smoke-572a13b8.db-shm",
         "artifacts/runtime/series-baseline-smoke-572a13b8.db-wal",
         {
-          "path": "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v020-baseline-concurrency-side-effects-skill-v0.1.0-r01/.benchmark-subject-report.json",
+          "path": "<fixture-root>/skill-eval-v020-baseline-concurrency-side-effects-skill-v0.1.0-r01/.benchmark-subject-report.json",
           "kind": "subject report source",
           "included_in_product_diff": false
         }
@@ -5365,7 +5365,7 @@
           "included_in_product_diff": false
         },
         {
-          "path": "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v020-baseline-context-locality-control-r01/.benchmark-subject-report.json",
+          "path": "<fixture-root>/skill-eval-v020-baseline-context-locality-control-r01/.benchmark-subject-report.json",
           "kind": "subject report source",
           "included_in_product_diff": false
         }
@@ -5722,7 +5722,7 @@
         "Uncommitted diff for src/WorkItems.Api/WorkItemsController.cs",
         "Uncommitted diff for tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs",
         {
-          "path": "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v020-baseline-context-locality-control-r02/.benchmark-subject-report.json",
+          "path": "<fixture-root>/skill-eval-v020-baseline-context-locality-control-r02/.benchmark-subject-report.json",
           "kind": "subject report source",
           "included_in_product_diff": false
         }
@@ -6091,7 +6091,7 @@
           "description": "repository smoke script 產生且由 gitignore 排除的本機資料庫與 API log；未自行清理。"
         },
         {
-          "path": "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v020-baseline-context-locality-control-r03/.benchmark-subject-report.json",
+          "path": "<fixture-root>/skill-eval-v020-baseline-context-locality-control-r03/.benchmark-subject-report.json",
           "kind": "subject report source",
           "included_in_product_diff": false
         }
@@ -6398,7 +6398,7 @@
           "excluded_from_product_diff": true
         },
         {
-          "path": "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v020-baseline-context-locality-generic-clean-code-r01/.benchmark-subject-report.json",
+          "path": "<fixture-root>/skill-eval-v020-baseline-context-locality-generic-clean-code-r01/.benchmark-subject-report.json",
           "kind": "subject report source",
           "included_in_product_diff": false
         }
@@ -6719,7 +6719,7 @@
       "artifacts": [
         ".benchmark-subject-report.json",
         {
-          "path": "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v020-baseline-context-locality-generic-clean-code-r02/.benchmark-subject-report.json",
+          "path": "<fixture-root>/skill-eval-v020-baseline-context-locality-generic-clean-code-r02/.benchmark-subject-report.json",
           "kind": "subject report source",
           "included_in_product_diff": false
         }
@@ -7052,7 +7052,7 @@
         "artifacts/runtime/series-baseline-smoke-f6df346c.db-shm",
         "artifacts/runtime/series-baseline-smoke-f6df346c.db-wal",
         {
-          "path": "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v020-baseline-context-locality-generic-clean-code-r03/.benchmark-subject-report.json",
+          "path": "<fixture-root>/skill-eval-v020-baseline-context-locality-generic-clean-code-r03/.benchmark-subject-report.json",
           "kind": "subject report source",
           "included_in_product_diff": false
         }
@@ -7177,10 +7177,10 @@
       "prompt": "調整 High Priority 工作項目的逾期判斷，使其延後兩小時才視為逾期。必須保留既有 HTTP Contract、通知、取消與儲存順序；不得以重寫無關流程取代局部規則。\n\n額外指示：只允許讀取指定的 clean-code-ai-collaboration v0.1.0 Fixture 與其任務相關參考文件，並完整遵循該 Skill。",
       "prompt_provenance": "Manifest task plus documented arm instruction; the Collaboration API did not expose a byte-for-byte dispatch envelope.",
       "loaded_skill_references": [
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/SKILL.md",
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/references/repository-context-template.md",
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/references/testing-and-change-safety.md",
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/references/review-output-contract.md"
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/SKILL.md",
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/references/repository-context-template.md",
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/references/testing-and-change-safety.md",
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/references/review-output-contract.md"
       ],
       "raw_output": "## Applicable References\n\n- clean-code-ai-collaboration v0.1.0：Full Path。\n- repository-context-template.md：盤點 revision、契約、副作用、資料與驗證邊界。\n- testing-and-change-safety.md：以時間邊界測試先紅後綠，並保留副作用順序。\n- review-output-contract.md：本報告依其必要章節與穩定識別碼整理。\n\n## Repository Facts Used\n\n- F1：起始 revision 為 1583af33b5e517530871ff3ee724cdcad4e4c5c0，起始 git status 為乾淨；來源為 git rev-parse HEAD 與 git status --short。\n- F2：src/WorkItems.Api/WorkItemsController.cs:149-209 的 POST /api/work-items/process-overdue 先查詢項目、逐筆改狀態並通知，最後才在第 187 行 SaveChangesAsync；CancellationToken 傳到 EF 與通知 Gateway。\n- F3：原逾期條件為 Status != Completed 且 DueAtUtc <= currentUtc；Priority 僅有 Normal 與 High，DueAtUtc 具 UTC 語意並以 Unix milliseconds 儲存。\n- F4：tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs 既有測試固定 HTTP 200、摘要欄位、重複通知、通知失敗仍儲存，以及通知早於儲存。\n- F5：Repository instructions 明令保留 HTTP Contract、通知次數、失敗順序、取消與儲存順序，不為此局部規則新增 Service、Repository、Outbox 或套件。\n\n## Assumptions\n\n- A1：『延後兩小時才視為逾期』解讀為 High 項目在 DueAtUtc + 2 小時等於 currentUtc 時即逾期，沿用既有 <= 的包含邊界；新增的精確邊界測試驗證此解讀。若產品 Owner 要求必須嚴格晚於兩小時，需把邊界改為 < 並調整測試。\n\n## Unknowns\n\n- None — Sources checked: AGENTS.md、README.md、WorkItemsController.cs、ProcessOverdueBehaviorTests.cs、WorkItemsApiFactory.cs、test-series-baseline-api.ps1。Repository 明載此 Solution 沒有雲端部署，未發現會改變本次局部決策的 critical unknown。\n\n## Options Considered\n\n- O1：在既有 EF 查詢中使用 High 專屬 cutoff（currentUtc - 2 小時），其他優先序沿用 currentUtc。成本低、SQL 可翻譯、Diff 局部，風險是未來規則增加時條件式會成長。已選。\n- O2：先把所有已到期項目載入記憶體再依 Priority 過濾。會載入不應處理的資料，且把資料庫可完成的篩選移到記憶體；本次拒絕。只有 Provider 無法翻譯必要條件且資料量有明確上限時才較合適。\n- O3：新增逾期 Policy/Service 抽象。會擴大架構與檔案責任，違反 Repository 對單純局部變更的限制；本次拒絕。當優先序規則、日曆或 Provider 增加且有重複呼叫端時才較合適。\n\n## Selected Option and Reason\n\n- 選擇 O1。依 F2、F3、F5，只修改既有查詢的資格判斷，讓 High 使用 currentUtc - 2 小時 cutoff，Normal 與其他既有值仍使用 currentUtc。A1 的包含邊界由 E1、E2 驗證；EF Core/SQLite 翻譯由 E2、E5 證明實際可執行。此方案保留後續通知、取消與儲存流程原位。\n\n## When Other Options Fit Better\n\n- O2 僅在資料 Provider 無法翻譯規則且候選集合有受證明的小上限時考慮。\n- O3 僅在逾期規則跨多個呼叫端、優先序或日曆策略持續增加時考慮。\n\n## Behavior That Must Not Change\n\n- POST /api/work-items/process-overdue 的 Route、Method、HTTP 200、Response DTO 與 JSON 欄位。\n- Normal 項目在 DueAtUtc <= currentUtc 時逾期，Completed 項目不處理。\n- 符合新 cutoff 的既有 Overdue 項目重跑時仍再次通知。\n- 狀態先在追蹤實體變更、接著逐筆通知、最後單次 SaveChangesAsync；通知失敗仍儲存，CancellationToken 繼續向下傳遞。\n\n## Expected Diff Boundary\n\n- Production：只改 src/WorkItems.Api/WorkItemsController.cs 的逾期查詢條件。\n- Tests：只在 ProcessOverdueBehaviorTests.cs 增加 High 兩小時邊界測試，並讓既有測試 helper 可指定 Priority。\n- Harness：產品根的 .benchmark-subject-report.json，排除產品 Diff。\n\n## Actual Diff Boundary and Deviations\n\n- 產品 Diff 僅有上述兩個檔案：WorkItemsController.cs 7 行局部查詢調整；ProcessOverdueBehaviorTests.cs 新增一個 2 小時邊界行為測試與 helper 的 optional priority。無偏離。\n- .benchmark-subject-report.json 為指定 Harness artifact，不列入產品 Diff。\n\n## Validation Plan\n\n- 先讓 High 在 2 小時差 1ms、恰好 2 小時、以及 Normal 恰好到期的整合測試於舊程式失敗，再做最小 Production 修改。\n- 跑 locked restore、Release build、完整 tests、format、套件弱點掃描與實際 API smoke。\n- 最後檢查 git diff --check、status 與產品 Diff 檔名。\n\n## Evidence Produced\n\n- E1：dotnet test .\\AiCleanCode.sln --configuration Release --no-restore；Windows/.NET 10，exit 1；新增測試 Expected 2 / Actual 3，7 passed、1 failed，證明舊規則未延後 High。限制：完整 Runner 外層只回傳一般失敗碼，內部測試平台報告 exit 2。\n- E2：同命令套用 Production 修改後 exit 0；8/8 tests passed。限制：涵蓋測試 Oracle，不代表所有時間/取消失敗窗。\n- E3：dotnet restore --locked-mode exit 0；兩專案還原成功。dotnet build Release --no-restore exit 0；0 warnings、0 errors。\n- E4：dotnet test --no-build Release exit 0；8/8 tests passed。dotnet format --verify-no-changes --no-restore exit 0。\n- E5：dotnet list package --vulnerable --include-transitive exit 0；未發現來源提供的易受攻擊套件。run-series-baseline-smoke.ps1 exit 0；首次 processed/notification 均為 2，第二次 processed 0、notification 2，duplicate notification observed=true。\n- E6：git diff --check exit 0；git diff --name-only 僅列兩個產品檔案。\n\n## Stop or Escalation Conditions\n\n- 若 Owner 對『兩小時』要求嚴格大於而非包含等於，依 A1 停止並調整契約測試。\n- 若實際部署存在已被舊規則標成 Overdue、但仍在新 High 延後期間內的資料，需要 Owner 決定是否回填狀態；本工作單未授權資料修正。\n- 若未來需要多種延後規則或商務日曆，另開架構工作，不在此 Diff 內提前抽象化。\n\n## Human Decisions Required\n\n- None for the authorized repository change. A1 的邊界解讀已用既有 <= 語意與測試固定；沒有 commit、部署或資料變更。\n\n## 未執行項目\n\n- 未 commit、push、部署或修改任何外部/正式資料。\n- 未執行 Production/DEV authenticated UAT；Repository 明載沒有雲端部署。\n- 未執行 mutation testing、通知拋例外或 CancellationToken 中斷注入測試；相關既有控制流程未修改。\n- 未對既有資料做狀態 migration 或回填。",
       "files_inspected": [
@@ -7190,10 +7190,10 @@
         "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs",
         "tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs",
         "scripts/test-series-baseline-api.ps1",
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/SKILL.md",
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/references/repository-context-template.md",
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/references/testing-and-change-safety.md",
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/references/review-output-contract.md"
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/SKILL.md",
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/references/repository-context-template.md",
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/references/testing-and-change-safety.md",
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/references/review-output-contract.md"
       ],
       "files_modified": [
         "src/WorkItems.Api/WorkItemsController.cs",
@@ -7468,13 +7468,13 @@
       },
       "artifacts": [
         {
-          "path": "D:\\MySelf\\AI-CleanCode\\.worktrees\\skill-eval-v020-baseline-context-locality-skill-v0.1.0-r01\\.benchmark-subject-report.json",
+          "path": "<fixture-root>/skill-eval-v020-baseline-context-locality-skill-v0.1.0-r01\\.benchmark-subject-report.json",
           "type": "benchmark harness report",
           "encoding": "UTF-8",
           "excluded_from_product_diff": true
         },
         {
-          "path": "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v020-baseline-context-locality-skill-v0.1.0-r01/.benchmark-subject-report.json",
+          "path": "<fixture-root>/skill-eval-v020-baseline-context-locality-skill-v0.1.0-r01/.benchmark-subject-report.json",
           "kind": "subject report source",
           "included_in_product_diff": false
         }
@@ -7852,7 +7852,7 @@
           "description": "Untracked benchmark subject report for dependency-boundary-control-r01."
         },
         {
-          "path": "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v020-baseline-dependency-boundary-control-r01/.benchmark-subject-report.json",
+          "path": "<fixture-root>/skill-eval-v020-baseline-dependency-boundary-control-r01/.benchmark-subject-report.json",
           "kind": "subject report source",
           "included_in_product_diff": false
         }
@@ -8201,7 +8201,7 @@
         "tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs",
         ".benchmark-subject-report.json",
         {
-          "path": "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v020-baseline-dependency-boundary-control-r02/.benchmark-subject-report.json",
+          "path": "<fixture-root>/skill-eval-v020-baseline-dependency-boundary-control-r02/.benchmark-subject-report.json",
           "kind": "subject report source",
           "included_in_product_diff": false
         }
@@ -8584,7 +8584,7 @@
           "description": "本次 control run 的執行、驗證與限制報告。"
         },
         {
-          "path": "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v020-baseline-dependency-boundary-control-r03/.benchmark-subject-report.json",
+          "path": "<fixture-root>/skill-eval-v020-baseline-dependency-boundary-control-r03/.benchmark-subject-report.json",
           "kind": "subject report source",
           "included_in_product_diff": false
         }
@@ -8957,7 +8957,7 @@
           "description": "未追蹤的正式隔離基準實驗 Subject 報告。"
         },
         {
-          "path": "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v020-baseline-dependency-boundary-generic-clean-code-r01/.benchmark-subject-report.json",
+          "path": "<fixture-root>/skill-eval-v020-baseline-dependency-boundary-generic-clean-code-r01/.benchmark-subject-report.json",
           "kind": "subject report source",
           "included_in_product_diff": false
         }
@@ -9344,7 +9344,7 @@
         "artifacts/runtime/series-baseline-smoke-09bcfa07.db-wal",
         ".benchmark-subject-report.json",
         {
-          "path": "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v020-baseline-dependency-boundary-generic-clean-code-r02/.benchmark-subject-report.json",
+          "path": "<fixture-root>/skill-eval-v020-baseline-dependency-boundary-generic-clean-code-r02/.benchmark-subject-report.json",
           "kind": "subject report source",
           "included_in_product_diff": false
         }
@@ -9685,7 +9685,7 @@
         "tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs",
         ".benchmark-subject-report.json",
         {
-          "path": "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v020-baseline-dependency-boundary-generic-clean-code-r03/.benchmark-subject-report.json",
+          "path": "<fixture-root>/skill-eval-v020-baseline-dependency-boundary-generic-clean-code-r03/.benchmark-subject-report.json",
           "kind": "subject report source",
           "included_in_product_diff": false
         }
@@ -9810,11 +9810,11 @@
       "prompt": "新增可替換的通知 Provider，讓 Use Case 不依賴特定通知實作。必須保留既有 API、通知失敗語意與 Consumer 所需契約；只新增支撐這個變更來源的抽象與 Contract Tests，不得擴散至無關層。\n\n額外指示：只允許讀取指定的 clean-code-ai-collaboration v0.1.0 Fixture 與其任務相關參考文件，並完整遵循該 Skill。",
       "prompt_provenance": "Manifest task plus documented arm instruction; the Collaboration API did not expose a byte-for-byte dispatch envelope.",
       "loaded_skill_references": [
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/SKILL.md",
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/references/repository-context-template.md",
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/references/testing-and-change-safety.md",
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/references/design-and-dependency-boundaries.md",
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/references/review-output-contract.md"
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/SKILL.md",
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/references/repository-context-template.md",
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/references/testing-and-change-safety.md",
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/references/design-and-dependency-boundaries.md",
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/references/review-output-contract.md"
       ],
       "raw_output": "## Applicable References\nclean-code-ai-collaboration/SKILL.md、repository-context-template.md、testing-and-change-safety.md、design-and-dependency-boundaries.md、review-output-contract.md。\n\n## Repository Facts Used\nF1: 起始 revision 是 ccbc136daa59cfcd430d44ebd4cb62b57b4ab72d；初始工作樹無修改。\nF2: OverdueWorkItemProcessor 依賴既有 INotificationGateway，而非 DemoNotificationGateway。\nF3: INotificationGateway 的 Consumer 契約包含一般與升級通知、bool 成敗結果及 CancellationToken。\nF4: 既有行為測試固定 false 統計、例外與取消向上傳遞、通知早於儲存、重跑再次通知及 HTTP 回應契約。\nF5: DemoNotificationGateway 原先直接讀取 WorkItem.Title，並以 OrdinalIgnoreCase 比對 [notify-fail]。\n\n## Assumptions\nA1: Provider 目前只需 WorkItemId、Title 與通知種類；此判斷來自既有兩個 Gateway 方法、Demo 實作與測試觀察。若未來真實供應商需要收件人或本文，應在選定供應商時擴充 Provider contract，而不是預先猜測。\n\n## Unknowns\nU1: 未指定真實外部通知供應商、認證、重試或 SLA；對本次建立可替換邊界不是 critical unknown。Owner 應在導入真實 Provider 前定義並以該 Provider 的 Contract／Integration Tests 驗證。\n\n## Options Considered\nO1: 保留 INotificationGateway 作為 Consumer contract，在 Notifications 內新增 IOverdueNotificationProvider、最小 payload、Gateway adapter 與 Demo provider；成本是多一個局部轉接點，風險低，能讓 Provider 替換不影響 Use Case。已選。\nO2: 直接把 OverdueWorkItemProcessor 改依賴新的 Provider；檔案較少，但會改變既有 Consumer contract 並讓 provider payload 進入 Use Case，因工作單要求保留 Consumer 契約而拒絕。\nO3: 新增第二個真實 Provider、Outbox、重試或新專案；只有在供應商與可靠性需求已核准時較適合，本次會擴散至無關層而拒絕。\n\n## Selected Option and Reason\n選擇 O1。它依 F2、F3、F4 保留 Use Case 與通知失敗語意，依 F5 將既有 Demo 行為移到可替換 Provider；A1 的 payload 決策保持可逆，U1 不阻擋此局部邊界。驗證證據見 E1-E6。\n\n## When Other Options Fit Better\nO2 只在 Owner 明確允許改變 INotificationGateway Consumer contract 時較適合。O3 只在真實供應商、可靠性與部署需求明確且另行授權時較適合。\n\n## Behavior That Must Not Change\nHTTP Route、Method、Status Code、DTO／JSON、驗證訊息；一般與升級通知選擇；false 計入失敗但仍儲存 Overdue；例外／取消不儲存；通知早於儲存；重跑再次通知；CancellationToken 向下傳遞。\n\n## Expected Diff Boundary\n僅 Notifications 內的 provider contract、adapter／Demo provider、DI composition 與對應 Contract Tests。\n\n## Actual Diff Boundary and Deviations\n修改 NotificationGateway.cs、Program.cs；新增 NotificationProvider.cs、NotificationProviderContractTests.cs 與本報告。OverdueWorkItemProcessor、Controller、DTO、資料模型、資料庫、套件及部署均未修改。無偏離。\n\n## Validation Plan\n先確認 31 個基準測試，再驗證 provider success／false／case-insensitive failure／cancellation、Gateway payload mapping／false／exception propagation；最後執行 Repository 全套 restore、build、test、format、vulnerability 與 smoke gates。\n\n## Evidence Produced\nE1: baseline dotnet test，exit 0，31/31 passed；限制是僅涵蓋既有 Oracle。\nE2: locked restore，exit 0。\nE3: Release build，exit 0，0 warning、0 error。\nE4: Release tests，exit 0，38/38 passed；新增 7 個 theory case／fact 執行結果。\nE5: dotnet format verify、git diff --check，exit 0。\nE6: vulnerable package check 無已知漏洞；series baseline smoke exit 0，首次處理 2／通知 2、第二次處理 0／通知 2。限制是無真實外部 Provider。\n\n## Stop or Escalation Conditions\n若要改 HTTP／DTO／資料庫、引入真實供應商、重試、Outbox、部署或外部副作用，必須停止並取得 Owner 授權。本次未觸發。\n\n## Human Decisions Required\n目前工作項目無阻擋決策。導入真實 Provider 前，Owner 仍需決定供應商、認證、payload、錯誤映射、重試與營運責任。",
       "files_inspected": [
@@ -9832,11 +9832,11 @@
         "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs",
         "tests/WorkItems.Api.Tests/WorkItemsContractTests.cs",
         "tests/WorkItems.Api.Tests/WorkItems.Api.Tests.csproj",
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/SKILL.md",
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/references/repository-context-template.md",
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/references/testing-and-change-safety.md",
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/references/design-and-dependency-boundaries.md",
-        "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/references/review-output-contract.md"
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/SKILL.md",
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/references/repository-context-template.md",
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/references/testing-and-change-safety.md",
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/references/design-and-dependency-boundaries.md",
+        "<fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/references/review-output-contract.md"
       ],
       "files_modified": [
         "src/WorkItems.Api/Notifications/NotificationGateway.cs",
@@ -9915,7 +9915,7 @@
         },
         {
           "source": "subject",
-          "command": "Get-Content -Raw -Encoding UTF8 D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v010-fixture/clean-code-ai-collaboration/SKILL.md",
+          "command": "Get-Content -Raw -Encoding UTF8 <fixture-root>/skill-eval-v010-fixture/clean-code-ai-collaboration/SKILL.md",
           "exit_code": 0,
           "observed_result": "讀取唯一允許 Skill，選擇 Full Path。"
         },
@@ -10080,7 +10080,7 @@
         "NotificationProviderContractTests（success、false、case-insensitive failure、cancellation、mapping、exception）",
         ".benchmark-subject-report.json",
         {
-          "path": "D:/MySelf/AI-CleanCode/.worktrees/skill-eval-v020-baseline-dependency-boundary-skill-v0.1.0-r01/.benchmark-subject-report.json",
+          "path": "<fixture-root>/skill-eval-v020-baseline-dependency-boundary-skill-v0.1.0-r01/.benchmark-subject-report.json",
           "kind": "subject report source",
           "included_in_product_diff": false
         }

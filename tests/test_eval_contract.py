@@ -1171,6 +1171,26 @@ class EvalContractTests(unittest.TestCase):
 
         self.assertEqual([], failures, "\n".join(failures))
 
+    def test_public_result_files_do_not_expose_personal_paths(self) -> None:
+        result_paths = sorted((EVAL_ROOT / "results").glob("*.json"))
+        unix_home_pattern = r"(?<![A-Za-z0-9._-])/(?:Users|home)/"
+
+        self.assertTrue(result_paths)
+        self.assertRegex('"/home/example/project"', unix_home_pattern)
+        self.assertRegex('"cd /Users/example/project"', unix_home_pattern)
+        self.assertNotRegex('"src/home/index.cs"', unix_home_pattern)
+        self.assertNotRegex('"docs/Users/guide.md"', unix_home_pattern)
+        for result_path in result_paths:
+            serialized = result_path.read_text(encoding="utf-8")
+            with self.subTest(result=result_path.name):
+                self.assertNotRegex(
+                    serialized,
+                    r"(?<![A-Za-z0-9])[A-Za-z]:[\\/]",
+                )
+                self.assertNotRegex(serialized, unix_home_pattern)
+                self.assertNotIn("erichuang", serialized.lower())
+                self.assertNotIn("kcislk", serialized.lower())
+
 
 if __name__ == "__main__":
     unittest.main()
