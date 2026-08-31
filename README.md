@@ -153,7 +153,7 @@ mkdir -p "$skills_root"
 cp -R "./clean-code-ai-collaboration" "$target"
 ```
 
-目前公開評測會在 Prompt 中明確載入這個 Skill，Codex adapter 的結構也已通過契約測試。自動偵測、implicit invocation 與重新啟動行為尚待實機驗證；如果 Skill 清單沒有出現，請先重新啟動 Codex，再確認安裝路徑。
+安裝完成後，建議先在任務中明確指定 `$clean-code-ai-collaboration`，再依實際需求補上 Repository 路徑、修改範圍與驗收條件。目前公開評測同樣採用明確載入方式，Codex adapter 的結構也已通過契約測試。自動偵測、implicit invocation 與重新啟動行為尚待實機驗證；如果 Skill 清單沒有出現，請先重新啟動 Codex，再確認安裝路徑。
 
 ### Client 支援狀態
 

@@ -282,6 +282,10 @@ class SkillContractTests(unittest.TestCase):
             "自動偵測、implicit invocation 與重新啟動行為尚待實機驗證",
             readme,
         )
+        self.assertIn(
+            "安裝完成後，建議先在任務中明確指定 `$clean-code-ai-collaboration`",
+            readme,
+        )
         self.assertIn("請先確認內容，不要直接覆寫", readme)
         self.assertIn("內容與格式", readme)
         self.assertIn("尚未完成實機驗證", readme)
