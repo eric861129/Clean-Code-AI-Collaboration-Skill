@@ -12,19 +12,26 @@ metadata:
 
 ## Core Principle
 
-The repository provides facts; Clean Code provides quality judgment. CLEAN controls collaboration responsibilities between the User and Agent. Repository facts override examples in this Skill. Evidence supports a decision but does not enlarge authorization.
+Repository facts control Context; Clean Code supplies quality judgment; CLEAN defines User-Agent responsibilities. Evidence supports decisions, never authorization.
 
 ## Path Selection
 
-Evaluate Full Audit first, then Standard, then Lightweight. New evidence may upgrade a path; it must not downgrade one to shorten the report.
+Evaluate Full Audit, then Standard, then Lightweight. Evidence may upgrade a path; it must not downgrade one to shorten the report.
 
-- **Full Audit Path:** use for a public contract, production data or migration, external side effect, third-party dependency change, concurrency, security, privilege, CI, infrastructure, deployment, destructive action, unclear authority, formal audit, material trade-off, or critical unknown. Read [repository-context-template.md](references/repository-context-template.md).
+- **Full Audit Path:** use for a public contract, production data or migration, external side effect, dependency change, concurrency, security, privilege, CI, infrastructure, deployment, destructive action, unclear authority, formal audit, material trade-off, or critical unknown. Read [repository-context-template.md](references/repository-context-template.md).
 - **Standard Path:** use for a repository feature, test, defect, refactor, or internal design change with known ownership, authorization, behavior boundary, and executable gates.
 - **Lightweight Path:** use only for a local, reversible readability change with no behavior, contract, data, side effect, dependency, ownership, or deployment impact and one obvious option.
 
+## Delivery Readiness
+
+- **Prototype:** answer one isolated, disposable question with a repeatable Oracle; list remaining Production-Ready gates.
+- **Production-Ready:** satisfy repository policy and relevant executable gates; report deployment, UAT, and validation blind spots.
+
+Readiness never lowers risk or authorization. A Prototype touching production data, public contracts, providers, security, or external effects still uses Full Audit.
+
 ## Reference Routing
 
-Read [clean-code-for-agent-legibility.md](references/clean-code-for-agent-legibility.md) first when judging whether code lets an Agent find, change, validate, and explain the relevant behavior. Load only references that change the current decision:
+Read [clean-code-for-agent-legibility.md](references/clean-code-for-agent-legibility.md) when judging whether an Agent can find, change, validate, and explain behavior. Load other references only when relevant:
 
 - Code structure or naming: [code-readability.md](references/code-readability.md)
 - Tests, defects, refactoring, or risky behavior: [testing-and-change-safety.md](references/testing-and-change-safety.md)
@@ -34,19 +41,19 @@ Read [clean-code-for-agent-legibility.md](references/clean-code-for-agent-legibi
 
 ## CLEAN Lenses
 
-Use CLEAN as the User's review lens for an Agent's work. It is not a score that claims automatic compliance.
+Use CLEAN as the User's review lens, not an automatic-compliance score.
 
-- **C — Context-Aware Code（情境感知）:** establish Context from repository facts before change.
-- **L — Localized Change（局部變更）:** state the Expected Diff and keep the change boundary local.
-- **E — Explicit Intent and Boundaries（意圖明確）:** make Intent, contracts, and ownership visible.
-- **A — Auditable by Evidence（實據可審）:** connect Evidence to validation and known gaps.
-- **N — Non-Surprising Behavior（符合預期）:** preserve Behavior, including failures and side effects.
+- **C — Context-Aware Code（情境感知）:** establish Context from repository facts.
+- **L — Localized Change（局部變更）:** state the Expected Diff and keep it local.
+- **E — Explicit Intent and Boundaries（意圖明確）:** expose Intent, contracts, and ownership.
+- **A — Auditable by Evidence（實據可審）:** connect Evidence to validation gaps.
+- **N — Non-Surprising Behavior（符合預期）:** preserve Behavior, failures, and side effects.
 
 ## Authorization Gate
 
-- **evidence does not grant authority.** Valid authority is the intersection of platform limits, repository instructions, explicit User authorization, and responsible Owner approval.
+- **evidence does not grant authority.** Authority requires platform permission, repository instructions, explicit User authorization, and responsible Owner approval.
 - Without explicit authority, stop before changing a public contract, dependency, production data or migration, external side effect, secret or privilege, CI or infrastructure, deployment, or any destructive operation.
-- When evidence supports a change outside the authorized boundary, analyze it, propose a Diff or decision, name the required Owner, and leave the external state unchanged.
+- For out-of-scope changes, analyze, propose a Diff, name the Owner, and leave external state unchanged.
 - Stop for conflicting instructions, a critical unknown, or high-risk behavior that available evidence cannot validate.
 
 ## Required Output

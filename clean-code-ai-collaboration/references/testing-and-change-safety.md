@@ -8,6 +8,21 @@ Use this reference for a feature, defect, refactor, acceptance outcome, side eff
 
 Choose an observable behavior and an independent Oracle before selecting a development rhythm. Existing tests are evidence of covered behavior; they can also preserve an old misunderstanding.
 
+## Executable Gate Routing
+
+Inventory existing repository gates before selecting validation. Use the smallest set that observes the actual risk; do not install a fashionable tool or change CI without authorization.
+
+| Gate | Use it for | It does not prove |
+| --- | --- | --- |
+| Formatter and Linter | Repository-defined formatting and mechanical style | Behavior, data, or side-effect correctness |
+| Static Analysis and Architecture Test | Type, dependency, complexity, nullability, security, or layer rules the analyzer actually implements | Requirements absent from the configured rules |
+| Build | Compilation, packaging, and configured build checks | Runtime behavior or deployment success |
+| Unit, Integration, Contract, and E2E Test | Observable behavior at the boundary each test executes | Untested failures, environments, or consumers |
+| Dependency and Security Scan | Known issues in the scanned dependency and configuration scope | Unknown vulnerabilities or authorization to upgrade |
+| Coverage and Mutation Test | Execution reach and whether selected code changes are detected | A reliable Oracle or correct business expectation |
+
+A Prototype requires a repeatable Oracle for its experiment and a list of Production-Ready gates not run. Production-Ready work runs all repository-required gates relevant to the Diff. Record every executed command, environment, exit code, result, and limitation; record a required gate not run as a validation blind spot.
+
 ## Selection Rules
 
 | Decision | Apply it when | Choose the alternative when | Checkable output |

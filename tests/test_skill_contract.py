@@ -190,6 +190,38 @@ class SkillContractTests(unittest.TestCase):
         self.assertIn("upgrade", content.lower())
         self.assertIn("must not downgrade", content.lower())
 
+    def test_delivery_readiness_does_not_lower_risk_or_authority(self) -> None:
+        content = SKILL_PATH.read_text(encoding="utf-8")
+        section = content.split("## Delivery Readiness", maxsplit=1)[1]
+        section = section.split("## ", maxsplit=1)[0]
+
+        for term in {"Prototype", "Production-Ready", "Full Audit", "authorization"}:
+            with self.subTest(term=term):
+                self.assertIn(term, section)
+
+    def test_testing_reference_routes_repository_native_gates(self) -> None:
+        content = (
+            SKILL_ROOT / "references" / "testing-and-change-safety.md"
+        ).read_text(encoding="utf-8")
+        gate_section = content.split("## Executable Gate Routing", maxsplit=1)[1]
+        gate_section = gate_section.split("## ", maxsplit=1)[0]
+
+        for term in {
+            "Formatter",
+            "Linter",
+            "Static Analysis",
+            "Build",
+            "Unit",
+            "Integration",
+            "E2E",
+            "Security",
+            "Mutation",
+            "blind spot",
+            "authorization",
+        }:
+            with self.subTest(term=term):
+                self.assertIn(term.lower(), gate_section.lower())
+
     def test_authorization_gate_is_always_loaded(self) -> None:
         content = SKILL_PATH.read_text(encoding="utf-8")
         required_terms = {

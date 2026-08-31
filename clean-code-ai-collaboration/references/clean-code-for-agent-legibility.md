@@ -16,6 +16,10 @@ Use this reference when a request requires an Agent to locate the relevant behav
 
 Over-abstraction can hide a local decision behind indirection. Incorrect names can direct search to the wrong behavior. Stale comments can contradict code. Brittle tests can reward implementation shape instead of behavior. Documentation drift can turn a once-correct route into misleading Context. Treat each as a reason to narrow the claim, inspect evidence, or stop.
 
+## Delivery-Stage Judgment
+
+A Prototype needs enough naming, cohesion, and executable evidence to make the experiment understandable and repeatable; it does not need speculative production abstractions. Production-Ready work must satisfy repository policy and relevant quality gates. In both stages, reject an abstraction that only adds navigation, mapping, synchronization, or Context cost without protecting a known change source.
+
 ## Evidence Questions
 
 - Which repository files, callers, tests, configuration, or contracts establish the relevant Context?
