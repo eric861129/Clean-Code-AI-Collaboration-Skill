@@ -196,6 +196,27 @@ class SkillContractTests(unittest.TestCase):
 
         self.assertIn("$clean-code-ai-collaboration", content)
 
+    def test_codex_adapter_exposes_open_core_work_types_and_guardrails(self) -> None:
+        content = (SKILL_ROOT / "agents" / "openai.yaml").read_text(encoding="utf-8")
+        required_terms = {
+            'display_name: "Clean Code AI Collaboration"',
+            'short_description: "Use repository-aware Clean Code judgment for AI coding"',
+            "$clean-code-ai-collaboration",
+            "plan",
+            "implement",
+            "review",
+            "repository facts",
+            "behavior gates",
+            "keep the Diff local",
+            "report validation blind spots",
+            "stop at authorization boundaries",
+            "allow_implicit_invocation: true",
+        }
+
+        for term in required_terms:
+            with self.subTest(term=term):
+                self.assertIn(term, content)
+
     def test_v020_metadata_and_clean_lenses_are_discoverable(self) -> None:
         content = SKILL_PATH.read_text(encoding="utf-8")
         frontmatter = re.match(
