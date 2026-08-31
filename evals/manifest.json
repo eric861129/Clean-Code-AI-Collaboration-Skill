@@ -1,6 +1,14 @@
 {
   "schema_version": "1.0",
   "benchmark_version": "0.2.0",
+  "diff_boundary_pattern_semantics": {
+    "version": "regex-fullmatch-v1",
+    "engine": "python-re",
+    "path_format": "repository-relative-posix",
+    "case_sensitive": true,
+    "match_mode": "fullmatch",
+    "check_rename_source_and_destination": true
+  },
   "repository": {
     "url": "https://github.com/eric861129/AI-CleanCode-API-Demo.git",
     "read_only": true
@@ -97,6 +105,16 @@
         "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs",
         "tests/WorkItems.Api.Tests/WorkItemsContractTests.cs"
       ],
+      "allowed_diff_patterns": [
+        "^src/WorkItems[.]Api/(?:Data/WorkItemsDbContext|Models/WorkItem|Notifications/NotificationGateway|OverdueWorkItemProcessor|WorkItemsController)[.]cs$",
+        "^tests/WorkItems[.]Api[.]Tests/(?:ProcessOverdueBehaviorTests|WorkItemsContractTests)[.]cs$"
+      ],
+      "boundary_negative_examples": [
+        "src/WorkItems.Api/Program.cs",
+        "src/WorkItems.Api/HighPriorityPolicy.cs",
+        "tests/WorkItems.Api.Tests/HighPriorityPolicyTests.cs",
+        "scripts/test-series-baseline-api.ps1"
+      ],
       "oracle_commands": [
         "dotnet test AiCleanCode.sln --no-restore",
         "dotnet format AiCleanCode.sln --verify-no-changes --no-restore"
@@ -133,6 +151,15 @@
       "allowed_diff": [
         "src/WorkItems.Api/OverdueWorkItemProcessor.cs",
         "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
+      ],
+      "allowed_diff_patterns": [
+        "^src/WorkItems[.]Api/OverdueWorkItemProcessor[.]cs$",
+        "^tests/WorkItems[.]Api[.]Tests/(?:ProcessOverdue|OverdueProcessing)[A-Za-z0-9]*Tests[.]cs$"
+      ],
+      "boundary_negative_examples": [
+        "src/WorkItems.Api/WorkItemsController.cs",
+        "tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs",
+        "scripts/test-series-baseline-api.ps1"
       ],
       "oracle_commands": [
         "dotnet test AiCleanCode.sln --no-restore",
@@ -175,6 +202,23 @@
         "tests/WorkItems.Api.Tests/NotificationGatewayContractTests.cs",
         "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs",
         "tests/WorkItems.Api.Tests/WorkItemsContractTests.cs"
+      ],
+      "allowed_diff_patterns": [
+        "^src/WorkItems[.]Api/(?:OverdueWorkItemProcessor|Program)[.]cs$",
+        "^src/WorkItems[.]Api/Notifications/(?=[A-Za-z0-9]*(?:OverdueNotification|WorkItemNotification|NotificationProvider|NotificationGateway))(?=[A-Za-z0-9]*(?:Gateway|Provider|Sender))[A-Za-z0-9]+[.]cs$",
+        "^src/WorkItems[.]Api/(?=[A-Za-z0-9]*(?:OverdueNotification|WorkItemNotification))(?=[A-Za-z0-9]*(?:Provider|Sender))[A-Za-z0-9]+[.]cs$",
+        "^src/WorkItems[.]Api/Contracts/(?=[A-Za-z0-9]*(?:NotificationProviderContract|OverdueNotificationContract|WorkItemNotificationContract))[A-Za-z0-9]+[.]cs$",
+        "^tests/WorkItems[.]Api[.]Tests/(?=[A-Za-z0-9]*(?:NotificationProvider|NotificationGateway|OverdueNotificationProvider|WorkItemNotificationSender)ContractTests)[A-Za-z0-9]+[.]cs$",
+        "^tests/WorkItems[.]Api[.]Tests/(?:ProcessOverdueBehaviorTests|WorkItemsContractTests|WorkItemsApiFactory)[.]cs$"
+      ],
+      "boundary_negative_examples": [
+        "src/WorkItems.Api/Contracts/WorkItemContracts.cs",
+        "src/WorkItems.Api/Data/WorkItemsDbContext.cs",
+        "src/WorkItems.Api/Notifications/NotificationTelemetry.cs",
+        "src/WorkItems.Api/Notifications/NotificationTelemetryProvider.cs",
+        "src/WorkItems.Api/Contracts/NotificationTelemetryContract.cs",
+        "tests/WorkItems.Api.Tests/WorkItemContractTests.cs",
+        "scripts/test-series-baseline-api.ps1"
       ],
       "oracle_commands": [
         "dotnet test AiCleanCode.sln --no-restore",
@@ -223,6 +267,20 @@
         "src/WorkItems.Api/Program.cs",
         "tests/WorkItems.Api.Tests/OverdueProcessingWorkerTests.cs",
         "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
+      ],
+      "allowed_diff_patterns": [
+        "^src/WorkItems[.]Api/(?:Data/WorkItemsDbContext|Models/WorkItem|OverdueProcessingOptions|OverdueProcessingWorker|OverdueWorkItemProcessor|Program)[.]cs$",
+        "^src/WorkItems[.]Api/(?=[A-Za-z0-9]*(?:OverdueProcessing|WorkItemProcessing|WorkItemNotification))(?=[A-Za-z0-9]*(?:Coordinator|Registry|Claim|Lease|SingleFlight))[A-Za-z0-9]+[.]cs$",
+        "^tests/WorkItems[.]Api[.]Tests/(?=[A-Za-z0-9]*(?:OverdueProcessing|WorkItemNotification))(?=[A-Za-z0-9]*(?:Concurrent|Concurrency|Race|Claim|Lease))[A-Za-z0-9]*Tests[.]cs$",
+        "^tests/WorkItems[.]Api[.]Tests/(?:OverdueProcessingWorkerTests|ProcessOverdueBehaviorTests|WorkItemsApiFactory)[.]cs$"
+      ],
+      "boundary_negative_examples": [
+        "src/WorkItems.Api/Telemetry.cs",
+        "src/WorkItems.Api/NotificationCoordinator.cs",
+        "src/WorkItems.Api/OverdueTelemetryCoordinator.cs",
+        "tests/WorkItems.Api.Tests/NotificationConcurrencyTests.cs",
+        "tests/WorkItems.Api.Tests/OverdueTelemetryConcurrencyTests.cs",
+        "scripts/test-series-baseline-api.ps1"
       ],
       "oracle_commands": [
         "dotnet test AiCleanCode.sln --no-restore",

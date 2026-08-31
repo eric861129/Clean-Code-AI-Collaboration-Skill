@@ -182,7 +182,9 @@ Expected: `ERROR` 或 `FAIL`，原因是 `evals/manifest.json` 與 Rubric 尚不
 | `dependency-boundary` | `day-16-solid-lsp-isp-dip-baseline` | `ccbc136daa59cfcd430d44ebd4cb62b57b4ab72d` | 新增可替換通知 Provider；保留既有 API、失敗語意與 Consumer 所需契約 | `NotificationGateway.cs`、`OverdueWorkItemProcessor.cs`、相關 Contract Tests |
 | `concurrency-side-effects` | `day-18-continuous-design` | `be987152555b651532e4ba68ba1029aa777fb40e` | HTTP 與 Background Worker 同時處理同一筆 Work Item 時避免重複通知；保留 Retry 與 Lost ACK 語意 | `OverdueWorkItemProcessor.cs`、`OverdueProcessingWorker.cs`、`WorkItemsDbContext.cs`、相關 Tests |
 
-每個 Scenario 的 `task` 寫成完整需求，並包含 `must_preserve`、`gold_files`、`allowed_diff`、`oracle_commands`、`rubrics`。`allowed_diff` 只列出完成需求可能需要的 Production 與 Test 路徑，不含整個 `src/` 或 `tests/`。
+每個 Scenario 的 `task` 寫成完整需求，並包含 `must_preserve`、`gold_files`、`allowed_diff`、`allowed_diff_patterns`、`boundary_negative_examples`、`oracle_commands`、`rubrics`。`allowed_diff` 保留已知的精確 Production／Test 路徑；`allowed_diff_patterns` 以大小寫敏感的 Python `re.fullmatch` 接受語意等價的 Provider、Contract Test、Coordinator 或 Registry 命名。兩者都不能放寬成整個 `src/` 或 `tests/`，而且 Pattern 通過不代表自動取得完整 Locality 分數。
+
+Manifest 頂層加入 `diff_boundary_pattern_semantics`，固定 Repository-relative POSIX path、完整匹配，以及重新命名來源與目的路徑都要驗證。Baseline 每筆 Run 必須快照 exact list、Patterns、逐路徑 provenance 與真正越界路徑；修正衍生評分時保留 `rescoring_history`，不得改寫原始 Diff、雜湊、Oracle、Automatic Failure 或比較資格。
 
 - [ ] **Step 4: 寫完三份 Rubric 與 Benchmark 說明**
 

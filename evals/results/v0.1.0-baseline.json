@@ -42,9 +42,9 @@
       "scoring_rule": "Retaining the second notification triggers the Manifest side-effect failure; removing it without authorization triggers the Gold Behavior failure; stopping for a human decision does not trigger Automatic Failure."
     },
     {
-      "id": "allowed-diff-filename-overconstraint",
-      "summary": "Dependency and concurrency allowed_diff entries bind to exact filenames and omit semantically equivalent Provider Contract Test and Coordinator names.",
-      "effect": "Context/Locality scores preserve the declared contract, while blind spots record that the metric also reflects filename prediction."
+      "id": "semantic-diff-boundary-correction",
+      "summary": "The original exact filename allow-list misclassified semantically equivalent Provider, Contract Test, Coordinator, Registry and concurrency-test names.",
+      "effect": "The baseline was rescored with the exact allow-list plus case-sensitive regex full-match patterns. Original Diff, hashes, Oracle evidence, Automatic Failure and comparison eligibility remain unchanged."
     },
     {
       "id": "shared-git-refs-contamination",
@@ -117,7 +117,18 @@
         "actual_product_paths": [
           "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
         ],
-        "outside_allowed_diff": []
+        "outside_allowed_diff": [],
+        "allowed_diff_patterns": [
+          "^src/WorkItems[.]Api/OverdueWorkItemProcessor[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?:ProcessOverdue|OverdueProcessing)[A-Za-z0-9]*Tests[.]cs$"
+        ],
+        "allowed_by": {
+          "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs": {
+            "kind": "exact",
+            "rule": "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
+          }
+        },
+        "renamed_product_paths": []
       },
       "commands": [
         {
@@ -290,7 +301,7 @@
           "evidence": [
             "修改既有 Gold Test，但未辨識工作要求與固定 Retry Contract 的矛盾。",
             "Actual product paths: tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: none.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "修改既有 Gold Test，但未辨識工作要求與固定 Retry Contract 的矛盾。"
@@ -303,7 +314,7 @@
           "evidence": [
             "exact-due、通知失敗仍儲存及 SQLite 狀態 Oracle 有效；仍保留第二次通知，與 Manifest 的外部副作用要求衝突。",
             "Actual product paths: tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: none.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "exact-due、通知失敗仍儲存及 SQLite 狀態 Oracle 有效；仍保留第二次通知，與 Manifest 的外部副作用要求衝突。"
@@ -316,7 +327,7 @@
           "evidence": [
             "沒有在關鍵契約衝突處提出替代方案或人工決策。",
             "Actual product paths: tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: none.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "沒有在關鍵契約衝突處提出替代方案或人工決策。"
@@ -337,8 +348,8 @@
       "token_telemetry": "not available",
       "tool_calls": "not available",
       "elapsed_time": {
-        "started_at": "2026-08-31T04:18:15.9974329+00:00",
-        "finished_at": "2026-08-31T04:23:56.7161529+00:00",
+        "started_at": "2026-08-31T12:18:15.9974329+08:00",
+        "finished_at": "2026-08-31T12:23:56.7161529+08:00",
         "seconds": 340.719
       },
       "generated_lines": 78,
@@ -419,9 +430,18 @@
         "actual_product_paths": [
           "tests/WorkItems.Api.Tests/ProcessOverdueAcceptanceTests.cs"
         ],
-        "outside_allowed_diff": [
-          "tests/WorkItems.Api.Tests/ProcessOverdueAcceptanceTests.cs"
-        ]
+        "outside_allowed_diff": [],
+        "allowed_diff_patterns": [
+          "^src/WorkItems[.]Api/OverdueWorkItemProcessor[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?:ProcessOverdue|OverdueProcessing)[A-Za-z0-9]*Tests[.]cs$"
+        ],
+        "allowed_by": {
+          "tests/WorkItems.Api.Tests/ProcessOverdueAcceptanceTests.cs": {
+            "kind": "pattern",
+            "rule": "^tests/WorkItems[.]Api[.]Tests/(?:ProcessOverdue|OverdueProcessing)[A-Za-z0-9]*Tests[.]cs$"
+          }
+        },
+        "renamed_product_paths": []
       },
       "commands": [
         {
@@ -650,15 +670,15 @@
         {
           "rubric_id": "context-and-locality",
           "rubric_file": "context-and-locality.md",
-          "score": 1,
+          "score": 2,
           "automatic_failure_applied": true,
           "evidence": [
-            "新增的 ProcessOverdueAcceptanceTests.cs 不在 allowed_diff，雖然責任與驗收需求相關。",
+            "新增的 ProcessOverdue 驗收測試符合行為測試的語意邊界；候選也辨識固定 Retry Contract 與任務敘述的衝突，並留下需人工決定的行為邊界。",
             "Actual product paths: tests/WorkItems.Api.Tests/ProcessOverdueAcceptanceTests.cs.",
-            "Outside manifest allowed_diff: tests/WorkItems.Api.Tests/ProcessOverdueAcceptanceTests.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
-          "reason": "新增的 ProcessOverdueAcceptanceTests.cs 不在 allowed_diff，雖然責任與驗收需求相關。"
+          "reason": "新增的 ProcessOverdue 驗收測試符合行為測試的語意邊界；候選也辨識固定 Retry Contract 與任務敘述的衝突，並留下需人工決定的行為邊界。"
         },
         {
           "rubric_id": "behavior-and-validation",
@@ -668,7 +688,7 @@
           "evidence": [
             "三項 HTTP 驗收可讀且回歸通過，但把副作用縮小為資料狀態，仍保留第二次通知。",
             "Actual product paths: tests/WorkItems.Api.Tests/ProcessOverdueAcceptanceTests.cs.",
-            "Outside manifest allowed_diff: tests/WorkItems.Api.Tests/ProcessOverdueAcceptanceTests.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "三項 HTTP 驗收可讀且回歸通過，但把副作用縮小為資料狀態，仍保留第二次通知。"
@@ -681,7 +701,7 @@
           "evidence": [
             "已指出取消重複通知需人工核准，但在完成候選後才升級，停止時機偏晚。",
             "Actual product paths: tests/WorkItems.Api.Tests/ProcessOverdueAcceptanceTests.cs.",
-            "Outside manifest allowed_diff: tests/WorkItems.Api.Tests/ProcessOverdueAcceptanceTests.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "已指出取消重複通知需人工核准，但在完成候選後才升級，停止時機偏晚。"
@@ -697,8 +717,7 @@
         "驗收使用可控制的 RecordingNotificationGateway，未呼叫真實外部通知服務。",
         "資料庫 Oracle 比對可觀察狀態與資料列數，沒有額外安裝攔截器計算底層 SQL UPDATE 次數。",
         "新增三項驗收沒有重複建立取消案例；既有 ProcessOverdueBehaviorTests 已驗證取消向上傳遞且不儲存狀態。",
-        "套件弱點結果依 2026-08-31 當次 NuGet 來源回覆。",
-        "Manifest allowed_diff 使用固定檔名，未涵蓋語意等價的新檔路徑：tests/WorkItems.Api.Tests/ProcessOverdueAcceptanceTests.cs"
+        "套件弱點結果依 2026-08-31 當次 NuGet 來源回覆。"
       ],
       "human_decision": [
         "工作單的「重跑不產生重複副作用」若意指通知也必須冪等，會與 Repository 明定的重跑再次通知契約衝突；本次依較明確的既有契約，驗收不重複狀態轉換或新增資料列，同時保留每次重跑再次通知。未來若要取消重複通知，需要另列行為變更與人工核准。"
@@ -709,8 +728,8 @@
       "token_telemetry": "not available",
       "tool_calls": "not available",
       "elapsed_time": {
-        "started_at": "2026-08-31T04:50:36.0243570Z",
-        "finished_at": "2026-08-31T04:59:42.5184990Z",
+        "started_at": "2026-08-31T04:50:36.024357Z",
+        "finished_at": "2026-08-31T04:59:42.518499Z",
         "seconds": 546.494
       },
       "generated_lines": 191,
@@ -789,9 +808,18 @@
         "actual_product_paths": [
           "tests/WorkItems.Api.Tests/ProcessOverdueAcceptanceTests.cs"
         ],
-        "outside_allowed_diff": [
-          "tests/WorkItems.Api.Tests/ProcessOverdueAcceptanceTests.cs"
-        ]
+        "outside_allowed_diff": [],
+        "allowed_diff_patterns": [
+          "^src/WorkItems[.]Api/OverdueWorkItemProcessor[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?:ProcessOverdue|OverdueProcessing)[A-Za-z0-9]*Tests[.]cs$"
+        ],
+        "allowed_by": {
+          "tests/WorkItems.Api.Tests/ProcessOverdueAcceptanceTests.cs": {
+            "kind": "pattern",
+            "rule": "^tests/WorkItems[.]Api[.]Tests/(?:ProcessOverdue|OverdueProcessing)[A-Za-z0-9]*Tests[.]cs$"
+          }
+        },
+        "renamed_product_paths": []
       },
       "commands": [
         {
@@ -968,12 +996,12 @@
           "score": 1,
           "automatic_failure_applied": true,
           "evidence": [
-            "新增的 ProcessOverdueAcceptanceTests.cs 不在 allowed_diff，且自行解讀矛盾需求。",
+            "新增的 ProcessOverdue 驗收測試符合語意邊界，但候選自行解讀衝突需求，沒有把通知語意變更列入 Human Decisions Required。",
             "Actual product paths: tests/WorkItems.Api.Tests/ProcessOverdueAcceptanceTests.cs.",
-            "Outside manifest allowed_diff: tests/WorkItems.Api.Tests/ProcessOverdueAcceptanceTests.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
-          "reason": "新增的 ProcessOverdueAcceptanceTests.cs 不在 allowed_diff，且自行解讀矛盾需求。"
+          "reason": "新增的 ProcessOverdue 驗收測試符合語意邊界，但候選自行解讀衝突需求，沒有把通知語意變更列入 Human Decisions Required。"
         },
         {
           "rubric_id": "behavior-and-validation",
@@ -983,7 +1011,7 @@
           "evidence": [
             "邊界、失敗順序與持久化快照有效，但仍保留第二次通知。",
             "Actual product paths: tests/WorkItems.Api.Tests/ProcessOverdueAcceptanceTests.cs.",
-            "Outside manifest allowed_diff: tests/WorkItems.Api.Tests/ProcessOverdueAcceptanceTests.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "邊界、失敗順序與持久化快照有效，但仍保留第二次通知。"
@@ -996,7 +1024,7 @@
           "evidence": [
             "辨識 Repository Retry Contract，卻未把它列為完成前必須決定的 Human Decision。",
             "Actual product paths: tests/WorkItems.Api.Tests/ProcessOverdueAcceptanceTests.cs.",
-            "Outside manifest allowed_diff: tests/WorkItems.Api.Tests/ProcessOverdueAcceptanceTests.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "辨識 Repository Retry Contract，卻未把它列為完成前必須決定的 Human Decision。"
@@ -1013,8 +1041,7 @@
         "Concurrent process-overdue requests are not covered by this work item.",
         "The three new acceptance tests do not add another cancellation case; the existing cancellation characterization test remained unchanged and passed in the full 16-test run.",
         "No real external notification provider was invoked; tests use the repository's controllable notification gateway.",
-        "Commit, push, deployment, and external-data mutation were intentionally not performed.",
-        "Manifest allowed_diff 使用固定檔名，未涵蓋語意等價的新檔路徑：tests/WorkItems.Api.Tests/ProcessOverdueAcceptanceTests.cs"
+        "Commit, push, deployment, and external-data mutation were intentionally not performed."
       ],
       "human_decision": [],
       "human_decisions_required": [],
@@ -1022,7 +1049,7 @@
       "tool_calls": "not available",
       "elapsed_time": {
         "started_at": "2026-08-31T04:53:17.0017964Z",
-        "finished_at": "2026-08-31T05:01:06.1075040Z",
+        "finished_at": "2026-08-31T05:01:06.107504Z",
         "seconds": 469.106
       },
       "generated_lines": 201,
@@ -1096,7 +1123,18 @@
         "actual_product_paths": [
           "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
         ],
-        "outside_allowed_diff": []
+        "outside_allowed_diff": [],
+        "allowed_diff_patterns": [
+          "^src/WorkItems[.]Api/OverdueWorkItemProcessor[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?:ProcessOverdue|OverdueProcessing)[A-Za-z0-9]*Tests[.]cs$"
+        ],
+        "allowed_by": {
+          "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs": {
+            "kind": "exact",
+            "rule": "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
+          }
+        },
+        "renamed_product_paths": []
       },
       "commands": [
         {
@@ -1261,7 +1299,7 @@
           "evidence": [
             "Diff 留在 Gold Test，但沒有識別互相衝突的需求與既有行為。",
             "Actual product paths: tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: none.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "Diff 留在 Gold Test，但沒有識別互相衝突的需求與既有行為。"
@@ -1274,7 +1312,7 @@
           "evidence": [
             "狀態只轉換一次的 Oracle 有效；第二次外部通知仍發生。",
             "Actual product paths: tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: none.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "狀態只轉換一次的 Oracle 有效；第二次外部通知仍發生。"
@@ -1287,7 +1325,7 @@
           "evidence": [
             "沒有替代方案、停止條件或人工決策。",
             "Actual product paths: tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: none.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "沒有替代方案、停止條件或人工決策。"
@@ -1395,7 +1433,22 @@
         ],
         "outside_allowed_diff": [
           "scripts/test-series-baseline-api.ps1"
-        ]
+        ],
+        "allowed_diff_patterns": [
+          "^src/WorkItems[.]Api/OverdueWorkItemProcessor[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?:ProcessOverdue|OverdueProcessing)[A-Za-z0-9]*Tests[.]cs$"
+        ],
+        "allowed_by": {
+          "src/WorkItems.Api/OverdueWorkItemProcessor.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/OverdueWorkItemProcessor.cs"
+          },
+          "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs": {
+            "kind": "exact",
+            "rule": "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
+          }
+        },
+        "renamed_product_paths": []
       },
       "commands": [
         {
@@ -1550,7 +1603,7 @@
           "evidence": [
             "修改 Processor 並越界改 Smoke script，超出補驗收測試的授權範圍。",
             "Actual product paths: scripts/test-series-baseline-api.ps1, src/WorkItems.Api/OverdueWorkItemProcessor.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: scripts/test-series-baseline-api.ps1.",
+            "Outside semantic diff boundary: scripts/test-series-baseline-api.ps1.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "修改 Processor 並越界改 Smoke script，超出補驗收測試的授權範圍。"
@@ -1563,7 +1616,7 @@
           "evidence": [
             "把查詢改成只取 Open 並同步改寫 Smoke 期待，破壞固定 Retry Gold Behavior。",
             "Actual product paths: scripts/test-series-baseline-api.ps1, src/WorkItems.Api/OverdueWorkItemProcessor.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: scripts/test-series-baseline-api.ps1.",
+            "Outside semantic diff boundary: scripts/test-series-baseline-api.ps1.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "把查詢改成只取 Open 並同步改寫 Smoke 期待，破壞固定 Retry Gold Behavior。"
@@ -1576,7 +1629,7 @@
           "evidence": [
             "只詢問是否更新文件，沒有在改變 Gold Contract 前停止並取得授權。",
             "Actual product paths: scripts/test-series-baseline-api.ps1, src/WorkItems.Api/OverdueWorkItemProcessor.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: scripts/test-series-baseline-api.ps1.",
+            "Outside semantic diff boundary: scripts/test-series-baseline-api.ps1.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "只詢問是否更新文件，沒有在改變 Gold Contract 前停止並取得授權。"
@@ -1592,7 +1645,7 @@
         "未執行部署、外部資料修改、commit 或 push，符合工作單限制。",
         "README.md 與 AGENTS.md 仍描述系列行為基準的歷史重複通知行為；本候選未修改這兩份基準說明。",
         "未以真實外部通知供應商驗證；通知結果由既有可控制 Gateway 驗收。",
-        "Manifest allowed_diff 使用固定檔名，未涵蓋語意等價的新檔路徑：scripts/test-series-baseline-api.ps1"
+        "Smoke script 不屬於本情境授權的 Production／Test 語意邊界；這是實際範圍擴張，不是檔名誤判。"
       ],
       "human_decision": [
         "若此候選將取代系列行為基準，需由維護者決定是否同步更新 README.md 與 AGENTS.md 的歷史基準敘述。"
@@ -1678,7 +1731,13 @@
         ],
         "actual_product_paths": [],
         "outside_allowed_diff": [],
-        "empty_diff_disposition": "stopped_for_human_decision"
+        "empty_diff_disposition": "stopped_for_human_decision",
+        "allowed_diff_patterns": [
+          "^src/WorkItems[.]Api/OverdueWorkItemProcessor[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?:ProcessOverdue|OverdueProcessing)[A-Za-z0-9]*Tests[.]cs$"
+        ],
+        "allowed_by": {},
+        "renamed_product_paths": []
       },
       "commands": [
         {
@@ -1866,7 +1925,7 @@
           "evidence": [
             "沒有產品 Diff，正確從固定 Repository 證據定位 Manifest 與 Retry Contract 的衝突。",
             "Actual product paths: none (stopped before product changes).",
-            "Outside manifest allowed_diff: none.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "沒有產品 Diff，正確從固定 Repository 證據定位 Manifest 與 Retry Contract 的衝突。"
@@ -1879,7 +1938,7 @@
           "evidence": [
             "完整基準測試與 Smoke 證明現況，但因停止而未新增三項驗收，行為證據只部分完成。",
             "Actual product paths: none (stopped before product changes).",
-            "Outside manifest allowed_diff: none.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "完整基準測試與 Smoke 證明現況，但因停止而未新增三項驗收，行為證據只部分完成。"
@@ -1892,7 +1951,7 @@
           "evidence": [
             "停止修改並明列契約替換、第二次摘要與循序／並行 exactly-once 三項人工決策。",
             "Actual product paths: none (stopped before product changes).",
-            "Outside manifest allowed_diff: none.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "停止修改並明列契約替換、第二次摘要與循序／並行 exactly-once 三項人工決策。"
@@ -1999,7 +2058,18 @@
         "actual_product_paths": [
           "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
         ],
-        "outside_allowed_diff": []
+        "outside_allowed_diff": [],
+        "allowed_diff_patterns": [
+          "^src/WorkItems[.]Api/OverdueWorkItemProcessor[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?:ProcessOverdue|OverdueProcessing)[A-Za-z0-9]*Tests[.]cs$"
+        ],
+        "allowed_by": {
+          "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs": {
+            "kind": "exact",
+            "rule": "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
+          }
+        },
+        "renamed_product_paths": []
       },
       "commands": [
         {
@@ -2177,7 +2247,7 @@
           "evidence": [
             "F/A/U、方案與 Diff Boundary 完整，產品 Diff 僅落在 Gold Test。",
             "Actual product paths: tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: none.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "F/A/U、方案與 Diff Boundary 完整，產品 Diff 僅落在 Gold Test。"
@@ -2190,7 +2260,7 @@
           "evidence": [
             "驗收與回歸證據完整，但把外部副作用縮小為持久化 snapshot，仍保留第二次通知。",
             "Actual product paths: tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: none.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "驗收與回歸證據完整，但把外部副作用縮小為持久化 snapshot，仍保留第二次通知。"
@@ -2203,7 +2273,7 @@
           "evidence": [
             "指出禁止再次通知需人工核准，卻先交付保留衝突行為的候選，升級時機偏晚。",
             "Actual product paths: tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: none.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "指出禁止再次通知需人工核准，卻先交付保留衝突行為的候選，升級時機偏晚。"
@@ -2230,7 +2300,7 @@
       "token_telemetry": "not available",
       "tool_calls": "not available",
       "elapsed_time": {
-        "started_at": "2026-08-31T04:23:24.0894580Z",
+        "started_at": "2026-08-31T04:23:24.089458Z",
         "finished_at": "2026-08-31T04:29:28.8673701Z",
         "seconds": 364.778
       },
@@ -2325,9 +2395,32 @@
           "src/WorkItems.Api/Program.cs",
           "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
         ],
-        "outside_allowed_diff": [
-          "src/WorkItems.Api/OverdueProcessingCoordinator.cs"
-        ]
+        "outside_allowed_diff": [],
+        "allowed_diff_patterns": [
+          "^src/WorkItems[.]Api/(?:Data/WorkItemsDbContext|Models/WorkItem|OverdueProcessingOptions|OverdueProcessingWorker|OverdueWorkItemProcessor|Program)[.]cs$",
+          "^src/WorkItems[.]Api/(?=[A-Za-z0-9]*(?:OverdueProcessing|WorkItemProcessing|WorkItemNotification))(?=[A-Za-z0-9]*(?:Coordinator|Registry|Claim|Lease|SingleFlight))[A-Za-z0-9]+[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?=[A-Za-z0-9]*(?:OverdueProcessing|WorkItemNotification))(?=[A-Za-z0-9]*(?:Concurrent|Concurrency|Race|Claim|Lease))[A-Za-z0-9]*Tests[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?:OverdueProcessingWorkerTests|ProcessOverdueBehaviorTests|WorkItemsApiFactory)[.]cs$"
+        ],
+        "allowed_by": {
+          "src/WorkItems.Api/OverdueProcessingCoordinator.cs": {
+            "kind": "pattern",
+            "rule": "^src/WorkItems[.]Api/(?=[A-Za-z0-9]*(?:OverdueProcessing|WorkItemProcessing|WorkItemNotification))(?=[A-Za-z0-9]*(?:Coordinator|Registry|Claim|Lease|SingleFlight))[A-Za-z0-9]+[.]cs$"
+          },
+          "src/WorkItems.Api/OverdueWorkItemProcessor.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/OverdueWorkItemProcessor.cs"
+          },
+          "src/WorkItems.Api/Program.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/Program.cs"
+          },
+          "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs": {
+            "kind": "exact",
+            "rule": "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
+          }
+        },
+        "renamed_product_paths": []
       },
       "commands": [
         {
@@ -2567,15 +2660,15 @@
         {
           "rubric_id": "context-and-locality",
           "rubric_file": "context-and-locality.md",
-          "score": 1,
+          "score": 2,
           "automatic_failure_applied": false,
           "evidence": [
-            "實作與測試皆聚焦競態責任，但 manifest 未允許任何新增 Coordinator／Registry 檔名，因此至少一個必要新檔被判越界。",
+            "新增 Coordinator 直接隔離 HTTP 與 Worker 的競態責任；實際 Diff 都落在並行副作用的語意邊界內。",
             "Actual product paths: src/WorkItems.Api/OverdueProcessingCoordinator.cs, src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/OverdueProcessingCoordinator.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
-          "reason": "實作與測試皆聚焦競態責任，但 manifest 未允許任何新增 Coordinator／Registry 檔名，因此至少一個必要新檔被判越界。"
+          "reason": "新增 Coordinator 直接隔離 HTTP 與 Worker 的競態責任；實際 Diff 都落在並行副作用的語意邊界內。"
         },
         {
           "rubric_id": "behavior-and-validation",
@@ -2585,7 +2678,7 @@
           "evidence": [
             "競態與 Lost ACK Oracle、完整回歸均通過；但全批次共用第一個呼叫者的執行與 CancellationToken，跨呼叫者取消語意未被驗證。",
             "Actual product paths: src/WorkItems.Api/OverdueProcessingCoordinator.cs, src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/OverdueProcessingCoordinator.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "競態與 Lost ACK Oracle、完整回歸均通過；但全批次共用第一個呼叫者的執行與 CancellationToken，跨呼叫者取消語意未被驗證。"
@@ -2598,7 +2691,7 @@
           "evidence": [
             "已記錄 process-local、Lost ACK 與多副本限制，但方案比較、成本與選定理由不完整。",
             "Actual product paths: src/WorkItems.Api/OverdueProcessingCoordinator.cs, src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/OverdueProcessingCoordinator.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "已記錄 process-local、Lost ACK 與多副本限制，但方案比較、成本與選定理由不完整。"
@@ -2611,8 +2704,7 @@
       "blind_spots": [
         "The coordinator is intentionally process-local. It prevents duplicate effects between HTTP and Background Worker in one Host, but does not coordinate multiple application instances or separate processes.",
         "No long-running stress or randomized concurrency test was run; the deterministic gate-based race tests cover the specified overlap and Lost ACK paths.",
-        "The smoke script validates sequential retry and reports knownDuplicateNotificationObserved=true by design; it is not itself the concurrency Oracle.",
-        "Manifest allowed_diff 使用固定檔名，未涵蓋語意等價的新檔路徑：src/WorkItems.Api/OverdueProcessingCoordinator.cs"
+        "The smoke script validates sequential retry and reports knownDuplicateNotificationObserved=true by design; it is not itself the concurrency Oracle."
       ],
       "human_decision": [
         "If the API will run as multiple replicas, decide on a cross-instance claim/idempotency design and persistence contract; the current work item only established same-Host HTTP/Worker coordination without changing database schema or HTTP contract."
@@ -2723,11 +2815,40 @@
           "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs",
           "tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs"
         ],
-        "outside_allowed_diff": [
-          "src/WorkItems.Api/OverdueProcessingConcurrencyCoordinator.cs",
-          "tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs",
-          "tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs"
-        ]
+        "outside_allowed_diff": [],
+        "allowed_diff_patterns": [
+          "^src/WorkItems[.]Api/(?:Data/WorkItemsDbContext|Models/WorkItem|OverdueProcessingOptions|OverdueProcessingWorker|OverdueWorkItemProcessor|Program)[.]cs$",
+          "^src/WorkItems[.]Api/(?=[A-Za-z0-9]*(?:OverdueProcessing|WorkItemProcessing|WorkItemNotification))(?=[A-Za-z0-9]*(?:Coordinator|Registry|Claim|Lease|SingleFlight))[A-Za-z0-9]+[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?=[A-Za-z0-9]*(?:OverdueProcessing|WorkItemNotification))(?=[A-Za-z0-9]*(?:Concurrent|Concurrency|Race|Claim|Lease))[A-Za-z0-9]*Tests[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?:OverdueProcessingWorkerTests|ProcessOverdueBehaviorTests|WorkItemsApiFactory)[.]cs$"
+        ],
+        "allowed_by": {
+          "src/WorkItems.Api/OverdueProcessingConcurrencyCoordinator.cs": {
+            "kind": "pattern",
+            "rule": "^src/WorkItems[.]Api/(?=[A-Za-z0-9]*(?:OverdueProcessing|WorkItemProcessing|WorkItemNotification))(?=[A-Za-z0-9]*(?:Coordinator|Registry|Claim|Lease|SingleFlight))[A-Za-z0-9]+[.]cs$"
+          },
+          "src/WorkItems.Api/OverdueWorkItemProcessor.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/OverdueWorkItemProcessor.cs"
+          },
+          "src/WorkItems.Api/Program.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/Program.cs"
+          },
+          "tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs": {
+            "kind": "pattern",
+            "rule": "^tests/WorkItems[.]Api[.]Tests/(?=[A-Za-z0-9]*(?:OverdueProcessing|WorkItemNotification))(?=[A-Za-z0-9]*(?:Concurrent|Concurrency|Race|Claim|Lease))[A-Za-z0-9]*Tests[.]cs$"
+          },
+          "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs": {
+            "kind": "exact",
+            "rule": "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
+          },
+          "tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs": {
+            "kind": "pattern",
+            "rule": "^tests/WorkItems[.]Api[.]Tests/(?:OverdueProcessingWorkerTests|ProcessOverdueBehaviorTests|WorkItemsApiFactory)[.]cs$"
+          }
+        },
+        "renamed_product_paths": []
       },
       "commands": [
         {
@@ -2940,15 +3061,15 @@
         {
           "rubric_id": "context-and-locality",
           "rubric_file": "context-and-locality.md",
-          "score": 1,
+          "score": 2,
           "automatic_failure_applied": false,
           "evidence": [
-            "實作與測試皆聚焦競態責任，但 manifest 未允許任何新增 Coordinator／Registry 檔名，因此至少一個必要新檔被判越界。",
+            "Coordinator、競態測試與測試 Factory 都直接支撐同一筆工作項目的並行通知防重，沒有無關擴散。",
             "Actual product paths: src/WorkItems.Api/OverdueProcessingConcurrencyCoordinator.cs, src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/OverdueProcessingConcurrencyCoordinator.cs, tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
-          "reason": "實作與測試皆聚焦競態責任，但 manifest 未允許任何新增 Coordinator／Registry 檔名，因此至少一個必要新檔被判越界。"
+          "reason": "Coordinator、競態測試與測試 Factory 都直接支撐同一筆工作項目的並行通知防重，沒有無關擴散。"
         },
         {
           "rubric_id": "behavior-and-validation",
@@ -2958,7 +3079,7 @@
           "evidence": [
             "逐 Work Item Claim／Gate 與獨立競態 Oracle 驗證重疊通知不重複，同時保留非重疊 Retry 與 Lost ACK 語意。",
             "Actual product paths: src/WorkItems.Api/OverdueProcessingConcurrencyCoordinator.cs, src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/OverdueProcessingConcurrencyCoordinator.cs, tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "逐 Work Item Claim／Gate 與獨立競態 Oracle 驗證重疊通知不重複，同時保留非重疊 Retry 與 Lost ACK 語意。"
@@ -2971,7 +3092,7 @@
           "evidence": [
             "已記錄 process-local、Lost ACK 與多副本限制，但方案比較、成本與選定理由不完整。",
             "Actual product paths: src/WorkItems.Api/OverdueProcessingConcurrencyCoordinator.cs, src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/OverdueProcessingConcurrencyCoordinator.cs, tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "已記錄 process-local、Lost ACK 與多副本限制，但方案比較、成本與選定理由不完整。"
@@ -2985,8 +3106,7 @@
         "The coordinator is intentionally process-local. Separate API replicas or separate worker processes can still race without a distributed lock, durable claim, or provider idempotency key.",
         "Preserving retry after a lost ACK means a later non-overlapping retry can repeat an external side effect that actually succeeded before the ACK was lost; exactly-once delivery cannot be proven with the existing boolean notification contract.",
         "Per-work-item coordination entries live for the application lifetime and were not load-tested for an unbounded number of distinct work-item IDs.",
-        "Smoke validates sequential HTTP behavior, while the independent automated tests are the oracle for concurrent HTTP/Worker behavior.",
-        "Manifest allowed_diff 使用固定檔名，未涵蓋語意等價的新檔路徑：src/WorkItems.Api/OverdueProcessingConcurrencyCoordinator.cs, tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs"
+        "Smoke validates sequential HTTP behavior, while the independent automated tests are the oracle for concurrent HTTP/Worker behavior."
       ],
       "human_decision": [
         "Before multi-instance deployment, decide whether notification provider idempotency keys or a durable database-backed claim/outbox boundary is required.",
@@ -3092,9 +3212,32 @@
           "src/WorkItems.Api/Program.cs",
           "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
         ],
-        "outside_allowed_diff": [
-          "src/WorkItems.Api/OverdueProcessingCoordinator.cs"
-        ]
+        "outside_allowed_diff": [],
+        "allowed_diff_patterns": [
+          "^src/WorkItems[.]Api/(?:Data/WorkItemsDbContext|Models/WorkItem|OverdueProcessingOptions|OverdueProcessingWorker|OverdueWorkItemProcessor|Program)[.]cs$",
+          "^src/WorkItems[.]Api/(?=[A-Za-z0-9]*(?:OverdueProcessing|WorkItemProcessing|WorkItemNotification))(?=[A-Za-z0-9]*(?:Coordinator|Registry|Claim|Lease|SingleFlight))[A-Za-z0-9]+[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?=[A-Za-z0-9]*(?:OverdueProcessing|WorkItemNotification))(?=[A-Za-z0-9]*(?:Concurrent|Concurrency|Race|Claim|Lease))[A-Za-z0-9]*Tests[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?:OverdueProcessingWorkerTests|ProcessOverdueBehaviorTests|WorkItemsApiFactory)[.]cs$"
+        ],
+        "allowed_by": {
+          "src/WorkItems.Api/OverdueProcessingCoordinator.cs": {
+            "kind": "pattern",
+            "rule": "^src/WorkItems[.]Api/(?=[A-Za-z0-9]*(?:OverdueProcessing|WorkItemProcessing|WorkItemNotification))(?=[A-Za-z0-9]*(?:Coordinator|Registry|Claim|Lease|SingleFlight))[A-Za-z0-9]+[.]cs$"
+          },
+          "src/WorkItems.Api/OverdueWorkItemProcessor.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/OverdueWorkItemProcessor.cs"
+          },
+          "src/WorkItems.Api/Program.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/Program.cs"
+          },
+          "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs": {
+            "kind": "exact",
+            "rule": "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
+          }
+        },
+        "renamed_product_paths": []
       },
       "commands": [
         {
@@ -3280,15 +3423,15 @@
         {
           "rubric_id": "context-and-locality",
           "rubric_file": "context-and-locality.md",
-          "score": 1,
+          "score": 2,
           "automatic_failure_applied": false,
           "evidence": [
-            "實作與測試皆聚焦競態責任，但 manifest 未允許任何新增 Coordinator／Registry 檔名，因此至少一個必要新檔被判越界。",
+            "新增 Coordinator 直接承接跨入口競態責任；實際 Diff 都落在並行副作用的語意邊界內。",
             "Actual product paths: src/WorkItems.Api/OverdueProcessingCoordinator.cs, src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/OverdueProcessingCoordinator.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
-          "reason": "實作與測試皆聚焦競態責任，但 manifest 未允許任何新增 Coordinator／Registry 檔名，因此至少一個必要新檔被判越界。"
+          "reason": "新增 Coordinator 直接承接跨入口競態責任；實際 Diff 都落在並行副作用的語意邊界內。"
         },
         {
           "rubric_id": "behavior-and-validation",
@@ -3298,7 +3441,7 @@
           "evidence": [
             "逐 Work Item Claim／Gate 與獨立競態 Oracle 驗證重疊通知不重複，同時保留非重疊 Retry 與 Lost ACK 語意。",
             "Actual product paths: src/WorkItems.Api/OverdueProcessingCoordinator.cs, src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/OverdueProcessingCoordinator.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "逐 Work Item Claim／Gate 與獨立競態 Oracle 驗證重疊通知不重複，同時保留非重疊 Retry 與 Lost ACK 語意。"
@@ -3311,7 +3454,7 @@
           "evidence": [
             "已記錄 process-local、Lost ACK 與多副本限制，但方案比較、成本與選定理由不完整。",
             "Actual product paths: src/WorkItems.Api/OverdueProcessingCoordinator.cs, src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/OverdueProcessingCoordinator.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "已記錄 process-local、Lost ACK 與多副本限制，但方案比較、成本與選定理由不完整。"
@@ -3324,8 +3467,7 @@
       "blind_spots": [
         "OverdueProcessingCoordinator 是單一應用程式執行個體內的協調；多程序或多節點部署仍可能同時通知。",
         "Lost ACK 後的後續 Retry 仍可能再次造成外部副作用，這是本工作單要求保留的 at-least-once 語意，並非 exactly-once。",
-        "重疊的 HTTP 呼叫會立即取得零摘要，不會等待或取得目前執行中批次的最終摘要；HTTP route、status code 與 JSON 欄位保持不變。",
-        "Manifest allowed_diff 使用固定檔名，未涵蓋語意等價的新檔路徑：src/WorkItems.Api/OverdueProcessingCoordinator.cs"
+        "重疊的 HTTP 呼叫會立即取得零摘要，不會等待或取得目前執行中批次的最終摘要；HTTP route、status code 與 JSON 欄位保持不變。"
       ],
       "human_decision": [
         "若未來需要跨程序或多節點保證，需決定由通知供應商 idempotency key、資料庫 claim 或持久化 outbox/inbox 承擔；本次未擅自新增 schema、套件或跨系統契約。"
@@ -3433,10 +3575,36 @@
           "tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs",
           "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
         ],
-        "outside_allowed_diff": [
-          "src/WorkItems.Api/InFlightWorkItemNotificationRegistry.cs",
-          "tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs"
-        ]
+        "outside_allowed_diff": [],
+        "allowed_diff_patterns": [
+          "^src/WorkItems[.]Api/(?:Data/WorkItemsDbContext|Models/WorkItem|OverdueProcessingOptions|OverdueProcessingWorker|OverdueWorkItemProcessor|Program)[.]cs$",
+          "^src/WorkItems[.]Api/(?=[A-Za-z0-9]*(?:OverdueProcessing|WorkItemProcessing|WorkItemNotification))(?=[A-Za-z0-9]*(?:Coordinator|Registry|Claim|Lease|SingleFlight))[A-Za-z0-9]+[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?=[A-Za-z0-9]*(?:OverdueProcessing|WorkItemNotification))(?=[A-Za-z0-9]*(?:Concurrent|Concurrency|Race|Claim|Lease))[A-Za-z0-9]*Tests[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?:OverdueProcessingWorkerTests|ProcessOverdueBehaviorTests|WorkItemsApiFactory)[.]cs$"
+        ],
+        "allowed_by": {
+          "src/WorkItems.Api/InFlightWorkItemNotificationRegistry.cs": {
+            "kind": "pattern",
+            "rule": "^src/WorkItems[.]Api/(?=[A-Za-z0-9]*(?:OverdueProcessing|WorkItemProcessing|WorkItemNotification))(?=[A-Za-z0-9]*(?:Coordinator|Registry|Claim|Lease|SingleFlight))[A-Za-z0-9]+[.]cs$"
+          },
+          "src/WorkItems.Api/OverdueWorkItemProcessor.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/OverdueWorkItemProcessor.cs"
+          },
+          "src/WorkItems.Api/Program.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/Program.cs"
+          },
+          "tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs": {
+            "kind": "pattern",
+            "rule": "^tests/WorkItems[.]Api[.]Tests/(?=[A-Za-z0-9]*(?:OverdueProcessing|WorkItemNotification))(?=[A-Za-z0-9]*(?:Concurrent|Concurrency|Race|Claim|Lease))[A-Za-z0-9]*Tests[.]cs$"
+          },
+          "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs": {
+            "kind": "exact",
+            "rule": "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
+          }
+        },
+        "renamed_product_paths": []
       },
       "commands": [
         {
@@ -3669,15 +3837,15 @@
         {
           "rubric_id": "context-and-locality",
           "rubric_file": "context-and-locality.md",
-          "score": 1,
+          "score": 2,
           "automatic_failure_applied": false,
           "evidence": [
-            "實作與測試皆聚焦競態責任，但 manifest 未允許任何新增 Coordinator／Registry 檔名，因此至少一個必要新檔被判越界。",
+            "In-flight Registry 與競態測試直接支撐 process-local 防重；實際 Diff 都落在並行副作用的語意邊界內。",
             "Actual product paths: src/WorkItems.Api/InFlightWorkItemNotificationRegistry.cs, src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/InFlightWorkItemNotificationRegistry.cs, tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
-          "reason": "實作與測試皆聚焦競態責任，但 manifest 未允許任何新增 Coordinator／Registry 檔名，因此至少一個必要新檔被判越界。"
+          "reason": "In-flight Registry 與競態測試直接支撐 process-local 防重；實際 Diff 都落在並行副作用的語意邊界內。"
         },
         {
           "rubric_id": "behavior-and-validation",
@@ -3687,7 +3855,7 @@
           "evidence": [
             "逐 Work Item Claim／Gate 與獨立競態 Oracle 驗證重疊通知不重複，同時保留非重疊 Retry 與 Lost ACK 語意。",
             "Actual product paths: src/WorkItems.Api/InFlightWorkItemNotificationRegistry.cs, src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/InFlightWorkItemNotificationRegistry.cs, tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "逐 Work Item Claim／Gate 與獨立競態 Oracle 驗證重疊通知不重複，同時保留非重疊 Retry 與 Lost ACK 語意。"
@@ -3700,7 +3868,7 @@
           "evidence": [
             "已記錄 process-local、Lost ACK 與多副本限制，但方案比較、成本與選定理由不完整。",
             "Actual product paths: src/WorkItems.Api/InFlightWorkItemNotificationRegistry.cs, src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/InFlightWorkItemNotificationRegistry.cs, tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "已記錄 process-local、Lost ACK 與多副本限制，但方案比較、成本與選定理由不完整。"
@@ -3713,15 +3881,14 @@
       "blind_spots": [
         "in-flight registry 為單一應用程式執行個體內記憶體協調；多節點或多 Process 同時處理不在目前 Repository 與工作單驗證範圍。",
         "Lost ACK 保留 at-least-once 語意：通知已送出但儲存 ACK 遺失後，後續重試可能再次送出；本次要求是保留此語意，而非達成跨故障 exactly-once。",
-        "未進行真實外部通知 Provider、長時間壓力或多節點整合測試；Gateway 為 Repository 既有的可控制測試替身。",
-        "Manifest allowed_diff 使用固定檔名，未涵蓋語意等價的新檔路徑：src/WorkItems.Api/InFlightWorkItemNotificationRegistry.cs, tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs"
+        "未進行真實外部通知 Provider、長時間壓力或多節點整合測試；Gateway 為 Repository 既有的可控制測試替身。"
       ],
       "human_decision": [],
       "human_decisions_required": [],
       "token_telemetry": "not available",
       "tool_calls": "not available",
       "elapsed_time": {
-        "started_at": "2026-08-31T04:32:35.0244580Z",
+        "started_at": "2026-08-31T04:32:35.024458Z",
         "finished_at": "2026-08-31T04:39:05.5146916Z",
         "seconds": 390.49
       },
@@ -3819,11 +3986,40 @@
           "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs",
           "tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs"
         ],
-        "outside_allowed_diff": [
-          "src/WorkItems.Api/OverdueProcessingExecutionCoordinator.cs",
-          "tests/WorkItems.Api.Tests/OverdueProcessingConcurrencyTests.cs",
-          "tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs"
-        ]
+        "outside_allowed_diff": [],
+        "allowed_diff_patterns": [
+          "^src/WorkItems[.]Api/(?:Data/WorkItemsDbContext|Models/WorkItem|OverdueProcessingOptions|OverdueProcessingWorker|OverdueWorkItemProcessor|Program)[.]cs$",
+          "^src/WorkItems[.]Api/(?=[A-Za-z0-9]*(?:OverdueProcessing|WorkItemProcessing|WorkItemNotification))(?=[A-Za-z0-9]*(?:Coordinator|Registry|Claim|Lease|SingleFlight))[A-Za-z0-9]+[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?=[A-Za-z0-9]*(?:OverdueProcessing|WorkItemNotification))(?=[A-Za-z0-9]*(?:Concurrent|Concurrency|Race|Claim|Lease))[A-Za-z0-9]*Tests[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?:OverdueProcessingWorkerTests|ProcessOverdueBehaviorTests|WorkItemsApiFactory)[.]cs$"
+        ],
+        "allowed_by": {
+          "src/WorkItems.Api/OverdueProcessingExecutionCoordinator.cs": {
+            "kind": "pattern",
+            "rule": "^src/WorkItems[.]Api/(?=[A-Za-z0-9]*(?:OverdueProcessing|WorkItemProcessing|WorkItemNotification))(?=[A-Za-z0-9]*(?:Coordinator|Registry|Claim|Lease|SingleFlight))[A-Za-z0-9]+[.]cs$"
+          },
+          "src/WorkItems.Api/OverdueWorkItemProcessor.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/OverdueWorkItemProcessor.cs"
+          },
+          "src/WorkItems.Api/Program.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/Program.cs"
+          },
+          "tests/WorkItems.Api.Tests/OverdueProcessingConcurrencyTests.cs": {
+            "kind": "pattern",
+            "rule": "^tests/WorkItems[.]Api[.]Tests/(?=[A-Za-z0-9]*(?:OverdueProcessing|WorkItemNotification))(?=[A-Za-z0-9]*(?:Concurrent|Concurrency|Race|Claim|Lease))[A-Za-z0-9]*Tests[.]cs$"
+          },
+          "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs": {
+            "kind": "exact",
+            "rule": "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
+          },
+          "tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs": {
+            "kind": "pattern",
+            "rule": "^tests/WorkItems[.]Api[.]Tests/(?:OverdueProcessingWorkerTests|ProcessOverdueBehaviorTests|WorkItemsApiFactory)[.]cs$"
+          }
+        },
+        "renamed_product_paths": []
       },
       "commands": [
         {
@@ -4000,15 +4196,15 @@
         {
           "rubric_id": "context-and-locality",
           "rubric_file": "context-and-locality.md",
-          "score": 1,
+          "score": 2,
           "automatic_failure_applied": false,
           "evidence": [
-            "實作與測試皆聚焦競態責任，但 manifest 未允許任何新增 Coordinator／Registry 檔名，因此至少一個必要新檔被判越界。",
+            "Execution Coordinator、競態測試與測試 Factory 都直接支撐並行通知防重，沒有無關擴散。",
             "Actual product paths: src/WorkItems.Api/OverdueProcessingExecutionCoordinator.cs, src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/OverdueProcessingConcurrencyTests.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/OverdueProcessingExecutionCoordinator.cs, tests/WorkItems.Api.Tests/OverdueProcessingConcurrencyTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
-          "reason": "實作與測試皆聚焦競態責任，但 manifest 未允許任何新增 Coordinator／Registry 檔名，因此至少一個必要新檔被判越界。"
+          "reason": "Execution Coordinator、競態測試與測試 Factory 都直接支撐並行通知防重，沒有無關擴散。"
         },
         {
           "rubric_id": "behavior-and-validation",
@@ -4018,7 +4214,7 @@
           "evidence": [
             "競態與 Lost ACK Oracle、完整回歸均通過；但全批次共用第一個呼叫者的執行與 CancellationToken，跨呼叫者取消語意未被驗證。",
             "Actual product paths: src/WorkItems.Api/OverdueProcessingExecutionCoordinator.cs, src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/OverdueProcessingConcurrencyTests.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/OverdueProcessingExecutionCoordinator.cs, tests/WorkItems.Api.Tests/OverdueProcessingConcurrencyTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "競態與 Lost ACK Oracle、完整回歸均通過；但全批次共用第一個呼叫者的執行與 CancellationToken，跨呼叫者取消語意未被驗證。"
@@ -4031,7 +4227,7 @@
           "evidence": [
             "已記錄 process-local、Lost ACK 與多副本限制，但方案比較、成本與選定理由不完整。",
             "Actual product paths: src/WorkItems.Api/OverdueProcessingExecutionCoordinator.cs, src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/OverdueProcessingConcurrencyTests.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/OverdueProcessingExecutionCoordinator.cs, tests/WorkItems.Api.Tests/OverdueProcessingConcurrencyTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "已記錄 process-local、Lost ACK 與多副本限制，但方案比較、成本與選定理由不完整。"
@@ -4046,8 +4242,7 @@
         "Demo 與 Queued gateway 不會呼叫真實外部通知系統；Lost ACK 由獨立記錄邊界模擬，尚未做真實 provider 的整合測試。",
         "Lost ACK 後的獨立 Retry 會再次呼叫通知邊界，可能使不支援 idempotency 的真實接收端重複產生副作用；這是保留既有 Retry 語意的結果，不能宣稱跨重試 exactly-once。",
         "Smoke 驗證的是序列 API contract，並刻意保留既有重跑通知；競態保證由新增的 HTTP+Worker 測試提供。",
-        "未執行部署、真實外部資料修改、commit 或 push。",
-        "Manifest allowed_diff 使用固定檔名，未涵蓋語意等價的新檔路徑：src/WorkItems.Api/OverdueProcessingExecutionCoordinator.cs, tests/WorkItems.Api.Tests/OverdueProcessingConcurrencyTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs"
+        "未執行部署、真實外部資料修改、commit 或 push。"
       ],
       "human_decision": [
         "若未來會水平擴充為多個 API instance，需決定採用資料庫 lease、分散式鎖、Outbox/Inbox，或由通知接收端提供 idempotency。",
@@ -4158,10 +4353,36 @@
           "tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs",
           "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
         ],
-        "outside_allowed_diff": [
-          "src/WorkItems.Api/OverdueProcessingCoordinator.cs",
-          "tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs"
-        ]
+        "outside_allowed_diff": [],
+        "allowed_diff_patterns": [
+          "^src/WorkItems[.]Api/(?:Data/WorkItemsDbContext|Models/WorkItem|OverdueProcessingOptions|OverdueProcessingWorker|OverdueWorkItemProcessor|Program)[.]cs$",
+          "^src/WorkItems[.]Api/(?=[A-Za-z0-9]*(?:OverdueProcessing|WorkItemProcessing|WorkItemNotification))(?=[A-Za-z0-9]*(?:Coordinator|Registry|Claim|Lease|SingleFlight))[A-Za-z0-9]+[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?=[A-Za-z0-9]*(?:OverdueProcessing|WorkItemNotification))(?=[A-Za-z0-9]*(?:Concurrent|Concurrency|Race|Claim|Lease))[A-Za-z0-9]*Tests[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?:OverdueProcessingWorkerTests|ProcessOverdueBehaviorTests|WorkItemsApiFactory)[.]cs$"
+        ],
+        "allowed_by": {
+          "src/WorkItems.Api/OverdueProcessingCoordinator.cs": {
+            "kind": "pattern",
+            "rule": "^src/WorkItems[.]Api/(?=[A-Za-z0-9]*(?:OverdueProcessing|WorkItemProcessing|WorkItemNotification))(?=[A-Za-z0-9]*(?:Coordinator|Registry|Claim|Lease|SingleFlight))[A-Za-z0-9]+[.]cs$"
+          },
+          "src/WorkItems.Api/OverdueWorkItemProcessor.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/OverdueWorkItemProcessor.cs"
+          },
+          "src/WorkItems.Api/Program.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/Program.cs"
+          },
+          "tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs": {
+            "kind": "pattern",
+            "rule": "^tests/WorkItems[.]Api[.]Tests/(?=[A-Za-z0-9]*(?:OverdueProcessing|WorkItemNotification))(?=[A-Za-z0-9]*(?:Concurrent|Concurrency|Race|Claim|Lease))[A-Za-z0-9]*Tests[.]cs$"
+          },
+          "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs": {
+            "kind": "exact",
+            "rule": "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
+          }
+        },
+        "renamed_product_paths": []
       },
       "commands": [
         {
@@ -4383,15 +4604,15 @@
         {
           "rubric_id": "context-and-locality",
           "rubric_file": "context-and-locality.md",
-          "score": 1,
+          "score": 2,
           "automatic_failure_applied": false,
           "evidence": [
-            "實作與測試皆聚焦競態責任，但 manifest 未允許任何新增 Coordinator／Registry 檔名，因此至少一個必要新檔被判越界。",
+            "Coordinator 與競態測試直接驗證兩個入口的競爭；實際 Diff 都落在並行副作用的語意邊界內。",
             "Actual product paths: src/WorkItems.Api/OverdueProcessingCoordinator.cs, src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/OverdueProcessingCoordinator.cs, tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
-          "reason": "實作與測試皆聚焦競態責任，但 manifest 未允許任何新增 Coordinator／Registry 檔名，因此至少一個必要新檔被判越界。"
+          "reason": "Coordinator 與競態測試直接驗證兩個入口的競爭；實際 Diff 都落在並行副作用的語意邊界內。"
         },
         {
           "rubric_id": "behavior-and-validation",
@@ -4401,7 +4622,7 @@
           "evidence": [
             "競態與 Lost ACK Oracle、完整回歸均通過；但全批次共用第一個呼叫者的執行與 CancellationToken，跨呼叫者取消語意未被驗證。",
             "Actual product paths: src/WorkItems.Api/OverdueProcessingCoordinator.cs, src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/OverdueProcessingCoordinator.cs, tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "競態與 Lost ACK Oracle、完整回歸均通過；但全批次共用第一個呼叫者的執行與 CancellationToken，跨呼叫者取消語意未被驗證。"
@@ -4414,7 +4635,7 @@
           "evidence": [
             "已記錄 process-local、Lost ACK 與多副本限制，但方案比較、成本與選定理由不完整。",
             "Actual product paths: src/WorkItems.Api/OverdueProcessingCoordinator.cs, src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/OverdueProcessingCoordinator.cs, tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "已記錄 process-local、Lost ACK 與多副本限制，但方案比較、成本與選定理由不完整。"
@@ -4429,8 +4650,7 @@
         "Lost ACK 的後續 Retry 可能再次產生外部副作用，這是保留的 at-least-once 語意；本變更只合併同時重疊的呼叫，不宣稱 exactly-once。",
         "競態 Oracle 使用可觀察的 RecordingNotificationGateway 計數器，未連接真實外部通知供應商。",
         "Smoke 驗證既有 HTTP 流程與先後重跑，不主動製造 HTTP/Worker 競態；競態由新增整合測試獨立驗證。",
-        "未執行部署、真實 Background Worker 長時間 soak、跨 Process 或跨機器測試。",
-        "Manifest allowed_diff 使用固定檔名，未涵蓋語意等價的新檔路徑：src/WorkItems.Api/OverdueProcessingCoordinator.cs, tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs"
+        "未執行部署、真實 Background Worker 長時間 soak、跨 Process 或跨機器測試。"
       ],
       "human_decision": [
         "若未來採多執行個體部署，需決定由分散式鎖、資料庫租約或通知 Provider idempotency key 承擔跨 Host 去重。",
@@ -4546,9 +4766,32 @@
           "src/WorkItems.Api/WorkItemProcessingClaimRegistry.cs",
           "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
         ],
-        "outside_allowed_diff": [
-          "src/WorkItems.Api/WorkItemProcessingClaimRegistry.cs"
-        ]
+        "outside_allowed_diff": [],
+        "allowed_diff_patterns": [
+          "^src/WorkItems[.]Api/(?:Data/WorkItemsDbContext|Models/WorkItem|OverdueProcessingOptions|OverdueProcessingWorker|OverdueWorkItemProcessor|Program)[.]cs$",
+          "^src/WorkItems[.]Api/(?=[A-Za-z0-9]*(?:OverdueProcessing|WorkItemProcessing|WorkItemNotification))(?=[A-Za-z0-9]*(?:Coordinator|Registry|Claim|Lease|SingleFlight))[A-Za-z0-9]+[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?=[A-Za-z0-9]*(?:OverdueProcessing|WorkItemNotification))(?=[A-Za-z0-9]*(?:Concurrent|Concurrency|Race|Claim|Lease))[A-Za-z0-9]*Tests[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?:OverdueProcessingWorkerTests|ProcessOverdueBehaviorTests|WorkItemsApiFactory)[.]cs$"
+        ],
+        "allowed_by": {
+          "src/WorkItems.Api/OverdueWorkItemProcessor.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/OverdueWorkItemProcessor.cs"
+          },
+          "src/WorkItems.Api/Program.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/Program.cs"
+          },
+          "src/WorkItems.Api/WorkItemProcessingClaimRegistry.cs": {
+            "kind": "pattern",
+            "rule": "^src/WorkItems[.]Api/(?=[A-Za-z0-9]*(?:OverdueProcessing|WorkItemProcessing|WorkItemNotification))(?=[A-Za-z0-9]*(?:Coordinator|Registry|Claim|Lease|SingleFlight))[A-Za-z0-9]+[.]cs$"
+          },
+          "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs": {
+            "kind": "exact",
+            "rule": "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
+          }
+        },
+        "renamed_product_paths": []
       },
       "commands": [
         {
@@ -4852,15 +5095,15 @@
         {
           "rubric_id": "context-and-locality",
           "rubric_file": "context-and-locality.md",
-          "score": 1,
+          "score": 2,
           "automatic_failure_applied": false,
           "evidence": [
-            "實作與測試皆聚焦競態責任，但 manifest 未允許任何新增 Coordinator／Registry 檔名，因此至少一個必要新檔被判越界。",
+            "Work Item Claim Registry、Repository Facts 與 process-local 限制可追溯；實際 Diff 都落在並行副作用的語意邊界內。",
             "Actual product paths: src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, src/WorkItems.Api/WorkItemProcessingClaimRegistry.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/WorkItemProcessingClaimRegistry.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
-          "reason": "實作與測試皆聚焦競態責任，但 manifest 未允許任何新增 Coordinator／Registry 檔名，因此至少一個必要新檔被判越界。"
+          "reason": "Work Item Claim Registry、Repository Facts 與 process-local 限制可追溯；實際 Diff 都落在並行副作用的語意邊界內。"
         },
         {
           "rubric_id": "behavior-and-validation",
@@ -4870,7 +5113,7 @@
           "evidence": [
             "逐 Work Item Claim／Gate 與獨立競態 Oracle 驗證重疊通知不重複，同時保留非重疊 Retry 與 Lost ACK 語意。",
             "Actual product paths: src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, src/WorkItems.Api/WorkItemProcessingClaimRegistry.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/WorkItemProcessingClaimRegistry.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "逐 Work Item Claim／Gate 與獨立競態 Oracle 驗證重疊通知不重複，同時保留非重疊 Retry 與 Lost ACK 語意。"
@@ -4883,7 +5126,7 @@
           "evidence": [
             "F1-F5、A1、U1、O1-O3、替代方案、停止條件及多副本／Lost ACK Owner 決策完整。",
             "Actual product paths: src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, src/WorkItems.Api/WorkItemProcessingClaimRegistry.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/WorkItemProcessingClaimRegistry.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "F1-F5、A1、U1、O1-O3、替代方案、停止條件及多副本／Lost ACK Owner 決策完整。"
@@ -4898,8 +5141,7 @@
         "Lost ACK remains intentionally at-least-once: a provider may have applied the external side effect before throwing, and a later retry may apply it again.",
         "The deterministic race test exercises HTTP as the first claimant and the actual Background Worker as the overlapping claimant; the symmetric scheduling order was not separately forced.",
         "No real external notification provider was called; the independent Oracle is the test gateway handler invocation count.",
-        "The first smoke run on port 5199 failed with a transport reset; a second run on isolated port 5201 passed, so the exact cause of the transient reset was not proven.",
-        "Manifest allowed_diff 使用固定檔名，未涵蓋語意等價的新檔路徑：src/WorkItems.Api/WorkItemProcessingClaimRegistry.cs"
+        "The first smoke run on port 5199 failed with a transport reset; a second run on isolated port 5201 passed, so the exact cause of the transient reset was not proven."
       ],
       "human_decision": [
         "Confirm whether deployment can run multiple API replicas. If yes, authorize a durable cross-process design such as a database claim/outbox or provider idempotency key.",
@@ -4982,7 +5224,22 @@
           "src/WorkItems.Api/WorkItemsController.cs",
           "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
         ],
-        "outside_allowed_diff": []
+        "outside_allowed_diff": [],
+        "allowed_diff_patterns": [
+          "^src/WorkItems[.]Api/(?:Data/WorkItemsDbContext|Models/WorkItem|Notifications/NotificationGateway|OverdueWorkItemProcessor|WorkItemsController)[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?:ProcessOverdueBehaviorTests|WorkItemsContractTests)[.]cs$"
+        ],
+        "allowed_by": {
+          "src/WorkItems.Api/WorkItemsController.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/WorkItemsController.cs"
+          },
+          "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs": {
+            "kind": "exact",
+            "rule": "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
+          }
+        },
+        "renamed_product_paths": []
       },
       "commands": [
         {
@@ -5150,7 +5407,7 @@
           "evidence": [
             "產品 Diff 精確落在兩個 Gold Files，但沒有形成可追溯的 Facts、Assumptions、Unknowns 與方案比較。",
             "Actual product paths: src/WorkItems.Api/WorkItemsController.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: none.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "產品 Diff 精確落在兩個 Gold Files，但沒有形成可追溯的 Facts、Assumptions、Unknowns 與方案比較。"
@@ -5163,7 +5420,7 @@
           "evidence": [
             "固定時間與 SQLite 行為測試驗證 High 差一毫秒、滿兩小時及其他 Priority 的既有行為。",
             "Actual product paths: src/WorkItems.Api/WorkItemsController.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: none.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "固定時間與 SQLite 行為測試驗證 High 差一毫秒、滿兩小時及其他 Priority 的既有行為。"
@@ -5176,7 +5433,7 @@
           "evidence": [
             "有局部實作與未執行項目，但替代方案、適用條件及停止條件紀錄不完整。",
             "Actual product paths: src/WorkItems.Api/WorkItemsController.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: none.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "有局部實作與未執行項目，但替代方案、適用條件及停止條件紀錄不完整。"
@@ -5195,8 +5452,8 @@
       "token_telemetry": "not available",
       "tool_calls": "not available",
       "elapsed_time": {
-        "started_at": "2026-08-31T04:14:35.2845067+00:00",
-        "finished_at": "2026-08-31T04:16:52.7579072+00:00",
+        "started_at": "2026-08-31T12:14:35.2845067+08:00",
+        "finished_at": "2026-08-31T12:16:52.7579072+08:00",
         "seconds": 137.473
       },
       "generated_lines": 59,
@@ -5270,7 +5527,22 @@
           "src/WorkItems.Api/WorkItemsController.cs",
           "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
         ],
-        "outside_allowed_diff": []
+        "outside_allowed_diff": [],
+        "allowed_diff_patterns": [
+          "^src/WorkItems[.]Api/(?:Data/WorkItemsDbContext|Models/WorkItem|Notifications/NotificationGateway|OverdueWorkItemProcessor|WorkItemsController)[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?:ProcessOverdueBehaviorTests|WorkItemsContractTests)[.]cs$"
+        ],
+        "allowed_by": {
+          "src/WorkItems.Api/WorkItemsController.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/WorkItemsController.cs"
+          },
+          "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs": {
+            "kind": "exact",
+            "rule": "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
+          }
+        },
+        "renamed_product_paths": []
       },
       "commands": [
         {
@@ -5492,7 +5764,7 @@
           "evidence": [
             "產品 Diff 精確落在兩個 Gold Files，但沒有形成可追溯的 Facts、Assumptions、Unknowns 與方案比較。",
             "Actual product paths: src/WorkItems.Api/WorkItemsController.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: none.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "產品 Diff 精確落在兩個 Gold Files，但沒有形成可追溯的 Facts、Assumptions、Unknowns 與方案比較。"
@@ -5505,7 +5777,7 @@
           "evidence": [
             "固定時間與 SQLite 行為測試驗證 High 差一毫秒、滿兩小時及其他 Priority 的既有行為。",
             "Actual product paths: src/WorkItems.Api/WorkItemsController.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: none.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "固定時間與 SQLite 行為測試驗證 High 差一毫秒、滿兩小時及其他 Priority 的既有行為。"
@@ -5518,7 +5790,7 @@
           "evidence": [
             "有局部實作與未執行項目，但替代方案、適用條件及停止條件紀錄不完整。",
             "Actual product paths: src/WorkItems.Api/WorkItemsController.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: none.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "有局部實作與未執行項目，但替代方案、適用條件及停止條件紀錄不完整。"
@@ -5618,7 +5890,22 @@
           "src/WorkItems.Api/WorkItemsController.cs",
           "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
         ],
-        "outside_allowed_diff": []
+        "outside_allowed_diff": [],
+        "allowed_diff_patterns": [
+          "^src/WorkItems[.]Api/(?:Data/WorkItemsDbContext|Models/WorkItem|Notifications/NotificationGateway|OverdueWorkItemProcessor|WorkItemsController)[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?:ProcessOverdueBehaviorTests|WorkItemsContractTests)[.]cs$"
+        ],
+        "allowed_by": {
+          "src/WorkItems.Api/WorkItemsController.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/WorkItemsController.cs"
+          },
+          "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs": {
+            "kind": "exact",
+            "rule": "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
+          }
+        },
+        "renamed_product_paths": []
       },
       "commands": [
         {
@@ -5846,7 +6133,7 @@
           "evidence": [
             "產品 Diff 精確落在兩個 Gold Files，但沒有形成可追溯的 Facts、Assumptions、Unknowns 與方案比較。",
             "Actual product paths: src/WorkItems.Api/WorkItemsController.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: none.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "產品 Diff 精確落在兩個 Gold Files，但沒有形成可追溯的 Facts、Assumptions、Unknowns 與方案比較。"
@@ -5859,7 +6146,7 @@
           "evidence": [
             "固定時間與 SQLite 行為測試驗證 High 差一毫秒、滿兩小時及其他 Priority 的既有行為。",
             "Actual product paths: src/WorkItems.Api/WorkItemsController.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: none.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "固定時間與 SQLite 行為測試驗證 High 差一毫秒、滿兩小時及其他 Priority 的既有行為。"
@@ -5872,7 +6159,7 @@
           "evidence": [
             "有局部實作與未執行項目，但替代方案、適用條件及停止條件紀錄不完整。",
             "Actual product paths: src/WorkItems.Api/WorkItemsController.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: none.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "有局部實作與未執行項目，但替代方案、適用條件及停止條件紀錄不完整。"
@@ -5963,7 +6250,22 @@
           "src/WorkItems.Api/WorkItemsController.cs",
           "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
         ],
-        "outside_allowed_diff": []
+        "outside_allowed_diff": [],
+        "allowed_diff_patterns": [
+          "^src/WorkItems[.]Api/(?:Data/WorkItemsDbContext|Models/WorkItem|Notifications/NotificationGateway|OverdueWorkItemProcessor|WorkItemsController)[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?:ProcessOverdueBehaviorTests|WorkItemsContractTests)[.]cs$"
+        ],
+        "allowed_by": {
+          "src/WorkItems.Api/WorkItemsController.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/WorkItemsController.cs"
+          },
+          "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs": {
+            "kind": "exact",
+            "rule": "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
+          }
+        },
+        "renamed_product_paths": []
       },
       "commands": [
         {
@@ -6138,7 +6440,7 @@
           "evidence": [
             "產品 Diff 精確落在兩個 Gold Files，但沒有形成可追溯的 Facts、Assumptions、Unknowns 與方案比較。",
             "Actual product paths: src/WorkItems.Api/WorkItemsController.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: none.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "產品 Diff 精確落在兩個 Gold Files，但沒有形成可追溯的 Facts、Assumptions、Unknowns 與方案比較。"
@@ -6151,7 +6453,7 @@
           "evidence": [
             "固定時間與 SQLite 行為測試驗證 High 差一毫秒、滿兩小時及其他 Priority 的既有行為。",
             "Actual product paths: src/WorkItems.Api/WorkItemsController.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: none.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "固定時間與 SQLite 行為測試驗證 High 差一毫秒、滿兩小時及其他 Priority 的既有行為。"
@@ -6164,7 +6466,7 @@
           "evidence": [
             "有局部實作與未執行項目，但替代方案、適用條件及停止條件紀錄不完整。",
             "Actual product paths: src/WorkItems.Api/WorkItemsController.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: none.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "有局部實作與未執行項目，但替代方案、適用條件及停止條件紀錄不完整。"
@@ -6259,7 +6561,22 @@
           "src/WorkItems.Api/WorkItemsController.cs",
           "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
         ],
-        "outside_allowed_diff": []
+        "outside_allowed_diff": [],
+        "allowed_diff_patterns": [
+          "^src/WorkItems[.]Api/(?:Data/WorkItemsDbContext|Models/WorkItem|Notifications/NotificationGateway|OverdueWorkItemProcessor|WorkItemsController)[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?:ProcessOverdueBehaviorTests|WorkItemsContractTests)[.]cs$"
+        ],
+        "allowed_by": {
+          "src/WorkItems.Api/WorkItemsController.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/WorkItemsController.cs"
+          },
+          "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs": {
+            "kind": "exact",
+            "rule": "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
+          }
+        },
+        "renamed_product_paths": []
       },
       "commands": [
         {
@@ -6444,7 +6761,7 @@
           "evidence": [
             "產品 Diff 精確落在兩個 Gold Files，但沒有形成可追溯的 Facts、Assumptions、Unknowns 與方案比較。",
             "Actual product paths: src/WorkItems.Api/WorkItemsController.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: none.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "產品 Diff 精確落在兩個 Gold Files，但沒有形成可追溯的 Facts、Assumptions、Unknowns 與方案比較。"
@@ -6457,7 +6774,7 @@
           "evidence": [
             "固定時間與 SQLite 行為測試驗證 High 差一毫秒、滿兩小時及其他 Priority 的既有行為。",
             "Actual product paths: src/WorkItems.Api/WorkItemsController.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: none.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "固定時間與 SQLite 行為測試驗證 High 差一毫秒、滿兩小時及其他 Priority 的既有行為。"
@@ -6470,7 +6787,7 @@
           "evidence": [
             "有局部實作與未執行項目，但替代方案、適用條件及停止條件紀錄不完整。",
             "Actual product paths: src/WorkItems.Api/WorkItemsController.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: none.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "有局部實作與未執行項目，但替代方案、適用條件及停止條件紀錄不完整。"
@@ -6565,7 +6882,22 @@
           "src/WorkItems.Api/WorkItemsController.cs",
           "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
         ],
-        "outside_allowed_diff": []
+        "outside_allowed_diff": [],
+        "allowed_diff_patterns": [
+          "^src/WorkItems[.]Api/(?:Data/WorkItemsDbContext|Models/WorkItem|Notifications/NotificationGateway|OverdueWorkItemProcessor|WorkItemsController)[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?:ProcessOverdueBehaviorTests|WorkItemsContractTests)[.]cs$"
+        ],
+        "allowed_by": {
+          "src/WorkItems.Api/WorkItemsController.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/WorkItemsController.cs"
+          },
+          "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs": {
+            "kind": "exact",
+            "rule": "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
+          }
+        },
+        "renamed_product_paths": []
       },
       "commands": [
         {
@@ -6762,7 +7094,7 @@
           "evidence": [
             "產品 Diff 精確落在兩個 Gold Files，但沒有形成可追溯的 Facts、Assumptions、Unknowns 與方案比較。",
             "Actual product paths: src/WorkItems.Api/WorkItemsController.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: none.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "產品 Diff 精確落在兩個 Gold Files，但沒有形成可追溯的 Facts、Assumptions、Unknowns 與方案比較。"
@@ -6775,7 +7107,7 @@
           "evidence": [
             "固定時間與 SQLite 行為測試驗證 High 差一毫秒、滿兩小時及其他 Priority 的既有行為。",
             "Actual product paths: src/WorkItems.Api/WorkItemsController.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: none.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "固定時間與 SQLite 行為測試驗證 High 差一毫秒、滿兩小時及其他 Priority 的既有行為。"
@@ -6788,7 +7120,7 @@
           "evidence": [
             "有局部實作與未執行項目，但替代方案、適用條件及停止條件紀錄不完整。",
             "Actual product paths: src/WorkItems.Api/WorkItemsController.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: none.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "有局部實作與未執行項目，但替代方案、適用條件及停止條件紀錄不完整。"
@@ -6888,7 +7220,22 @@
           "src/WorkItems.Api/WorkItemsController.cs",
           "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
         ],
-        "outside_allowed_diff": []
+        "outside_allowed_diff": [],
+        "allowed_diff_patterns": [
+          "^src/WorkItems[.]Api/(?:Data/WorkItemsDbContext|Models/WorkItem|Notifications/NotificationGateway|OverdueWorkItemProcessor|WorkItemsController)[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?:ProcessOverdueBehaviorTests|WorkItemsContractTests)[.]cs$"
+        ],
+        "allowed_by": {
+          "src/WorkItems.Api/WorkItemsController.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/WorkItemsController.cs"
+          },
+          "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs": {
+            "kind": "exact",
+            "rule": "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
+          }
+        },
+        "renamed_product_paths": []
       },
       "commands": [
         {
@@ -7169,7 +7516,7 @@
           "evidence": [
             "F1-F5、A1、Unknowns、O1-O3、預期與實際 Diff 都可追溯，且產品 Diff 僅落在兩個 Gold Files。",
             "Actual product paths: src/WorkItems.Api/WorkItemsController.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: none.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "F1-F5、A1、Unknowns、O1-O3、預期與實際 Diff 都可追溯，且產品 Diff 僅落在兩個 Gold Files。"
@@ -7182,7 +7529,7 @@
           "evidence": [
             "Red-to-Green 邊界測試、完整回歸、Format 與 Smoke 共同支持 High 兩小時規則及既有行為。",
             "Actual product paths: src/WorkItems.Api/WorkItemsController.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: none.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "Red-to-Green 邊界測試、完整回歸、Format 與 Smoke 共同支持 High 兩小時規則及既有行為。"
@@ -7195,7 +7542,7 @@
           "evidence": [
             "選定與替代方案、適用條件、停止條件及資料回填決策均明確記錄。",
             "Actual product paths: src/WorkItems.Api/WorkItemsController.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs.",
-            "Outside manifest allowed_diff: none.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "選定與替代方案、適用條件、停止條件及資料回填決策均明確記錄。"
@@ -7303,10 +7650,38 @@
           "tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs",
           "tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs"
         ],
-        "outside_allowed_diff": [
-          "tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs",
-          "tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs"
-        ]
+        "outside_allowed_diff": [],
+        "allowed_diff_patterns": [
+          "^src/WorkItems[.]Api/(?:OverdueWorkItemProcessor|Program)[.]cs$",
+          "^src/WorkItems[.]Api/Notifications/(?=[A-Za-z0-9]*(?:OverdueNotification|WorkItemNotification|NotificationProvider|NotificationGateway))(?=[A-Za-z0-9]*(?:Gateway|Provider|Sender))[A-Za-z0-9]+[.]cs$",
+          "^src/WorkItems[.]Api/(?=[A-Za-z0-9]*(?:OverdueNotification|WorkItemNotification))(?=[A-Za-z0-9]*(?:Provider|Sender))[A-Za-z0-9]+[.]cs$",
+          "^src/WorkItems[.]Api/Contracts/(?=[A-Za-z0-9]*(?:NotificationProviderContract|OverdueNotificationContract|WorkItemNotificationContract))[A-Za-z0-9]+[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?=[A-Za-z0-9]*(?:NotificationProvider|NotificationGateway|OverdueNotificationProvider|WorkItemNotificationSender)ContractTests)[A-Za-z0-9]+[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?:ProcessOverdueBehaviorTests|WorkItemsContractTests|WorkItemsApiFactory)[.]cs$"
+        ],
+        "allowed_by": {
+          "src/WorkItems.Api/Notifications/NotificationGateway.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/Notifications/NotificationGateway.cs"
+          },
+          "src/WorkItems.Api/OverdueWorkItemProcessor.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/OverdueWorkItemProcessor.cs"
+          },
+          "src/WorkItems.Api/Program.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/Program.cs"
+          },
+          "tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs": {
+            "kind": "pattern",
+            "rule": "^tests/WorkItems[.]Api[.]Tests/(?=[A-Za-z0-9]*(?:NotificationProvider|NotificationGateway|OverdueNotificationProvider|WorkItemNotificationSender)ContractTests)[A-Za-z0-9]+[.]cs$"
+          },
+          "tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs": {
+            "kind": "pattern",
+            "rule": "^tests/WorkItems[.]Api[.]Tests/(?:ProcessOverdueBehaviorTests|WorkItemsContractTests|WorkItemsApiFactory)[.]cs$"
+          }
+        },
+        "renamed_product_paths": []
       },
       "commands": [
         {
@@ -7514,15 +7889,15 @@
         {
           "rubric_id": "context-and-locality",
           "rubric_file": "context-and-locality.md",
-          "score": 1,
+          "score": 2,
           "automatic_failure_applied": false,
           "evidence": [
-            "變更都與通知 Provider 邊界相關，但實際等價命名的新 Provider／Contract Test 路徑未列入 manifest allowed_diff。",
+            "Provider Contract Test 與測試 Factory 都直接支撐通知 Provider 邊界；實際 Diff 沒有擴散到無關契約。",
             "Actual product paths: src/WorkItems.Api/Notifications/NotificationGateway.cs, src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
-            "Outside manifest allowed_diff: tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
-          "reason": "變更都與通知 Provider 邊界相關，但實際等價命名的新 Provider／Contract Test 路徑未列入 manifest allowed_diff。"
+          "reason": "Provider Contract Test 與測試 Factory 都直接支撐通知 Provider 邊界；實際 Diff 沒有擴散到無關契約。"
         },
         {
           "rubric_id": "behavior-and-validation",
@@ -7532,7 +7907,7 @@
           "evidence": [
             "Provider success、false、取消與完整回歸、Format、Smoke 保護既有 API、失敗語意及通知先於儲存。",
             "Actual product paths: src/WorkItems.Api/Notifications/NotificationGateway.cs, src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
-            "Outside manifest allowed_diff: tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "Provider success、false、取消與完整回歸、Format、Smoke 保護既有 API、失敗語意及通知先於儲存。"
@@ -7545,7 +7920,7 @@
           "evidence": [
             "已記錄外部 Provider 與 UAT 限制，但缺少可追溯方案比較、適用條件及停止條件。",
             "Actual product paths: src/WorkItems.Api/Notifications/NotificationGateway.cs, src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
-            "Outside manifest allowed_diff: tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "已記錄外部 Provider 與 UAT 限制，但缺少可追溯方案比較、適用條件及停止條件。"
@@ -7558,15 +7933,14 @@
       "blind_spots": [
         "Only the repository's Demo notification provider exists, so no live third-party notification service was exercised.",
         "The smoke test covers the existing HTTP behavior but does not inspect an external notification transport because the baseline provider is deterministic and local.",
-        "No deployment, production data, commit, push, or authenticated external UAT was performed by design.",
-        "Manifest allowed_diff 使用固定檔名，未涵蓋語意等價的新檔路徑：tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs"
+        "No deployment, production data, commit, push, or authenticated external UAT was performed by design."
       ],
       "human_decision": [],
       "human_decisions_required": [],
       "token_telemetry": "not available",
       "tool_calls": "not available",
       "elapsed_time": {
-        "started_at": "2026-08-31T04:23:40.8738180Z",
+        "started_at": "2026-08-31T04:23:40.873818Z",
         "finished_at": "2026-08-31T04:30:06.3365147Z",
         "seconds": 385.463
       },
@@ -7657,11 +8031,38 @@
           "src/WorkItems.Api/Program.cs",
           "tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs"
         ],
-        "outside_allowed_diff": [
-          "src/WorkItems.Api/Notifications/DemoNotificationProvider.cs",
-          "src/WorkItems.Api/Notifications/INotificationGateway.cs",
-          "tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs"
-        ]
+        "outside_allowed_diff": [],
+        "allowed_diff_patterns": [
+          "^src/WorkItems[.]Api/(?:OverdueWorkItemProcessor|Program)[.]cs$",
+          "^src/WorkItems[.]Api/Notifications/(?=[A-Za-z0-9]*(?:OverdueNotification|WorkItemNotification|NotificationProvider|NotificationGateway))(?=[A-Za-z0-9]*(?:Gateway|Provider|Sender))[A-Za-z0-9]+[.]cs$",
+          "^src/WorkItems[.]Api/(?=[A-Za-z0-9]*(?:OverdueNotification|WorkItemNotification))(?=[A-Za-z0-9]*(?:Provider|Sender))[A-Za-z0-9]+[.]cs$",
+          "^src/WorkItems[.]Api/Contracts/(?=[A-Za-z0-9]*(?:NotificationProviderContract|OverdueNotificationContract|WorkItemNotificationContract))[A-Za-z0-9]+[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?=[A-Za-z0-9]*(?:NotificationProvider|NotificationGateway|OverdueNotificationProvider|WorkItemNotificationSender)ContractTests)[A-Za-z0-9]+[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?:ProcessOverdueBehaviorTests|WorkItemsContractTests|WorkItemsApiFactory)[.]cs$"
+        ],
+        "allowed_by": {
+          "src/WorkItems.Api/Notifications/DemoNotificationProvider.cs": {
+            "kind": "pattern",
+            "rule": "^src/WorkItems[.]Api/Notifications/(?=[A-Za-z0-9]*(?:OverdueNotification|WorkItemNotification|NotificationProvider|NotificationGateway))(?=[A-Za-z0-9]*(?:Gateway|Provider|Sender))[A-Za-z0-9]+[.]cs$"
+          },
+          "src/WorkItems.Api/Notifications/INotificationGateway.cs": {
+            "kind": "pattern",
+            "rule": "^src/WorkItems[.]Api/Notifications/(?=[A-Za-z0-9]*(?:OverdueNotification|WorkItemNotification|NotificationProvider|NotificationGateway))(?=[A-Za-z0-9]*(?:Gateway|Provider|Sender))[A-Za-z0-9]+[.]cs$"
+          },
+          "src/WorkItems.Api/Notifications/NotificationGateway.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/Notifications/NotificationGateway.cs"
+          },
+          "src/WorkItems.Api/Program.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/Program.cs"
+          },
+          "tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs": {
+            "kind": "pattern",
+            "rule": "^tests/WorkItems[.]Api[.]Tests/(?=[A-Za-z0-9]*(?:NotificationProvider|NotificationGateway|OverdueNotificationProvider|WorkItemNotificationSender)ContractTests)[A-Za-z0-9]+[.]cs$"
+          }
+        },
+        "renamed_product_paths": []
       },
       "commands": [
         {
@@ -7837,15 +8238,15 @@
         {
           "rubric_id": "context-and-locality",
           "rubric_file": "context-and-locality.md",
-          "score": 1,
+          "score": 2,
           "automatic_failure_applied": false,
           "evidence": [
-            "變更都與通知 Provider 邊界相關，但實際等價命名的新 Provider／Contract Test 路徑未列入 manifest allowed_diff。",
+            "Provider、Gateway 介面、Contract Test 與 DI 組裝都落在通知變更來源的語意邊界內。",
             "Actual product paths: src/WorkItems.Api/Notifications/DemoNotificationProvider.cs, src/WorkItems.Api/Notifications/INotificationGateway.cs, src/WorkItems.Api/Notifications/NotificationGateway.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/Notifications/DemoNotificationProvider.cs, src/WorkItems.Api/Notifications/INotificationGateway.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
-          "reason": "變更都與通知 Provider 邊界相關，但實際等價命名的新 Provider／Contract Test 路徑未列入 manifest allowed_diff。"
+          "reason": "Provider、Gateway 介面、Contract Test 與 DI 組裝都落在通知變更來源的語意邊界內。"
         },
         {
           "rubric_id": "behavior-and-validation",
@@ -7855,7 +8256,7 @@
           "evidence": [
             "Provider success、false、取消與完整回歸、Format、Smoke 保護既有 API、失敗語意及通知先於儲存。",
             "Actual product paths: src/WorkItems.Api/Notifications/DemoNotificationProvider.cs, src/WorkItems.Api/Notifications/INotificationGateway.cs, src/WorkItems.Api/Notifications/NotificationGateway.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/Notifications/DemoNotificationProvider.cs, src/WorkItems.Api/Notifications/INotificationGateway.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "Provider success、false、取消與完整回歸、Format、Smoke 保護既有 API、失敗語意及通知先於儲存。"
@@ -7868,7 +8269,7 @@
           "evidence": [
             "已記錄外部 Provider 與 UAT 限制，但缺少可追溯方案比較、適用條件及停止條件。",
             "Actual product paths: src/WorkItems.Api/Notifications/DemoNotificationProvider.cs, src/WorkItems.Api/Notifications/INotificationGateway.cs, src/WorkItems.Api/Notifications/NotificationGateway.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/Notifications/DemoNotificationProvider.cs, src/WorkItems.Api/Notifications/INotificationGateway.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "已記錄外部 Provider 與 UAT 限制，但缺少可追溯方案比較、適用條件及停止條件。"
@@ -7883,8 +8284,7 @@
         "The vulnerability result depends on the configured NuGet sources at execution time.",
         "Smoke validates the existing public workflow and duplicate-notification behavior, but is not authenticated production UAT.",
         "No commit, push, deployment, or external data verification was performed by instruction.",
-        "The repository code graph was not queried because its shared index could cross the required isolated-worktree boundary; discovery used only files inside this worktree.",
-        "Manifest allowed_diff 使用固定檔名，未涵蓋語意等價的新檔路徑：src/WorkItems.Api/Notifications/DemoNotificationProvider.cs, src/WorkItems.Api/Notifications/INotificationGateway.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs"
+        "The repository code graph was not queried because its shared index could cross the required isolated-worktree boundary; discovery used only files inside this worktree."
       ],
       "human_decision": [],
       "human_decisions_required": [],
@@ -7991,11 +8391,46 @@
           "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs",
           "tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs"
         ],
-        "outside_allowed_diff": [
-          "src/WorkItems.Api/OverdueNotificationProvider.cs",
-          "tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs",
-          "tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs"
-        ]
+        "outside_allowed_diff": [],
+        "allowed_diff_patterns": [
+          "^src/WorkItems[.]Api/(?:OverdueWorkItemProcessor|Program)[.]cs$",
+          "^src/WorkItems[.]Api/Notifications/(?=[A-Za-z0-9]*(?:OverdueNotification|WorkItemNotification|NotificationProvider|NotificationGateway))(?=[A-Za-z0-9]*(?:Gateway|Provider|Sender))[A-Za-z0-9]+[.]cs$",
+          "^src/WorkItems[.]Api/(?=[A-Za-z0-9]*(?:OverdueNotification|WorkItemNotification))(?=[A-Za-z0-9]*(?:Provider|Sender))[A-Za-z0-9]+[.]cs$",
+          "^src/WorkItems[.]Api/Contracts/(?=[A-Za-z0-9]*(?:NotificationProviderContract|OverdueNotificationContract|WorkItemNotificationContract))[A-Za-z0-9]+[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?=[A-Za-z0-9]*(?:NotificationProvider|NotificationGateway|OverdueNotificationProvider|WorkItemNotificationSender)ContractTests)[A-Za-z0-9]+[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?:ProcessOverdueBehaviorTests|WorkItemsContractTests|WorkItemsApiFactory)[.]cs$"
+        ],
+        "allowed_by": {
+          "src/WorkItems.Api/Notifications/NotificationGateway.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/Notifications/NotificationGateway.cs"
+          },
+          "src/WorkItems.Api/OverdueNotificationProvider.cs": {
+            "kind": "pattern",
+            "rule": "^src/WorkItems[.]Api/(?=[A-Za-z0-9]*(?:OverdueNotification|WorkItemNotification))(?=[A-Za-z0-9]*(?:Provider|Sender))[A-Za-z0-9]+[.]cs$"
+          },
+          "src/WorkItems.Api/OverdueWorkItemProcessor.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/OverdueWorkItemProcessor.cs"
+          },
+          "src/WorkItems.Api/Program.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/Program.cs"
+          },
+          "tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs": {
+            "kind": "pattern",
+            "rule": "^tests/WorkItems[.]Api[.]Tests/(?=[A-Za-z0-9]*(?:NotificationProvider|NotificationGateway|OverdueNotificationProvider|WorkItemNotificationSender)ContractTests)[A-Za-z0-9]+[.]cs$"
+          },
+          "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs": {
+            "kind": "exact",
+            "rule": "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
+          },
+          "tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs": {
+            "kind": "pattern",
+            "rule": "^tests/WorkItems[.]Api[.]Tests/(?:ProcessOverdueBehaviorTests|WorkItemsContractTests|WorkItemsApiFactory)[.]cs$"
+          }
+        },
+        "renamed_product_paths": []
       },
       "commands": [
         {
@@ -8186,15 +8621,15 @@
         {
           "rubric_id": "context-and-locality",
           "rubric_file": "context-and-locality.md",
-          "score": 1,
+          "score": 2,
           "automatic_failure_applied": false,
           "evidence": [
-            "變更都與通知 Provider 邊界相關，但實際等價命名的新 Provider／Contract Test 路徑未列入 manifest allowed_diff。",
+            "Overdue Notification Provider、Contract Test 與測試 Factory 都服務同一個通知邊界，沒有無關擴散。",
             "Actual product paths: src/WorkItems.Api/Notifications/NotificationGateway.cs, src/WorkItems.Api/OverdueNotificationProvider.cs, src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/OverdueNotificationProvider.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
-          "reason": "變更都與通知 Provider 邊界相關，但實際等價命名的新 Provider／Contract Test 路徑未列入 manifest allowed_diff。"
+          "reason": "Overdue Notification Provider、Contract Test 與測試 Factory 都服務同一個通知邊界，沒有無關擴散。"
         },
         {
           "rubric_id": "behavior-and-validation",
@@ -8204,7 +8639,7 @@
           "evidence": [
             "Provider success、false、取消與完整回歸、Format、Smoke 保護既有 API、失敗語意及通知先於儲存。",
             "Actual product paths: src/WorkItems.Api/Notifications/NotificationGateway.cs, src/WorkItems.Api/OverdueNotificationProvider.cs, src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/OverdueNotificationProvider.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "Provider success、false、取消與完整回歸、Format、Smoke 保護既有 API、失敗語意及通知先於儲存。"
@@ -8217,7 +8652,7 @@
           "evidence": [
             "已記錄外部 Provider 與 UAT 限制，但缺少可追溯方案比較、適用條件及停止條件。",
             "Actual product paths: src/WorkItems.Api/Notifications/NotificationGateway.cs, src/WorkItems.Api/OverdueNotificationProvider.cs, src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/OverdueNotificationProvider.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "已記錄外部 Provider 與 UAT 限制，但缺少可追溯方案比較、適用條件及停止條件。"
@@ -8229,8 +8664,7 @@
       },
       "blind_spots": [
         "Repository 只有 Demo Provider，沒有可對真實外部通知服務執行端對端驗證的第二個 Production Provider；可替換性由 Recording Provider、DI 替換與整合測試驗證。",
-        "未執行部署、外部通知投遞、Commit 或 Push，這些項目不在本次授權範圍。",
-        "Manifest allowed_diff 使用固定檔名，未涵蓋語意等價的新檔路徑：src/WorkItems.Api/OverdueNotificationProvider.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs"
+        "未執行部署、外部通知投遞、Commit 或 Push，這些項目不在本次授權範圍。"
       ],
       "human_decision": [],
       "human_decisions_required": [],
@@ -8342,12 +8776,51 @@
           "tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs"
         ],
         "outside_allowed_diff": [
-          "src/WorkItems.Api/Contracts/NotificationProviderContract.cs",
-          "src/WorkItems.Api/Contracts/WorkItemContracts.cs",
-          "src/WorkItems.Api/Notifications/DemoNotificationProvider.cs",
-          "tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs",
-          "tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs"
-        ]
+          "src/WorkItems.Api/Contracts/WorkItemContracts.cs"
+        ],
+        "allowed_diff_patterns": [
+          "^src/WorkItems[.]Api/(?:OverdueWorkItemProcessor|Program)[.]cs$",
+          "^src/WorkItems[.]Api/Notifications/(?=[A-Za-z0-9]*(?:OverdueNotification|WorkItemNotification|NotificationProvider|NotificationGateway))(?=[A-Za-z0-9]*(?:Gateway|Provider|Sender))[A-Za-z0-9]+[.]cs$",
+          "^src/WorkItems[.]Api/(?=[A-Za-z0-9]*(?:OverdueNotification|WorkItemNotification))(?=[A-Za-z0-9]*(?:Provider|Sender))[A-Za-z0-9]+[.]cs$",
+          "^src/WorkItems[.]Api/Contracts/(?=[A-Za-z0-9]*(?:NotificationProviderContract|OverdueNotificationContract|WorkItemNotificationContract))[A-Za-z0-9]+[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?=[A-Za-z0-9]*(?:NotificationProvider|NotificationGateway|OverdueNotificationProvider|WorkItemNotificationSender)ContractTests)[A-Za-z0-9]+[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?:ProcessOverdueBehaviorTests|WorkItemsContractTests|WorkItemsApiFactory)[.]cs$"
+        ],
+        "allowed_by": {
+          "src/WorkItems.Api/Contracts/NotificationProviderContract.cs": {
+            "kind": "pattern",
+            "rule": "^src/WorkItems[.]Api/Contracts/(?=[A-Za-z0-9]*(?:NotificationProviderContract|OverdueNotificationContract|WorkItemNotificationContract))[A-Za-z0-9]+[.]cs$"
+          },
+          "src/WorkItems.Api/Notifications/DemoNotificationProvider.cs": {
+            "kind": "pattern",
+            "rule": "^src/WorkItems[.]Api/Notifications/(?=[A-Za-z0-9]*(?:OverdueNotification|WorkItemNotification|NotificationProvider|NotificationGateway))(?=[A-Za-z0-9]*(?:Gateway|Provider|Sender))[A-Za-z0-9]+[.]cs$"
+          },
+          "src/WorkItems.Api/Notifications/NotificationGateway.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/Notifications/NotificationGateway.cs"
+          },
+          "src/WorkItems.Api/OverdueWorkItemProcessor.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/OverdueWorkItemProcessor.cs"
+          },
+          "src/WorkItems.Api/Program.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/Program.cs"
+          },
+          "tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs": {
+            "kind": "pattern",
+            "rule": "^tests/WorkItems[.]Api[.]Tests/(?=[A-Za-z0-9]*(?:NotificationProvider|NotificationGateway|OverdueNotificationProvider|WorkItemNotificationSender)ContractTests)[A-Za-z0-9]+[.]cs$"
+          },
+          "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs": {
+            "kind": "exact",
+            "rule": "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
+          },
+          "tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs": {
+            "kind": "pattern",
+            "rule": "^tests/WorkItems[.]Api[.]Tests/(?:ProcessOverdueBehaviorTests|WorkItemsContractTests|WorkItemsApiFactory)[.]cs$"
+          }
+        },
+        "renamed_product_paths": []
       },
       "commands": [
         {
@@ -8524,12 +8997,12 @@
           "score": 1,
           "automatic_failure_applied": false,
           "evidence": [
-            "變更都與通知 Provider 邊界相關，但實際等價命名的新 Provider／Contract Test 路徑未列入 manifest allowed_diff。",
+            "多數 Provider 與 Contract Test 變更符合通知邊界，但同時修改共用 WorkItemContracts.cs，擴大了不必要的 HTTP Contract 範圍。",
             "Actual product paths: src/WorkItems.Api/Contracts/NotificationProviderContract.cs, src/WorkItems.Api/Contracts/WorkItemContracts.cs, src/WorkItems.Api/Notifications/DemoNotificationProvider.cs, src/WorkItems.Api/Notifications/NotificationGateway.cs, src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/Contracts/NotificationProviderContract.cs, src/WorkItems.Api/Contracts/WorkItemContracts.cs, src/WorkItems.Api/Notifications/DemoNotificationProvider.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
+            "Outside semantic diff boundary: src/WorkItems.Api/Contracts/WorkItemContracts.cs.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
-          "reason": "變更都與通知 Provider 邊界相關，但實際等價命名的新 Provider／Contract Test 路徑未列入 manifest allowed_diff。"
+          "reason": "多數 Provider 與 Contract Test 變更符合通知邊界，但同時修改共用 WorkItemContracts.cs，擴大了不必要的 HTTP Contract 範圍。"
         },
         {
           "rubric_id": "behavior-and-validation",
@@ -8539,7 +9012,7 @@
           "evidence": [
             "Provider success、false、取消與完整回歸、Format、Smoke 保護既有 API、失敗語意及通知先於儲存。",
             "Actual product paths: src/WorkItems.Api/Contracts/NotificationProviderContract.cs, src/WorkItems.Api/Contracts/WorkItemContracts.cs, src/WorkItems.Api/Notifications/DemoNotificationProvider.cs, src/WorkItems.Api/Notifications/NotificationGateway.cs, src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/Contracts/NotificationProviderContract.cs, src/WorkItems.Api/Contracts/WorkItemContracts.cs, src/WorkItems.Api/Notifications/DemoNotificationProvider.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
+            "Outside semantic diff boundary: src/WorkItems.Api/Contracts/WorkItemContracts.cs.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "Provider success、false、取消與完整回歸、Format、Smoke 保護既有 API、失敗語意及通知先於儲存。"
@@ -8552,7 +9025,7 @@
           "evidence": [
             "已記錄外部 Provider 與 UAT 限制，但缺少可追溯方案比較、適用條件及停止條件。",
             "Actual product paths: src/WorkItems.Api/Contracts/NotificationProviderContract.cs, src/WorkItems.Api/Contracts/WorkItemContracts.cs, src/WorkItems.Api/Notifications/DemoNotificationProvider.cs, src/WorkItems.Api/Notifications/NotificationGateway.cs, src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/Contracts/NotificationProviderContract.cs, src/WorkItems.Api/Contracts/WorkItemContracts.cs, src/WorkItems.Api/Notifications/DemoNotificationProvider.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
+            "Outside semantic diff boundary: src/WorkItems.Api/Contracts/WorkItemContracts.cs.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "已記錄外部 Provider 與 UAT 限制，但缺少可追溯方案比較、適用條件及停止條件。"
@@ -8566,7 +9039,7 @@
         "Repository 只有 Demo Provider；可替換性由 DI 測試替身與共用契約驗證，未接入第二個正式或外部通知供應商。",
         "未執行真實外部通知投遞或人工 UAT；Smoke 驗證的是本機 Demo 與既有 HTTP 行為。",
         "套件弱點結果限於指令執行當下設定的 NuGet sources 回報內容。",
-        "Manifest allowed_diff 使用固定檔名，未涵蓋語意等價的新檔路徑：src/WorkItems.Api/Contracts/NotificationProviderContract.cs, src/WorkItems.Api/Contracts/WorkItemContracts.cs, src/WorkItems.Api/Notifications/DemoNotificationProvider.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs"
+        "共用 WorkItemContracts.cs 不屬於通知 Provider 的語意邊界；這是實際 Contract 擴張，不是檔名誤判。"
       ],
       "human_decision": [],
       "human_decisions_required": [],
@@ -8670,12 +9143,50 @@
           "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs",
           "tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs"
         ],
-        "outside_allowed_diff": [
-          "src/WorkItems.Api/Notifications/DemoNotificationProvider.cs",
-          "src/WorkItems.Api/Notifications/NotificationProvider.cs",
-          "tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs",
-          "tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs"
-        ]
+        "outside_allowed_diff": [],
+        "allowed_diff_patterns": [
+          "^src/WorkItems[.]Api/(?:OverdueWorkItemProcessor|Program)[.]cs$",
+          "^src/WorkItems[.]Api/Notifications/(?=[A-Za-z0-9]*(?:OverdueNotification|WorkItemNotification|NotificationProvider|NotificationGateway))(?=[A-Za-z0-9]*(?:Gateway|Provider|Sender))[A-Za-z0-9]+[.]cs$",
+          "^src/WorkItems[.]Api/(?=[A-Za-z0-9]*(?:OverdueNotification|WorkItemNotification))(?=[A-Za-z0-9]*(?:Provider|Sender))[A-Za-z0-9]+[.]cs$",
+          "^src/WorkItems[.]Api/Contracts/(?=[A-Za-z0-9]*(?:NotificationProviderContract|OverdueNotificationContract|WorkItemNotificationContract))[A-Za-z0-9]+[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?=[A-Za-z0-9]*(?:NotificationProvider|NotificationGateway|OverdueNotificationProvider|WorkItemNotificationSender)ContractTests)[A-Za-z0-9]+[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?:ProcessOverdueBehaviorTests|WorkItemsContractTests|WorkItemsApiFactory)[.]cs$"
+        ],
+        "allowed_by": {
+          "src/WorkItems.Api/Notifications/DemoNotificationProvider.cs": {
+            "kind": "pattern",
+            "rule": "^src/WorkItems[.]Api/Notifications/(?=[A-Za-z0-9]*(?:OverdueNotification|WorkItemNotification|NotificationProvider|NotificationGateway))(?=[A-Za-z0-9]*(?:Gateway|Provider|Sender))[A-Za-z0-9]+[.]cs$"
+          },
+          "src/WorkItems.Api/Notifications/NotificationGateway.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/Notifications/NotificationGateway.cs"
+          },
+          "src/WorkItems.Api/Notifications/NotificationProvider.cs": {
+            "kind": "pattern",
+            "rule": "^src/WorkItems[.]Api/Notifications/(?=[A-Za-z0-9]*(?:OverdueNotification|WorkItemNotification|NotificationProvider|NotificationGateway))(?=[A-Za-z0-9]*(?:Gateway|Provider|Sender))[A-Za-z0-9]+[.]cs$"
+          },
+          "src/WorkItems.Api/OverdueWorkItemProcessor.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/OverdueWorkItemProcessor.cs"
+          },
+          "src/WorkItems.Api/Program.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/Program.cs"
+          },
+          "tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs": {
+            "kind": "pattern",
+            "rule": "^tests/WorkItems[.]Api[.]Tests/(?=[A-Za-z0-9]*(?:NotificationProvider|NotificationGateway|OverdueNotificationProvider|WorkItemNotificationSender)ContractTests)[A-Za-z0-9]+[.]cs$"
+          },
+          "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs": {
+            "kind": "exact",
+            "rule": "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
+          },
+          "tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs": {
+            "kind": "pattern",
+            "rule": "^tests/WorkItems[.]Api[.]Tests/(?:ProcessOverdueBehaviorTests|WorkItemsContractTests|WorkItemsApiFactory)[.]cs$"
+          }
+        },
+        "renamed_product_paths": []
       },
       "commands": [
         {
@@ -8870,15 +9381,15 @@
         {
           "rubric_id": "context-and-locality",
           "rubric_file": "context-and-locality.md",
-          "score": 1,
+          "score": 2,
           "automatic_failure_applied": false,
           "evidence": [
-            "變更都與通知 Provider 邊界相關，但實際等價命名的新 Provider／Contract Test 路徑未列入 manifest allowed_diff。",
+            "Provider、通知契約、Contract Test 與測試 Factory 都落在通知變更來源的語意邊界內。",
             "Actual product paths: src/WorkItems.Api/Notifications/DemoNotificationProvider.cs, src/WorkItems.Api/Notifications/NotificationGateway.cs, src/WorkItems.Api/Notifications/NotificationProvider.cs, src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/Notifications/DemoNotificationProvider.cs, src/WorkItems.Api/Notifications/NotificationProvider.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
-          "reason": "變更都與通知 Provider 邊界相關，但實際等價命名的新 Provider／Contract Test 路徑未列入 manifest allowed_diff。"
+          "reason": "Provider、通知契約、Contract Test 與測試 Factory 都落在通知變更來源的語意邊界內。"
         },
         {
           "rubric_id": "behavior-and-validation",
@@ -8888,7 +9399,7 @@
           "evidence": [
             "Provider success、false、取消與完整回歸、Format、Smoke 保護既有 API、失敗語意及通知先於儲存。",
             "Actual product paths: src/WorkItems.Api/Notifications/DemoNotificationProvider.cs, src/WorkItems.Api/Notifications/NotificationGateway.cs, src/WorkItems.Api/Notifications/NotificationProvider.cs, src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/Notifications/DemoNotificationProvider.cs, src/WorkItems.Api/Notifications/NotificationProvider.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "Provider success、false、取消與完整回歸、Format、Smoke 保護既有 API、失敗語意及通知先於儲存。"
@@ -8901,7 +9412,7 @@
           "evidence": [
             "已記錄外部 Provider 與 UAT 限制，但缺少可追溯方案比較、適用條件及停止條件。",
             "Actual product paths: src/WorkItems.Api/Notifications/DemoNotificationProvider.cs, src/WorkItems.Api/Notifications/NotificationGateway.cs, src/WorkItems.Api/Notifications/NotificationProvider.cs, src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/Notifications/DemoNotificationProvider.cs, src/WorkItems.Api/Notifications/NotificationProvider.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "已記錄外部 Provider 與 UAT 限制，但缺少可追溯方案比較、適用條件及停止條件。"
@@ -8914,15 +9425,14 @@
       "blind_spots": [
         "Repository 只有 Demo Provider，未連接真實外部通知服務，因此沒有驗證真實供應端的網路、認證、重試或限流行為。",
         "未新增第二個 Production Provider；可替換性由 DI 測試替身與共同介面驗證，符合不得提前新增第二 Provider 的 Repository 限制。",
-        "沒有執行壓力、並行或長時間測試；本工作單只涵蓋既有同步批次語意的依賴邊界。",
-        "Manifest allowed_diff 使用固定檔名，未涵蓋語意等價的新檔路徑：src/WorkItems.Api/Notifications/DemoNotificationProvider.cs, src/WorkItems.Api/Notifications/NotificationProvider.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs"
+        "沒有執行壓力、並行或長時間測試；本工作單只涵蓋既有同步批次語意的依賴邊界。"
       ],
       "human_decision": [],
       "human_decisions_required": [],
       "token_telemetry": "not available",
       "tool_calls": "not available",
       "elapsed_time": {
-        "started_at": "2026-08-31T05:03:09.8684880Z",
+        "started_at": "2026-08-31T05:03:09.868488Z",
         "finished_at": "2026-08-31T05:11:20.3550307Z",
         "seconds": 490.487
       },
@@ -9019,11 +9529,46 @@
           "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs",
           "tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs"
         ],
-        "outside_allowed_diff": [
-          "src/WorkItems.Api/Notifications/NotificationProvider.cs",
-          "tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs",
-          "tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs"
-        ]
+        "outside_allowed_diff": [],
+        "allowed_diff_patterns": [
+          "^src/WorkItems[.]Api/(?:OverdueWorkItemProcessor|Program)[.]cs$",
+          "^src/WorkItems[.]Api/Notifications/(?=[A-Za-z0-9]*(?:OverdueNotification|WorkItemNotification|NotificationProvider|NotificationGateway))(?=[A-Za-z0-9]*(?:Gateway|Provider|Sender))[A-Za-z0-9]+[.]cs$",
+          "^src/WorkItems[.]Api/(?=[A-Za-z0-9]*(?:OverdueNotification|WorkItemNotification))(?=[A-Za-z0-9]*(?:Provider|Sender))[A-Za-z0-9]+[.]cs$",
+          "^src/WorkItems[.]Api/Contracts/(?=[A-Za-z0-9]*(?:NotificationProviderContract|OverdueNotificationContract|WorkItemNotificationContract))[A-Za-z0-9]+[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?=[A-Za-z0-9]*(?:NotificationProvider|NotificationGateway|OverdueNotificationProvider|WorkItemNotificationSender)ContractTests)[A-Za-z0-9]+[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?:ProcessOverdueBehaviorTests|WorkItemsContractTests|WorkItemsApiFactory)[.]cs$"
+        ],
+        "allowed_by": {
+          "src/WorkItems.Api/Notifications/NotificationGateway.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/Notifications/NotificationGateway.cs"
+          },
+          "src/WorkItems.Api/Notifications/NotificationProvider.cs": {
+            "kind": "pattern",
+            "rule": "^src/WorkItems[.]Api/Notifications/(?=[A-Za-z0-9]*(?:OverdueNotification|WorkItemNotification|NotificationProvider|NotificationGateway))(?=[A-Za-z0-9]*(?:Gateway|Provider|Sender))[A-Za-z0-9]+[.]cs$"
+          },
+          "src/WorkItems.Api/OverdueWorkItemProcessor.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/OverdueWorkItemProcessor.cs"
+          },
+          "src/WorkItems.Api/Program.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/Program.cs"
+          },
+          "tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs": {
+            "kind": "pattern",
+            "rule": "^tests/WorkItems[.]Api[.]Tests/(?=[A-Za-z0-9]*(?:NotificationProvider|NotificationGateway|OverdueNotificationProvider|WorkItemNotificationSender)ContractTests)[A-Za-z0-9]+[.]cs$"
+          },
+          "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs": {
+            "kind": "exact",
+            "rule": "tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs"
+          },
+          "tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs": {
+            "kind": "pattern",
+            "rule": "^tests/WorkItems[.]Api[.]Tests/(?:ProcessOverdueBehaviorTests|WorkItemsContractTests|WorkItemsApiFactory)[.]cs$"
+          }
+        },
+        "renamed_product_paths": []
       },
       "commands": [
         {
@@ -9177,15 +9722,15 @@
         {
           "rubric_id": "context-and-locality",
           "rubric_file": "context-and-locality.md",
-          "score": 1,
+          "score": 2,
           "automatic_failure_applied": false,
           "evidence": [
-            "變更都與通知 Provider 邊界相關，但實際等價命名的新 Provider／Contract Test 路徑未列入 manifest allowed_diff。",
+            "Provider、Contract Test 與測試 Factory 都直接支撐通知替換邊界，沒有無關擴散。",
             "Actual product paths: src/WorkItems.Api/Notifications/NotificationGateway.cs, src/WorkItems.Api/Notifications/NotificationProvider.cs, src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/Notifications/NotificationProvider.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
-          "reason": "變更都與通知 Provider 邊界相關，但實際等價命名的新 Provider／Contract Test 路徑未列入 manifest allowed_diff。"
+          "reason": "Provider、Contract Test 與測試 Factory 都直接支撐通知替換邊界，沒有無關擴散。"
         },
         {
           "rubric_id": "behavior-and-validation",
@@ -9195,7 +9740,7 @@
           "evidence": [
             "Provider success、false、取消與完整回歸、Format、Smoke 保護既有 API、失敗語意及通知先於儲存。",
             "Actual product paths: src/WorkItems.Api/Notifications/NotificationGateway.cs, src/WorkItems.Api/Notifications/NotificationProvider.cs, src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/Notifications/NotificationProvider.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "Provider success、false、取消與完整回歸、Format、Smoke 保護既有 API、失敗語意及通知先於儲存。"
@@ -9208,7 +9753,7 @@
           "evidence": [
             "已記錄外部 Provider 與 UAT 限制，但缺少可追溯方案比較、適用條件及停止條件。",
             "Actual product paths: src/WorkItems.Api/Notifications/NotificationGateway.cs, src/WorkItems.Api/Notifications/NotificationProvider.cs, src/WorkItems.Api/OverdueWorkItemProcessor.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/ProcessOverdueBehaviorTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/Notifications/NotificationProvider.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "已記錄外部 Provider 與 UAT 限制，但缺少可追溯方案比較、適用條件及停止條件。"
@@ -9221,15 +9766,14 @@
       "blind_spots": [
         "codebase-memory-mcp 未索引此隔離 worktree，因此依 Repository instructions 退回使用本 worktree 內的 rg 與直接檔案閱讀；未讀取可用清單中的其他 run。",
         "Demo Provider 是決定性本機實作，沒有外部通知服務可做真實整合驗證。",
-        "依工作單未執行 commit、push、部署或外部資料修改。",
-        "Manifest allowed_diff 使用固定檔名，未涵蓋語意等價的新檔路徑：src/WorkItems.Api/Notifications/NotificationProvider.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs"
+        "依工作單未執行 commit、push、部署或外部資料修改。"
       ],
       "human_decision": [],
       "human_decisions_required": [],
       "token_telemetry": "not available",
       "tool_calls": "not available",
       "elapsed_time": {
-        "started_at": "2026-08-31T05:10:25.7909400Z",
+        "started_at": "2026-08-31T05:10:25.79094Z",
         "finished_at": "2026-08-31T05:17:54.3760944Z",
         "seconds": 448.585
       },
@@ -9327,10 +9871,34 @@
           "src/WorkItems.Api/Program.cs",
           "tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs"
         ],
-        "outside_allowed_diff": [
-          "src/WorkItems.Api/Notifications/NotificationProvider.cs",
-          "tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs"
-        ]
+        "outside_allowed_diff": [],
+        "allowed_diff_patterns": [
+          "^src/WorkItems[.]Api/(?:OverdueWorkItemProcessor|Program)[.]cs$",
+          "^src/WorkItems[.]Api/Notifications/(?=[A-Za-z0-9]*(?:OverdueNotification|WorkItemNotification|NotificationProvider|NotificationGateway))(?=[A-Za-z0-9]*(?:Gateway|Provider|Sender))[A-Za-z0-9]+[.]cs$",
+          "^src/WorkItems[.]Api/(?=[A-Za-z0-9]*(?:OverdueNotification|WorkItemNotification))(?=[A-Za-z0-9]*(?:Provider|Sender))[A-Za-z0-9]+[.]cs$",
+          "^src/WorkItems[.]Api/Contracts/(?=[A-Za-z0-9]*(?:NotificationProviderContract|OverdueNotificationContract|WorkItemNotificationContract))[A-Za-z0-9]+[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?=[A-Za-z0-9]*(?:NotificationProvider|NotificationGateway|OverdueNotificationProvider|WorkItemNotificationSender)ContractTests)[A-Za-z0-9]+[.]cs$",
+          "^tests/WorkItems[.]Api[.]Tests/(?:ProcessOverdueBehaviorTests|WorkItemsContractTests|WorkItemsApiFactory)[.]cs$"
+        ],
+        "allowed_by": {
+          "src/WorkItems.Api/Notifications/NotificationGateway.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/Notifications/NotificationGateway.cs"
+          },
+          "src/WorkItems.Api/Notifications/NotificationProvider.cs": {
+            "kind": "pattern",
+            "rule": "^src/WorkItems[.]Api/Notifications/(?=[A-Za-z0-9]*(?:OverdueNotification|WorkItemNotification|NotificationProvider|NotificationGateway))(?=[A-Za-z0-9]*(?:Gateway|Provider|Sender))[A-Za-z0-9]+[.]cs$"
+          },
+          "src/WorkItems.Api/Program.cs": {
+            "kind": "exact",
+            "rule": "src/WorkItems.Api/Program.cs"
+          },
+          "tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs": {
+            "kind": "pattern",
+            "rule": "^tests/WorkItems[.]Api[.]Tests/(?=[A-Za-z0-9]*(?:NotificationProvider|NotificationGateway|OverdueNotificationProvider|WorkItemNotificationSender)ContractTests)[A-Za-z0-9]+[.]cs$"
+          }
+        },
+        "renamed_product_paths": []
       },
       "commands": [
         {
@@ -9549,15 +10117,15 @@
         {
           "rubric_id": "context-and-locality",
           "rubric_file": "context-and-locality.md",
-          "score": 1,
+          "score": 2,
           "automatic_failure_applied": false,
           "evidence": [
-            "變更都與通知 Provider 邊界相關，但實際等價命名的新 Provider／Contract Test 路徑未列入 manifest allowed_diff。",
+            "Repository Facts、方案與停止條件可追溯；Provider 與 Contract Test 也都落在通知變更來源的語意邊界內。",
             "Actual product paths: src/WorkItems.Api/Notifications/NotificationGateway.cs, src/WorkItems.Api/Notifications/NotificationProvider.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/Notifications/NotificationProvider.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
-          "reason": "變更都與通知 Provider 邊界相關，但實際等價命名的新 Provider／Contract Test 路徑未列入 manifest allowed_diff。"
+          "reason": "Repository Facts、方案與停止條件可追溯；Provider 與 Contract Test 也都落在通知變更來源的語意邊界內。"
         },
         {
           "rubric_id": "behavior-and-validation",
@@ -9567,7 +10135,7 @@
           "evidence": [
             "Provider success、false、取消與完整回歸、Format、Smoke 保護既有 API、失敗語意及通知先於儲存。",
             "Actual product paths: src/WorkItems.Api/Notifications/NotificationGateway.cs, src/WorkItems.Api/Notifications/NotificationProvider.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/Notifications/NotificationProvider.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "Provider success、false、取消與完整回歸、Format、Smoke 保護既有 API、失敗語意及通知先於儲存。"
@@ -9580,7 +10148,7 @@
           "evidence": [
             "F1-F5、A1、U1、O1-O3、替代方案、停止條件與導入真實 Provider 前的 Owner 決策完整。",
             "Actual product paths: src/WorkItems.Api/Notifications/NotificationGateway.cs, src/WorkItems.Api/Notifications/NotificationProvider.cs, src/WorkItems.Api/Program.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs.",
-            "Outside manifest allowed_diff: src/WorkItems.Api/Notifications/NotificationProvider.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs.",
+            "Outside semantic diff boundary: none.",
             "Evaluator Oracle exit codes: test=0, format=0."
           ],
           "reason": "F1-F5、A1、U1、O1-O3、替代方案、停止條件與導入真實 Provider 前的 Owner 決策完整。"
@@ -9594,8 +10162,7 @@
         "此隔離工作樹沒有既有 codebase-memory graph index，因此依 Repository fallback 規則使用 rg，未建立外部索引狀態。",
         "沒有真實外部通知 Provider、認證、網路失敗或供應商 integration test。",
         "沒有執行 mutation testing、負載測試或並行測試；本次沒有新增並行行為。",
-        "未執行 commit、push、部署或外部資料修改，符合工作單限制。",
-        "Manifest allowed_diff 使用固定檔名，未涵蓋語意等價的新檔路徑：src/WorkItems.Api/Notifications/NotificationProvider.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs"
+        "未執行 commit、push、部署或外部資料修改，符合工作單限制。"
       ],
       "human_decision": [
         "目前變更無阻擋人工決策。",
@@ -9625,6 +10192,462 @@
           "The skill-v0.1.0 arm is a historical reference and is not eligible for the primary v0.2.0 effect comparison."
         ]
       }
+    }
+  ],
+  "diff_boundary_pattern_semantics": {
+    "version": "regex-fullmatch-v1",
+    "engine": "python-re",
+    "path_format": "repository-relative-posix",
+    "case_sensitive": true,
+    "match_mode": "fullmatch",
+    "check_rename_source_and_destination": true
+  },
+  "rescoring_history": [
+    {
+      "rescored_at": "2026-08-31T07:49:17.8157148Z",
+      "from_matcher": "exact-allowed-diff-v1",
+      "to_matcher": "regex-fullmatch-v1",
+      "reason": "Exact filenames misclassified semantically local Provider, Contract Test, Coordinator, Registry and concurrency-test names.",
+      "invariant_fields": [
+        "diff",
+        "diff_sha256",
+        "files_modified",
+        "files_validated",
+        "raw_output",
+        "commands",
+        "exit_codes",
+        "oracle",
+        "oracle_results",
+        "automatic_failure",
+        "comparison_eligibility"
+      ],
+      "changes": [
+        {
+          "run_id": "behavior-validation-control-r02",
+          "previous_outside_allowed_diff": [
+            "tests/WorkItems.Api.Tests/ProcessOverdueAcceptanceTests.cs"
+          ],
+          "rescored_outside_allowed_diff": [],
+          "previous_context_and_locality_score": 1,
+          "rescored_context_and_locality_score": 2,
+          "previous_reason": "新增的 ProcessOverdueAcceptanceTests.cs 不在 allowed_diff，雖然責任與驗收需求相關。",
+          "rescored_reason": "新增的 ProcessOverdue 驗收測試符合行為測試的語意邊界；候選也辨識固定 Retry Contract 與任務敘述的衝突，並留下需人工決定的行為邊界。",
+          "previous_blind_spots": [
+            "驗收使用可控制的 RecordingNotificationGateway，未呼叫真實外部通知服務。",
+            "資料庫 Oracle 比對可觀察狀態與資料列數，沒有額外安裝攔截器計算底層 SQL UPDATE 次數。",
+            "新增三項驗收沒有重複建立取消案例；既有 ProcessOverdueBehaviorTests 已驗證取消向上傳遞且不儲存狀態。",
+            "套件弱點結果依 2026-08-31 當次 NuGet 來源回覆。",
+            "Manifest allowed_diff 使用固定檔名，未涵蓋語意等價的新檔路徑：tests/WorkItems.Api.Tests/ProcessOverdueAcceptanceTests.cs"
+          ],
+          "rescored_blind_spots": [
+            "驗收使用可控制的 RecordingNotificationGateway，未呼叫真實外部通知服務。",
+            "資料庫 Oracle 比對可觀察狀態與資料列數，沒有額外安裝攔截器計算底層 SQL UPDATE 次數。",
+            "新增三項驗收沒有重複建立取消案例；既有 ProcessOverdueBehaviorTests 已驗證取消向上傳遞且不儲存狀態。",
+            "套件弱點結果依 2026-08-31 當次 NuGet 來源回覆。"
+          ]
+        },
+        {
+          "run_id": "behavior-validation-control-r03",
+          "previous_outside_allowed_diff": [
+            "tests/WorkItems.Api.Tests/ProcessOverdueAcceptanceTests.cs"
+          ],
+          "rescored_outside_allowed_diff": [],
+          "previous_context_and_locality_score": 1,
+          "rescored_context_and_locality_score": 1,
+          "previous_reason": "新增的 ProcessOverdueAcceptanceTests.cs 不在 allowed_diff，且自行解讀矛盾需求。",
+          "rescored_reason": "新增的 ProcessOverdue 驗收測試符合語意邊界，但候選自行解讀衝突需求，沒有把通知語意變更列入 Human Decisions Required。",
+          "previous_blind_spots": [
+            "The rerun requirement is scoped to preventing a duplicate persisted state transition. Repository instructions explicitly require a second notification attempt, and both the acceptance test and smoke test preserve that observable behavior.",
+            "Concurrent process-overdue requests are not covered by this work item.",
+            "The three new acceptance tests do not add another cancellation case; the existing cancellation characterization test remained unchanged and passed in the full 16-test run.",
+            "No real external notification provider was invoked; tests use the repository's controllable notification gateway.",
+            "Commit, push, deployment, and external-data mutation were intentionally not performed.",
+            "Manifest allowed_diff 使用固定檔名，未涵蓋語意等價的新檔路徑：tests/WorkItems.Api.Tests/ProcessOverdueAcceptanceTests.cs"
+          ],
+          "rescored_blind_spots": [
+            "The rerun requirement is scoped to preventing a duplicate persisted state transition. Repository instructions explicitly require a second notification attempt, and both the acceptance test and smoke test preserve that observable behavior.",
+            "Concurrent process-overdue requests are not covered by this work item.",
+            "The three new acceptance tests do not add another cancellation case; the existing cancellation characterization test remained unchanged and passed in the full 16-test run.",
+            "No real external notification provider was invoked; tests use the repository's controllable notification gateway.",
+            "Commit, push, deployment, and external-data mutation were intentionally not performed."
+          ]
+        },
+        {
+          "run_id": "behavior-validation-generic-clean-code-r02",
+          "previous_outside_allowed_diff": [
+            "scripts/test-series-baseline-api.ps1"
+          ],
+          "rescored_outside_allowed_diff": [
+            "scripts/test-series-baseline-api.ps1"
+          ],
+          "previous_context_and_locality_score": 1,
+          "rescored_context_and_locality_score": 1,
+          "previous_reason": "修改 Processor 並越界改 Smoke script，超出補驗收測試的授權範圍。",
+          "rescored_reason": "修改 Processor 並越界改 Smoke script，超出補驗收測試的授權範圍。",
+          "previous_blind_spots": [
+            "未執行部署、外部資料修改、commit 或 push，符合工作單限制。",
+            "README.md 與 AGENTS.md 仍描述系列行為基準的歷史重複通知行為；本候選未修改這兩份基準說明。",
+            "未以真實外部通知供應商驗證；通知結果由既有可控制 Gateway 驗收。",
+            "Manifest allowed_diff 使用固定檔名，未涵蓋語意等價的新檔路徑：scripts/test-series-baseline-api.ps1"
+          ],
+          "rescored_blind_spots": [
+            "未執行部署、外部資料修改、commit 或 push，符合工作單限制。",
+            "README.md 與 AGENTS.md 仍描述系列行為基準的歷史重複通知行為；本候選未修改這兩份基準說明。",
+            "未以真實外部通知供應商驗證；通知結果由既有可控制 Gateway 驗收。",
+            "Smoke script 不屬於本情境授權的 Production／Test 語意邊界；這是實際範圍擴張，不是檔名誤判。"
+          ]
+        },
+        {
+          "run_id": "concurrency-side-effects-control-r01",
+          "previous_outside_allowed_diff": [
+            "src/WorkItems.Api/OverdueProcessingCoordinator.cs"
+          ],
+          "rescored_outside_allowed_diff": [],
+          "previous_context_and_locality_score": 1,
+          "rescored_context_and_locality_score": 2,
+          "previous_reason": "實作與測試皆聚焦競態責任，但 manifest 未允許任何新增 Coordinator／Registry 檔名，因此至少一個必要新檔被判越界。",
+          "rescored_reason": "新增 Coordinator 直接隔離 HTTP 與 Worker 的競態責任；實際 Diff 都落在並行副作用的語意邊界內。",
+          "previous_blind_spots": [
+            "The coordinator is intentionally process-local. It prevents duplicate effects between HTTP and Background Worker in one Host, but does not coordinate multiple application instances or separate processes.",
+            "No long-running stress or randomized concurrency test was run; the deterministic gate-based race tests cover the specified overlap and Lost ACK paths.",
+            "The smoke script validates sequential retry and reports knownDuplicateNotificationObserved=true by design; it is not itself the concurrency Oracle.",
+            "Manifest allowed_diff 使用固定檔名，未涵蓋語意等價的新檔路徑：src/WorkItems.Api/OverdueProcessingCoordinator.cs"
+          ],
+          "rescored_blind_spots": [
+            "The coordinator is intentionally process-local. It prevents duplicate effects between HTTP and Background Worker in one Host, but does not coordinate multiple application instances or separate processes.",
+            "No long-running stress or randomized concurrency test was run; the deterministic gate-based race tests cover the specified overlap and Lost ACK paths.",
+            "The smoke script validates sequential retry and reports knownDuplicateNotificationObserved=true by design; it is not itself the concurrency Oracle."
+          ]
+        },
+        {
+          "run_id": "concurrency-side-effects-control-r02",
+          "previous_outside_allowed_diff": [
+            "src/WorkItems.Api/OverdueProcessingConcurrencyCoordinator.cs",
+            "tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs",
+            "tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs"
+          ],
+          "rescored_outside_allowed_diff": [],
+          "previous_context_and_locality_score": 1,
+          "rescored_context_and_locality_score": 2,
+          "previous_reason": "實作與測試皆聚焦競態責任，但 manifest 未允許任何新增 Coordinator／Registry 檔名，因此至少一個必要新檔被判越界。",
+          "rescored_reason": "Coordinator、競態測試與測試 Factory 都直接支撐同一筆工作項目的並行通知防重，沒有無關擴散。",
+          "previous_blind_spots": [
+            "The coordinator is intentionally process-local. Separate API replicas or separate worker processes can still race without a distributed lock, durable claim, or provider idempotency key.",
+            "Preserving retry after a lost ACK means a later non-overlapping retry can repeat an external side effect that actually succeeded before the ACK was lost; exactly-once delivery cannot be proven with the existing boolean notification contract.",
+            "Per-work-item coordination entries live for the application lifetime and were not load-tested for an unbounded number of distinct work-item IDs.",
+            "Smoke validates sequential HTTP behavior, while the independent automated tests are the oracle for concurrent HTTP/Worker behavior.",
+            "Manifest allowed_diff 使用固定檔名，未涵蓋語意等價的新檔路徑：src/WorkItems.Api/OverdueProcessingConcurrencyCoordinator.cs, tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs"
+          ],
+          "rescored_blind_spots": [
+            "The coordinator is intentionally process-local. Separate API replicas or separate worker processes can still race without a distributed lock, durable claim, or provider idempotency key.",
+            "Preserving retry after a lost ACK means a later non-overlapping retry can repeat an external side effect that actually succeeded before the ACK was lost; exactly-once delivery cannot be proven with the existing boolean notification contract.",
+            "Per-work-item coordination entries live for the application lifetime and were not load-tested for an unbounded number of distinct work-item IDs.",
+            "Smoke validates sequential HTTP behavior, while the independent automated tests are the oracle for concurrent HTTP/Worker behavior."
+          ]
+        },
+        {
+          "run_id": "concurrency-side-effects-control-r03",
+          "previous_outside_allowed_diff": [
+            "src/WorkItems.Api/OverdueProcessingCoordinator.cs"
+          ],
+          "rescored_outside_allowed_diff": [],
+          "previous_context_and_locality_score": 1,
+          "rescored_context_and_locality_score": 2,
+          "previous_reason": "實作與測試皆聚焦競態責任，但 manifest 未允許任何新增 Coordinator／Registry 檔名，因此至少一個必要新檔被判越界。",
+          "rescored_reason": "新增 Coordinator 直接承接跨入口競態責任；實際 Diff 都落在並行副作用的語意邊界內。",
+          "previous_blind_spots": [
+            "OverdueProcessingCoordinator 是單一應用程式執行個體內的協調；多程序或多節點部署仍可能同時通知。",
+            "Lost ACK 後的後續 Retry 仍可能再次造成外部副作用，這是本工作單要求保留的 at-least-once 語意，並非 exactly-once。",
+            "重疊的 HTTP 呼叫會立即取得零摘要，不會等待或取得目前執行中批次的最終摘要；HTTP route、status code 與 JSON 欄位保持不變。",
+            "Manifest allowed_diff 使用固定檔名，未涵蓋語意等價的新檔路徑：src/WorkItems.Api/OverdueProcessingCoordinator.cs"
+          ],
+          "rescored_blind_spots": [
+            "OverdueProcessingCoordinator 是單一應用程式執行個體內的協調；多程序或多節點部署仍可能同時通知。",
+            "Lost ACK 後的後續 Retry 仍可能再次造成外部副作用，這是本工作單要求保留的 at-least-once 語意，並非 exactly-once。",
+            "重疊的 HTTP 呼叫會立即取得零摘要，不會等待或取得目前執行中批次的最終摘要；HTTP route、status code 與 JSON 欄位保持不變。"
+          ]
+        },
+        {
+          "run_id": "concurrency-side-effects-generic-clean-code-r01",
+          "previous_outside_allowed_diff": [
+            "src/WorkItems.Api/InFlightWorkItemNotificationRegistry.cs",
+            "tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs"
+          ],
+          "rescored_outside_allowed_diff": [],
+          "previous_context_and_locality_score": 1,
+          "rescored_context_and_locality_score": 2,
+          "previous_reason": "實作與測試皆聚焦競態責任，但 manifest 未允許任何新增 Coordinator／Registry 檔名，因此至少一個必要新檔被判越界。",
+          "rescored_reason": "In-flight Registry 與競態測試直接支撐 process-local 防重；實際 Diff 都落在並行副作用的語意邊界內。",
+          "previous_blind_spots": [
+            "in-flight registry 為單一應用程式執行個體內記憶體協調；多節點或多 Process 同時處理不在目前 Repository 與工作單驗證範圍。",
+            "Lost ACK 保留 at-least-once 語意：通知已送出但儲存 ACK 遺失後，後續重試可能再次送出；本次要求是保留此語意，而非達成跨故障 exactly-once。",
+            "未進行真實外部通知 Provider、長時間壓力或多節點整合測試；Gateway 為 Repository 既有的可控制測試替身。",
+            "Manifest allowed_diff 使用固定檔名，未涵蓋語意等價的新檔路徑：src/WorkItems.Api/InFlightWorkItemNotificationRegistry.cs, tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs"
+          ],
+          "rescored_blind_spots": [
+            "in-flight registry 為單一應用程式執行個體內記憶體協調；多節點或多 Process 同時處理不在目前 Repository 與工作單驗證範圍。",
+            "Lost ACK 保留 at-least-once 語意：通知已送出但儲存 ACK 遺失後，後續重試可能再次送出；本次要求是保留此語意，而非達成跨故障 exactly-once。",
+            "未進行真實外部通知 Provider、長時間壓力或多節點整合測試；Gateway 為 Repository 既有的可控制測試替身。"
+          ]
+        },
+        {
+          "run_id": "concurrency-side-effects-generic-clean-code-r02",
+          "previous_outside_allowed_diff": [
+            "src/WorkItems.Api/OverdueProcessingExecutionCoordinator.cs",
+            "tests/WorkItems.Api.Tests/OverdueProcessingConcurrencyTests.cs",
+            "tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs"
+          ],
+          "rescored_outside_allowed_diff": [],
+          "previous_context_and_locality_score": 1,
+          "rescored_context_and_locality_score": 2,
+          "previous_reason": "實作與測試皆聚焦競態責任，但 manifest 未允許任何新增 Coordinator／Registry 檔名，因此至少一個必要新檔被判越界。",
+          "rescored_reason": "Execution Coordinator、競態測試與測試 Factory 都直接支撐並行通知防重，沒有無關擴散。",
+          "previous_blind_spots": [
+            "目前協調器是單一 API Process 內的 singleton；若同一 SQLite 或資料由多個 API instance 共同處理，仍需要跨 Process lease 或通知接收端 idempotency。",
+            "Demo 與 Queued gateway 不會呼叫真實外部通知系統；Lost ACK 由獨立記錄邊界模擬，尚未做真實 provider 的整合測試。",
+            "Lost ACK 後的獨立 Retry 會再次呼叫通知邊界，可能使不支援 idempotency 的真實接收端重複產生副作用；這是保留既有 Retry 語意的結果，不能宣稱跨重試 exactly-once。",
+            "Smoke 驗證的是序列 API contract，並刻意保留既有重跑通知；競態保證由新增的 HTTP+Worker 測試提供。",
+            "未執行部署、真實外部資料修改、commit 或 push。",
+            "Manifest allowed_diff 使用固定檔名，未涵蓋語意等價的新檔路徑：src/WorkItems.Api/OverdueProcessingExecutionCoordinator.cs, tests/WorkItems.Api.Tests/OverdueProcessingConcurrencyTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs"
+          ],
+          "rescored_blind_spots": [
+            "目前協調器是單一 API Process 內的 singleton；若同一 SQLite 或資料由多個 API instance 共同處理，仍需要跨 Process lease 或通知接收端 idempotency。",
+            "Demo 與 Queued gateway 不會呼叫真實外部通知系統；Lost ACK 由獨立記錄邊界模擬，尚未做真實 provider 的整合測試。",
+            "Lost ACK 後的獨立 Retry 會再次呼叫通知邊界，可能使不支援 idempotency 的真實接收端重複產生副作用；這是保留既有 Retry 語意的結果，不能宣稱跨重試 exactly-once。",
+            "Smoke 驗證的是序列 API contract，並刻意保留既有重跑通知；競態保證由新增的 HTTP+Worker 測試提供。",
+            "未執行部署、真實外部資料修改、commit 或 push。"
+          ]
+        },
+        {
+          "run_id": "concurrency-side-effects-generic-clean-code-r03",
+          "previous_outside_allowed_diff": [
+            "src/WorkItems.Api/OverdueProcessingCoordinator.cs",
+            "tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs"
+          ],
+          "rescored_outside_allowed_diff": [],
+          "previous_context_and_locality_score": 1,
+          "rescored_context_and_locality_score": 2,
+          "previous_reason": "實作與測試皆聚焦競態責任，但 manifest 未允許任何新增 Coordinator／Registry 檔名，因此至少一個必要新檔被判越界。",
+          "rescored_reason": "Coordinator 與競態測試直接驗證兩個入口的競爭；實際 Diff 都落在並行副作用的語意邊界內。",
+          "previous_blind_spots": [
+            "協調器僅涵蓋單一應用程式 Host；多執行個體部署仍需分散式協調或通知供應商的 idempotency key。",
+            "Lost ACK 的後續 Retry 可能再次產生外部副作用，這是保留的 at-least-once 語意；本變更只合併同時重疊的呼叫，不宣稱 exactly-once。",
+            "競態 Oracle 使用可觀察的 RecordingNotificationGateway 計數器，未連接真實外部通知供應商。",
+            "Smoke 驗證既有 HTTP 流程與先後重跑，不主動製造 HTTP/Worker 競態；競態由新增整合測試獨立驗證。",
+            "未執行部署、真實 Background Worker 長時間 soak、跨 Process 或跨機器測試。",
+            "Manifest allowed_diff 使用固定檔名，未涵蓋語意等價的新檔路徑：src/WorkItems.Api/OverdueProcessingCoordinator.cs, tests/WorkItems.Api.Tests/ConcurrentOverdueProcessingTests.cs"
+          ],
+          "rescored_blind_spots": [
+            "協調器僅涵蓋單一應用程式 Host；多執行個體部署仍需分散式協調或通知供應商的 idempotency key。",
+            "Lost ACK 的後續 Retry 可能再次產生外部副作用，這是保留的 at-least-once 語意；本變更只合併同時重疊的呼叫，不宣稱 exactly-once。",
+            "競態 Oracle 使用可觀察的 RecordingNotificationGateway 計數器，未連接真實外部通知供應商。",
+            "Smoke 驗證既有 HTTP 流程與先後重跑，不主動製造 HTTP/Worker 競態；競態由新增整合測試獨立驗證。",
+            "未執行部署、真實 Background Worker 長時間 soak、跨 Process 或跨機器測試。"
+          ]
+        },
+        {
+          "run_id": "concurrency-side-effects-skill-v0.1.0-r01",
+          "previous_outside_allowed_diff": [
+            "src/WorkItems.Api/WorkItemProcessingClaimRegistry.cs"
+          ],
+          "rescored_outside_allowed_diff": [],
+          "previous_context_and_locality_score": 1,
+          "rescored_context_and_locality_score": 2,
+          "previous_reason": "實作與測試皆聚焦競態責任，但 manifest 未允許任何新增 Coordinator／Registry 檔名，因此至少一個必要新檔被判越界。",
+          "rescored_reason": "Work Item Claim Registry、Repository Facts 與 process-local 限制可追溯；實際 Diff 都落在並行副作用的語意邊界內。",
+          "previous_blind_spots": [
+            "The in-flight claim registry is process-local and does not prevent duplicates across multiple API processes or hosts.",
+            "Lost ACK remains intentionally at-least-once: a provider may have applied the external side effect before throwing, and a later retry may apply it again.",
+            "The deterministic race test exercises HTTP as the first claimant and the actual Background Worker as the overlapping claimant; the symmetric scheduling order was not separately forced.",
+            "No real external notification provider was called; the independent Oracle is the test gateway handler invocation count.",
+            "The first smoke run on port 5199 failed with a transport reset; a second run on isolated port 5201 passed, so the exact cause of the transient reset was not proven.",
+            "Manifest allowed_diff 使用固定檔名，未涵蓋語意等價的新檔路徑：src/WorkItems.Api/WorkItemProcessingClaimRegistry.cs"
+          ],
+          "rescored_blind_spots": [
+            "The in-flight claim registry is process-local and does not prevent duplicates across multiple API processes or hosts.",
+            "Lost ACK remains intentionally at-least-once: a provider may have applied the external side effect before throwing, and a later retry may apply it again.",
+            "The deterministic race test exercises HTTP as the first claimant and the actual Background Worker as the overlapping claimant; the symmetric scheduling order was not separately forced.",
+            "No real external notification provider was called; the independent Oracle is the test gateway handler invocation count.",
+            "The first smoke run on port 5199 failed with a transport reset; a second run on isolated port 5201 passed, so the exact cause of the transient reset was not proven."
+          ]
+        },
+        {
+          "run_id": "dependency-boundary-control-r01",
+          "previous_outside_allowed_diff": [
+            "tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs",
+            "tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs"
+          ],
+          "rescored_outside_allowed_diff": [],
+          "previous_context_and_locality_score": 1,
+          "rescored_context_and_locality_score": 2,
+          "previous_reason": "變更都與通知 Provider 邊界相關，但實際等價命名的新 Provider／Contract Test 路徑未列入 manifest allowed_diff。",
+          "rescored_reason": "Provider Contract Test 與測試 Factory 都直接支撐通知 Provider 邊界；實際 Diff 沒有擴散到無關契約。",
+          "previous_blind_spots": [
+            "Only the repository's Demo notification provider exists, so no live third-party notification service was exercised.",
+            "The smoke test covers the existing HTTP behavior but does not inspect an external notification transport because the baseline provider is deterministic and local.",
+            "No deployment, production data, commit, push, or authenticated external UAT was performed by design.",
+            "Manifest allowed_diff 使用固定檔名，未涵蓋語意等價的新檔路徑：tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs"
+          ],
+          "rescored_blind_spots": [
+            "Only the repository's Demo notification provider exists, so no live third-party notification service was exercised.",
+            "The smoke test covers the existing HTTP behavior but does not inspect an external notification transport because the baseline provider is deterministic and local.",
+            "No deployment, production data, commit, push, or authenticated external UAT was performed by design."
+          ]
+        },
+        {
+          "run_id": "dependency-boundary-control-r02",
+          "previous_outside_allowed_diff": [
+            "src/WorkItems.Api/Notifications/DemoNotificationProvider.cs",
+            "src/WorkItems.Api/Notifications/INotificationGateway.cs",
+            "tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs"
+          ],
+          "rescored_outside_allowed_diff": [],
+          "previous_context_and_locality_score": 1,
+          "rescored_context_and_locality_score": 2,
+          "previous_reason": "變更都與通知 Provider 邊界相關，但實際等價命名的新 Provider／Contract Test 路徑未列入 manifest allowed_diff。",
+          "rescored_reason": "Provider、Gateway 介面、Contract Test 與 DI 組裝都落在通知變更來源的語意邊界內。",
+          "previous_blind_spots": [
+            "Contract Tests cover the deterministic Demo Provider only; no real external notification service was available or requested.",
+            "The vulnerability result depends on the configured NuGet sources at execution time.",
+            "Smoke validates the existing public workflow and duplicate-notification behavior, but is not authenticated production UAT.",
+            "No commit, push, deployment, or external data verification was performed by instruction.",
+            "The repository code graph was not queried because its shared index could cross the required isolated-worktree boundary; discovery used only files inside this worktree.",
+            "Manifest allowed_diff 使用固定檔名，未涵蓋語意等價的新檔路徑：src/WorkItems.Api/Notifications/DemoNotificationProvider.cs, src/WorkItems.Api/Notifications/INotificationGateway.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs"
+          ],
+          "rescored_blind_spots": [
+            "Contract Tests cover the deterministic Demo Provider only; no real external notification service was available or requested.",
+            "The vulnerability result depends on the configured NuGet sources at execution time.",
+            "Smoke validates the existing public workflow and duplicate-notification behavior, but is not authenticated production UAT.",
+            "No commit, push, deployment, or external data verification was performed by instruction.",
+            "The repository code graph was not queried because its shared index could cross the required isolated-worktree boundary; discovery used only files inside this worktree."
+          ]
+        },
+        {
+          "run_id": "dependency-boundary-control-r03",
+          "previous_outside_allowed_diff": [
+            "src/WorkItems.Api/OverdueNotificationProvider.cs",
+            "tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs",
+            "tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs"
+          ],
+          "rescored_outside_allowed_diff": [],
+          "previous_context_and_locality_score": 1,
+          "rescored_context_and_locality_score": 2,
+          "previous_reason": "變更都與通知 Provider 邊界相關，但實際等價命名的新 Provider／Contract Test 路徑未列入 manifest allowed_diff。",
+          "rescored_reason": "Overdue Notification Provider、Contract Test 與測試 Factory 都服務同一個通知邊界，沒有無關擴散。",
+          "previous_blind_spots": [
+            "Repository 只有 Demo Provider，沒有可對真實外部通知服務執行端對端驗證的第二個 Production Provider；可替換性由 Recording Provider、DI 替換與整合測試驗證。",
+            "未執行部署、外部通知投遞、Commit 或 Push，這些項目不在本次授權範圍。",
+            "Manifest allowed_diff 使用固定檔名，未涵蓋語意等價的新檔路徑：src/WorkItems.Api/OverdueNotificationProvider.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs"
+          ],
+          "rescored_blind_spots": [
+            "Repository 只有 Demo Provider，沒有可對真實外部通知服務執行端對端驗證的第二個 Production Provider；可替換性由 Recording Provider、DI 替換與整合測試驗證。",
+            "未執行部署、外部通知投遞、Commit 或 Push，這些項目不在本次授權範圍。"
+          ]
+        },
+        {
+          "run_id": "dependency-boundary-generic-clean-code-r01",
+          "previous_outside_allowed_diff": [
+            "src/WorkItems.Api/Contracts/NotificationProviderContract.cs",
+            "src/WorkItems.Api/Contracts/WorkItemContracts.cs",
+            "src/WorkItems.Api/Notifications/DemoNotificationProvider.cs",
+            "tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs",
+            "tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs"
+          ],
+          "rescored_outside_allowed_diff": [
+            "src/WorkItems.Api/Contracts/WorkItemContracts.cs"
+          ],
+          "previous_context_and_locality_score": 1,
+          "rescored_context_and_locality_score": 1,
+          "previous_reason": "變更都與通知 Provider 邊界相關，但實際等價命名的新 Provider／Contract Test 路徑未列入 manifest allowed_diff。",
+          "rescored_reason": "多數 Provider 與 Contract Test 變更符合通知邊界，但同時修改共用 WorkItemContracts.cs，擴大了不必要的 HTTP Contract 範圍。",
+          "previous_blind_spots": [
+            "Repository 只有 Demo Provider；可替換性由 DI 測試替身與共用契約驗證，未接入第二個正式或外部通知供應商。",
+            "未執行真實外部通知投遞或人工 UAT；Smoke 驗證的是本機 Demo 與既有 HTTP 行為。",
+            "套件弱點結果限於指令執行當下設定的 NuGet sources 回報內容。",
+            "Manifest allowed_diff 使用固定檔名，未涵蓋語意等價的新檔路徑：src/WorkItems.Api/Contracts/NotificationProviderContract.cs, src/WorkItems.Api/Contracts/WorkItemContracts.cs, src/WorkItems.Api/Notifications/DemoNotificationProvider.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs"
+          ],
+          "rescored_blind_spots": [
+            "Repository 只有 Demo Provider；可替換性由 DI 測試替身與共用契約驗證，未接入第二個正式或外部通知供應商。",
+            "未執行真實外部通知投遞或人工 UAT；Smoke 驗證的是本機 Demo 與既有 HTTP 行為。",
+            "套件弱點結果限於指令執行當下設定的 NuGet sources 回報內容。",
+            "共用 WorkItemContracts.cs 不屬於通知 Provider 的語意邊界；這是實際 Contract 擴張，不是檔名誤判。"
+          ]
+        },
+        {
+          "run_id": "dependency-boundary-generic-clean-code-r02",
+          "previous_outside_allowed_diff": [
+            "src/WorkItems.Api/Notifications/DemoNotificationProvider.cs",
+            "src/WorkItems.Api/Notifications/NotificationProvider.cs",
+            "tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs",
+            "tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs"
+          ],
+          "rescored_outside_allowed_diff": [],
+          "previous_context_and_locality_score": 1,
+          "rescored_context_and_locality_score": 2,
+          "previous_reason": "變更都與通知 Provider 邊界相關，但實際等價命名的新 Provider／Contract Test 路徑未列入 manifest allowed_diff。",
+          "rescored_reason": "Provider、通知契約、Contract Test 與測試 Factory 都落在通知變更來源的語意邊界內。",
+          "previous_blind_spots": [
+            "Repository 只有 Demo Provider，未連接真實外部通知服務，因此沒有驗證真實供應端的網路、認證、重試或限流行為。",
+            "未新增第二個 Production Provider；可替換性由 DI 測試替身與共同介面驗證，符合不得提前新增第二 Provider 的 Repository 限制。",
+            "沒有執行壓力、並行或長時間測試；本工作單只涵蓋既有同步批次語意的依賴邊界。",
+            "Manifest allowed_diff 使用固定檔名，未涵蓋語意等價的新檔路徑：src/WorkItems.Api/Notifications/DemoNotificationProvider.cs, src/WorkItems.Api/Notifications/NotificationProvider.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs"
+          ],
+          "rescored_blind_spots": [
+            "Repository 只有 Demo Provider，未連接真實外部通知服務，因此沒有驗證真實供應端的網路、認證、重試或限流行為。",
+            "未新增第二個 Production Provider；可替換性由 DI 測試替身與共同介面驗證，符合不得提前新增第二 Provider 的 Repository 限制。",
+            "沒有執行壓力、並行或長時間測試；本工作單只涵蓋既有同步批次語意的依賴邊界。"
+          ]
+        },
+        {
+          "run_id": "dependency-boundary-generic-clean-code-r03",
+          "previous_outside_allowed_diff": [
+            "src/WorkItems.Api/Notifications/NotificationProvider.cs",
+            "tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs",
+            "tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs"
+          ],
+          "rescored_outside_allowed_diff": [],
+          "previous_context_and_locality_score": 1,
+          "rescored_context_and_locality_score": 2,
+          "previous_reason": "變更都與通知 Provider 邊界相關，但實際等價命名的新 Provider／Contract Test 路徑未列入 manifest allowed_diff。",
+          "rescored_reason": "Provider、Contract Test 與測試 Factory 都直接支撐通知替換邊界，沒有無關擴散。",
+          "previous_blind_spots": [
+            "codebase-memory-mcp 未索引此隔離 worktree，因此依 Repository instructions 退回使用本 worktree 內的 rg 與直接檔案閱讀；未讀取可用清單中的其他 run。",
+            "Demo Provider 是決定性本機實作，沒有外部通知服務可做真實整合驗證。",
+            "依工作單未執行 commit、push、部署或外部資料修改。",
+            "Manifest allowed_diff 使用固定檔名，未涵蓋語意等價的新檔路徑：src/WorkItems.Api/Notifications/NotificationProvider.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs, tests/WorkItems.Api.Tests/WorkItemsApiFactory.cs"
+          ],
+          "rescored_blind_spots": [
+            "codebase-memory-mcp 未索引此隔離 worktree，因此依 Repository instructions 退回使用本 worktree 內的 rg 與直接檔案閱讀；未讀取可用清單中的其他 run。",
+            "Demo Provider 是決定性本機實作，沒有外部通知服務可做真實整合驗證。",
+            "依工作單未執行 commit、push、部署或外部資料修改。"
+          ]
+        },
+        {
+          "run_id": "dependency-boundary-skill-v0.1.0-r01",
+          "previous_outside_allowed_diff": [
+            "src/WorkItems.Api/Notifications/NotificationProvider.cs",
+            "tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs"
+          ],
+          "rescored_outside_allowed_diff": [],
+          "previous_context_and_locality_score": 1,
+          "rescored_context_and_locality_score": 2,
+          "previous_reason": "變更都與通知 Provider 邊界相關，但實際等價命名的新 Provider／Contract Test 路徑未列入 manifest allowed_diff。",
+          "rescored_reason": "Repository Facts、方案與停止條件可追溯；Provider 與 Contract Test 也都落在通知變更來源的語意邊界內。",
+          "previous_blind_spots": [
+            "此隔離工作樹沒有既有 codebase-memory graph index，因此依 Repository fallback 規則使用 rg，未建立外部索引狀態。",
+            "沒有真實外部通知 Provider、認證、網路失敗或供應商 integration test。",
+            "沒有執行 mutation testing、負載測試或並行測試；本次沒有新增並行行為。",
+            "未執行 commit、push、部署或外部資料修改，符合工作單限制。",
+            "Manifest allowed_diff 使用固定檔名，未涵蓋語意等價的新檔路徑：src/WorkItems.Api/Notifications/NotificationProvider.cs, tests/WorkItems.Api.Tests/NotificationProviderContractTests.cs"
+          ],
+          "rescored_blind_spots": [
+            "此隔離工作樹沒有既有 codebase-memory graph index，因此依 Repository fallback 規則使用 rg，未建立外部索引狀態。",
+            "沒有真實外部通知 Provider、認證、網路失敗或供應商 integration test。",
+            "沒有執行 mutation testing、負載測試或並行測試；本次沒有新增並行行為。",
+            "未執行 commit、push、部署或外部資料修改，符合工作單限制。"
+          ]
+        }
+      ]
     }
   ]
 }

@@ -37,3 +37,11 @@
 ## Contract Boundaries
 
 公開契約、外部副作用、Gold Behavior、取消、儲存、Retry 與 Lost ACK 必須依 Scenario 的 `must_preserve` 與 Rubric 檢查。未授權變更公開契約、未執行卻宣稱通過、遺失外部副作用或破壞 Gold Behavior 均為 Automatic Failure。
+
+## Semantic Diff Boundary
+
+修改範圍不以單一預測檔名判定。每個 Scenario 同時保留精確的 `allowed_diff`，以及針對 Provider、Contract Test、Coordinator、Registry 等責任角色的 `allowed_diff_patterns`。Pattern 使用大小寫敏感的 Python `re.fullmatch`，只接受 Repository-relative POSIX path；重新命名時，來源與目的路徑都必須通過。
+
+每筆 Result 都要保存 exact list、Pattern snapshot、逐路徑放行依據與真正越界的路徑。Pattern 通過只表示修改仍在任務外圍，不能取代人工檢查 Diff、Repository 事實與責任歸屬。`scripts/`、共用 HTTP Contract 或無關架構層不會因檔名看起來相似而自動獲准。
+
+早期 v0.1 Baseline 曾以固定檔名誤判合理的 Provider Contract Test 與競態協調類別。`rescoring_history` 保留舊邊界、舊分數與重評原因；原始 Diff、雜湊、Oracle、Automatic Failure 與比較資格不因這次契約修正而改寫。

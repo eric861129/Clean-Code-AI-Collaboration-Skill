@@ -88,6 +88,7 @@ FORBIDDEN_DIFF_PATH_PARTS = {
 }
 PORCELAIN_STATUS_PATTERN = re.compile(r"^[ MADRCUT?!]{2} .+$")
 AGGREGATE_SCORE_KEYS = {"total_score", "rubric_total"}
+DIFF_BOUNDARY_PATTERN_VERSION = "regex-fullmatch-v1"
 
 
 class EvalContractTests(unittest.TestCase):
@@ -110,26 +111,130 @@ class EvalContractTests(unittest.TestCase):
             for index, child in enumerate(value):
                 self.assert_no_aggregate_scores(child, f"{location}[{index}]")
 
+    def assert_repository_relative_posix_path(self, path: str) -> None:
+        self.assertTrue(path)
+        self.assertNotIn("\\", path)
+        self.assertFalse(path.startswith("/"))
+        self.assertNotRegex(path, r"^[A-Za-z]:")
+        self.assertNotIn("\x00", path)
+        self.assertNotIn("", path.split("/"))
+        self.assertTrue({".", ".."}.isdisjoint(path.split("/")))
+
+    def match_diff_path(self, path: str, scenario: dict) -> dict | None:
+        self.assert_repository_relative_posix_path(path)
+        if path in scenario["allowed_diff"]:
+            return {"kind": "exact", "rule": path}
+
+        for pattern in scenario["allowed_diff_patterns"]:
+            if re.fullmatch(pattern, path):
+                return {"kind": "pattern", "rule": pattern}
+        return None
+
+    def assert_diff_pattern_contract(self, manifest: dict) -> None:
+        semantics = manifest["diff_boundary_pattern_semantics"]
+        self.assertEqual(DIFF_BOUNDARY_PATTERN_VERSION, semantics["version"])
+        self.assertEqual("python-re", semantics["engine"])
+        self.assertEqual("repository-relative-posix", semantics["path_format"])
+        self.assertIs(True, semantics["case_sensitive"])
+        self.assertEqual("fullmatch", semantics["match_mode"])
+        self.assertIs(True, semantics["check_rename_source_and_destination"])
+
+        forbidden_broad_patterns = {
+            "^src/.*$",
+            "^tests/.*$",
+            "^src/WorkItems[.]Api/.*$",
+            "^tests/WorkItems[.]Api[.]Tests/.*$",
+        }
+        allowed_pattern_prefixes = (
+            "^src/WorkItems[.]Api/",
+            "^tests/WorkItems[.]Api[.]Tests/",
+        )
+        for scenario in manifest["scenarios"]:
+            patterns = scenario["allowed_diff_patterns"]
+            self.assertTrue(patterns)
+            self.assertEqual(len(patterns), len(set(patterns)))
+            self.assertTrue(forbidden_broad_patterns.isdisjoint(patterns))
+            for pattern in patterns:
+                self.assertTrue(pattern.startswith("^"), pattern)
+                self.assertTrue(pattern.endswith("$"), pattern)
+                self.assertTrue(pattern.startswith(allowed_pattern_prefixes), pattern)
+                self.assertNotRegex(
+                    pattern,
+                    r"\(\?[A-Za-z-]*i[A-Za-z-]*(?::|\))",
+                    "inline case-insensitive regex flags are forbidden",
+                )
+                re.compile(pattern)
+            for path in scenario["boundary_negative_examples"]:
+                self.assertIsNone(self.match_diff_path(path, scenario), path)
+
     def assert_diff_boundary_contract(self, run: dict, scenario: dict) -> None:
         boundary = run["diff_boundary"]
         allowed_diff = boundary["allowed_diff"]
+        allowed_diff_patterns = boundary["allowed_diff_patterns"]
         actual_product_paths = boundary["actual_product_paths"]
         outside_allowed_diff = boundary["outside_allowed_diff"]
+        allowed_by = boundary["allowed_by"]
+        renamed_product_paths = boundary["renamed_product_paths"]
 
         self.assertEqual(scenario["allowed_diff"], allowed_diff)
+        self.assertEqual(scenario["allowed_diff_patterns"], allowed_diff_patterns)
         self.assertEqual(run["files_modified"], actual_product_paths)
-        for paths in (allowed_diff, actual_product_paths, outside_allowed_diff):
+        for paths in (
+            allowed_diff,
+            allowed_diff_patterns,
+            actual_product_paths,
+            outside_allowed_diff,
+        ):
             self.assertEqual(len(paths), len(set(paths)))
 
-        allowed_diff_set = set(allowed_diff)
-        expected_outside_allowed_diff = [
-            path for path in actual_product_paths if path not in allowed_diff_set
+        diff_header_paths: list[str] = []
+        expected_renamed_product_paths: list[dict[str, str]] = []
+        for line in run["diff"].splitlines():
+            if not line.startswith("diff --git a/"):
+                continue
+            header_paths = line.removeprefix("diff --git a/").split(" b/", 1)
+            self.assertEqual(2, len(header_paths), line)
+            old_path, new_path = header_paths
+            self.assert_repository_relative_posix_path(old_path)
+            self.assert_repository_relative_posix_path(new_path)
+            diff_header_paths.append(new_path)
+            if old_path != new_path:
+                expected_renamed_product_paths.append(
+                    {"from": old_path, "to": new_path}
+                )
+
+        self.assertEqual(len(diff_header_paths), len(set(diff_header_paths)))
+        self.assertEqual(set(actual_product_paths), set(diff_header_paths))
+        self.assertEqual(expected_renamed_product_paths, renamed_product_paths)
+        rename_pairs = [
+            (rename["from"], rename["to"])
+            for rename in renamed_product_paths
         ]
+        self.assertEqual(len(rename_pairs), len(set(rename_pairs)))
+
+        evaluated_paths = list(actual_product_paths)
+        for rename in renamed_product_paths:
+            for path in (rename["from"], rename["to"]):
+                if path not in evaluated_paths:
+                    evaluated_paths.append(path)
+        expected_allowed_by = {
+            path: match
+            for path in evaluated_paths
+            if (match := self.match_diff_path(path, scenario)) is not None
+        }
+        expected_outside_allowed_diff = [
+            path for path in evaluated_paths if path not in expected_allowed_by
+        ]
+        self.assertEqual(expected_allowed_by, allowed_by)
         self.assertEqual(expected_outside_allowed_diff, outside_allowed_diff)
-        self.assertTrue(set(outside_allowed_diff).issubset(actual_product_paths))
+        for rename in renamed_product_paths:
+            self.assertEqual({"from", "to"}, set(rename))
+            self.assertIsNotNone(self.match_diff_path(rename["from"], scenario))
+            self.assertIsNotNone(self.match_diff_path(rename["to"], scenario))
 
     def test_manifest_defines_fixed_arms_and_scenarios(self) -> None:
         manifest = self.load_manifest()
+        self.assert_diff_pattern_contract(manifest)
         self.assertEqual(ARM_IDS, {item["id"] for item in manifest["arms"]})
         self.assertEqual(
             SCENARIO_IDS,
@@ -145,6 +250,7 @@ class EvalContractTests(unittest.TestCase):
                 self.assertTrue(scenario["task"].strip())
                 self.assertTrue(scenario["gold_files"])
                 self.assertTrue(scenario["allowed_diff"])
+                self.assertTrue(scenario["allowed_diff_patterns"])
                 self.assertIn(
                     "dotnet test AiCleanCode.sln --no-restore",
                     scenario["oracle_commands"],
@@ -176,6 +282,142 @@ class EvalContractTests(unittest.TestCase):
                 ]:
                     self.assertTrue(path.startswith(allowed_prefixes))
                     self.assertFalse(path.startswith(retired_prefixes))
+
+    def test_semantic_diff_boundaries_allow_role_names_without_allowing_drift(self) -> None:
+        manifest = self.load_manifest()
+        scenarios = {item["id"]: item for item in manifest["scenarios"]}
+
+        allowed_examples = {
+            "behavior-validation": (
+                "tests/WorkItems.Api.Tests/ProcessOverdueAcceptanceTests.cs"
+            ),
+            "dependency-boundary": (
+                "src/WorkItems.Api/Notifications/NotificationProvider.cs"
+            ),
+            "concurrency-side-effects": (
+                "src/WorkItems.Api/OverdueProcessingCoordinator.cs"
+            ),
+        }
+        for scenario_id, path in allowed_examples.items():
+            with self.subTest(scenario=scenario_id, path=path):
+                match = self.match_diff_path(path, scenarios[scenario_id])
+                self.assertEqual("pattern", match["kind"])
+
+        rejected_examples = {
+            "behavior-validation": "scripts/test-series-baseline-api.ps1",
+            "dependency-boundary": (
+                "src/WorkItems.Api/Contracts/WorkItemContracts.cs"
+            ),
+            "concurrency-side-effects": "src/WorkItems.Api/Telemetry.cs",
+        }
+        for scenario_id, path in rejected_examples.items():
+            with self.subTest(scenario=scenario_id, path=path):
+                self.assertIsNone(self.match_diff_path(path, scenarios[scenario_id]))
+
+        telemetry_drift = {
+            "dependency-boundary": [
+                "src/WorkItems.Api/Notifications/NotificationTelemetryProvider.cs",
+                "src/WorkItems.Api/Contracts/NotificationTelemetryContract.cs",
+            ],
+            "concurrency-side-effects": [
+                "src/WorkItems.Api/OverdueTelemetryCoordinator.cs",
+                "tests/WorkItems.Api.Tests/OverdueTelemetryConcurrencyTests.cs",
+            ],
+        }
+        for scenario_id, paths in telemetry_drift.items():
+            for path in paths:
+                with self.subTest(scenario=scenario_id, telemetry=path):
+                    self.assertIsNone(
+                        self.match_diff_path(path, scenarios[scenario_id])
+                    )
+
+    def test_semantic_diff_boundary_rejects_forged_provenance_and_rename_escape(self) -> None:
+        manifest = self.load_manifest()
+        scenario = next(
+            item for item in manifest["scenarios"] if item["id"] == "dependency-boundary"
+        )
+        result = json.loads(
+            (EVAL_ROOT / "results" / "v0.1.0-baseline.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        run = next(
+            item
+            for item in result["runs"]
+            if item["run_id"] == "dependency-boundary-control-r01"
+        )
+
+        forged = deepcopy(run)
+        forged["diff_boundary"]["allowed_by"] = {}
+        with self.assertRaises(AssertionError):
+            self.assert_diff_boundary_contract(forged, scenario)
+
+        rename_escape = deepcopy(run)
+        rename_escape["diff_boundary"]["renamed_product_paths"] = [
+            {
+                "from": "src/WorkItems.Api/Notifications/NotificationProvider.cs",
+                "to": "scripts/NotificationProvider.cs",
+            }
+        ]
+        with self.assertRaises(AssertionError):
+            self.assert_diff_boundary_contract(rename_escape, scenario)
+
+        unbacked_allowed_rename = deepcopy(run)
+        unbacked_allowed_rename["diff_boundary"]["renamed_product_paths"] = [
+            {
+                "from": "src/WorkItems.Api/Notifications/NotificationGateway.cs",
+                "to": "src/WorkItems.Api/Notifications/NotificationProvider.cs",
+            }
+        ]
+        with self.assertRaises(AssertionError):
+            self.assert_diff_boundary_contract(unbacked_allowed_rename, scenario)
+
+        duplicated_rename = deepcopy(unbacked_allowed_rename)
+        duplicated_rename["diff_boundary"]["renamed_product_paths"] *= 2
+        with self.assertRaises(AssertionError):
+            self.assert_diff_boundary_contract(duplicated_rename, scenario)
+
+        backed_rename = deepcopy(run)
+        rename_from = "src/WorkItems.Api/Notifications/NotificationGateway.cs"
+        rename_to = "src/WorkItems.Api/Notifications/NotificationProvider.cs"
+        backed_rename["diff"] = f"diff --git a/{rename_from} b/{rename_to}\n"
+        backed_rename["files_modified"] = [rename_to]
+        backed_rename["diff_boundary"]["actual_product_paths"] = [rename_to]
+        backed_rename["diff_boundary"]["renamed_product_paths"] = [
+            {"from": rename_from, "to": rename_to}
+        ]
+        backed_rename["diff_boundary"]["allowed_by"] = {
+            rename_to: self.match_diff_path(rename_to, scenario),
+            rename_from: self.match_diff_path(rename_from, scenario),
+        }
+        backed_rename["diff_boundary"]["outside_allowed_diff"] = []
+        self.assert_diff_boundary_contract(backed_rename, scenario)
+
+    def test_semantic_diff_boundary_rejects_overbroad_patterns_and_invalid_paths(self) -> None:
+        manifest = self.load_manifest()
+        overbroad = deepcopy(manifest)
+        overbroad["scenarios"][0]["allowed_diff_patterns"] = ["^.*$"]
+        with self.assertRaises(AssertionError):
+            self.assert_diff_pattern_contract(overbroad)
+
+        case_insensitive = deepcopy(manifest)
+        case_insensitive["scenarios"][2]["allowed_diff_patterns"] = [
+            "^src/WorkItems[.]Api/Notifications/(?i:OverdueNotificationProvider)[.]cs$"
+        ]
+        with self.assertRaises(AssertionError):
+            self.assert_diff_pattern_contract(case_insensitive)
+
+        scenario = manifest["scenarios"][0]
+        for invalid_path in (
+            "C:/src/WorkItems.Api/Program.cs",
+            "/src/WorkItems.Api/Program.cs",
+            "src\\WorkItems.Api\\Program.cs",
+            "src/../Program.cs",
+            "src//Program.cs",
+        ):
+            with self.subTest(path=invalid_path):
+                with self.assertRaises(AssertionError):
+                    self.match_diff_path(invalid_path, scenario)
 
     def test_rubric_files_exist_and_define_scoring(self) -> None:
         actual = {path.name for path in (EVAL_ROOT / "rubrics").glob("*.md")}
@@ -282,6 +524,10 @@ class EvalContractTests(unittest.TestCase):
         self.assertEqual("1.0", result["schema_version"])
         self.assertEqual("0.2.0", result["benchmark_version"])
         self.assertEqual("0.1.0", result["skill_version"])
+        self.assertEqual(
+            manifest["diff_boundary_pattern_semantics"],
+            result["diff_boundary_pattern_semantics"],
+        )
         self.assertEqual("Codex collaboration subject", result["environment"]["client"])
         self.assertEqual("gpt-5.6-sol", result["environment"]["model"])
         self.assertEqual("high", result["environment"]["reasoning_effort"])
@@ -294,6 +540,17 @@ class EvalContractTests(unittest.TestCase):
         run_ids = [run["run_id"] for run in runs]
         self.assertEqual(28, len(runs))
         self.assertEqual(28, len(set(run_ids)))
+
+        rescoring_history = result["rescoring_history"]
+        self.assertEqual(1, len(rescoring_history))
+        rescoring = rescoring_history[0]
+        self.assertEqual("exact-allowed-diff-v1", rescoring["from_matcher"])
+        self.assertEqual(DIFF_BOUNDARY_PATTERN_VERSION, rescoring["to_matcher"])
+        self.assertEqual(17, len(rescoring["changes"]))
+        self.assertEqual(
+            17,
+            len({change["run_id"] for change in rescoring["changes"]}),
+        )
 
         expected_matrix = {
             (scenario_id, arm_id, repetition)
@@ -310,6 +567,38 @@ class EvalContractTests(unittest.TestCase):
             for run in runs
         }
         self.assertEqual(expected_matrix, actual_matrix)
+
+        run_by_id = {run["run_id"]: run for run in runs}
+        for change in rescoring["changes"]:
+            with self.subTest(rescored_run=change["run_id"]):
+                run = run_by_id[change["run_id"]]
+                context_rubric = next(
+                    rubric
+                    for rubric in run["rubric_results"]
+                    if rubric["rubric_id"] == "context-and-locality"
+                )
+                self.assertEqual(
+                    run["diff_boundary"]["outside_allowed_diff"],
+                    change["rescored_outside_allowed_diff"],
+                )
+                self.assertEqual(
+                    context_rubric["score"],
+                    change["rescored_context_and_locality_score"],
+                )
+                self.assertEqual(context_rubric["reason"], change["rescored_reason"])
+                self.assertEqual(
+                    run["blind_spots"],
+                    change["rescored_blind_spots"],
+                )
+                self.assertTrue(
+                    change["previous_outside_allowed_diff"]
+                    != change["rescored_outside_allowed_diff"]
+                    or change["previous_context_and_locality_score"]
+                    != change["rescored_context_and_locality_score"]
+                    or change["previous_reason"] != change["rescored_reason"]
+                    or change["previous_blind_spots"]
+                    != change["rescored_blind_spots"]
+                )
 
         primary = [run for run in runs if run["arm_id"] in PRIMARY_ARM_IDS]
         regression = [run for run in runs if run["arm_id"] == "skill-v0.1.0"]
@@ -354,18 +643,6 @@ class EvalContractTests(unittest.TestCase):
                     run["diff_sha256"],
                 )
 
-                diff_header_paths: list[str] = []
-                for line in run["diff"].splitlines():
-                    if not line.startswith("diff --git a/"):
-                        continue
-                    header_paths = line.removeprefix("diff --git a/").split(" b/", 1)
-                    self.assertEqual(2, len(header_paths), line)
-                    old_path, new_path = header_paths
-                    self.assertEqual(old_path, new_path, line)
-                    diff_header_paths.append(new_path)
-
-                self.assertEqual(len(diff_header_paths), len(set(diff_header_paths)))
-                self.assertEqual(set(actual_product_paths), set(diff_header_paths))
                 for product_path in actual_product_paths:
                     path_parts = {part.lower() for part in Path(product_path).parts}
                     self.assertTrue(
@@ -482,6 +759,23 @@ class EvalContractTests(unittest.TestCase):
                 else:
                     self.assertEqual([], loaded_references)
                     self.assertEqual("not loaded", run["skill_version"])
+
+        outside_by_run = {
+            run["run_id"]: run["diff_boundary"]["outside_allowed_diff"]
+            for run in runs
+            if run["diff_boundary"]["outside_allowed_diff"]
+        }
+        self.assertEqual(
+            {
+                "behavior-validation-generic-clean-code-r02": [
+                    "scripts/test-series-baseline-api.ps1"
+                ],
+                "dependency-boundary-generic-clean-code-r01": [
+                    "src/WorkItems.Api/Contracts/WorkItemContracts.cs"
+                ],
+            },
+            outside_by_run,
+        )
 
         source_worktrees = [
             run["environment"]["source_worktree"] for run in runs
