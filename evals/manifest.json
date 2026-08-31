@@ -1,0 +1,157 @@
+{
+  "schema_version": "1.0",
+  "benchmark_version": "0.2.0",
+  "repository": {
+    "url": "https://github.com/eric861129/AI-CleanCode-API-Demo.git",
+    "read_only": true
+  },
+  "repetitions": {
+    "micro": 5,
+    "repository": 3
+  },
+  "arms": [
+    {
+      "id": "control",
+      "instruction": ""
+    },
+    {
+      "id": "generic-clean-code",
+      "instruction": "請遵守 Clean Code 完成任務。"
+    },
+    {
+      "id": "skill-v0.2.0",
+      "skill": "clean-code-ai-collaboration",
+      "version": "0.2.0"
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "context-locality",
+      "tag": "day-06-comments-formatting",
+      "commit": "1583af33b5e517530871ff3ee724cdcad4e4c5c0",
+      "task": "調整 High Priority 工作項目的逾期判斷，使其延後兩小時才視為逾期。必須保留既有 HTTP Contract、通知、取消與儲存順序；不得以重寫無關流程取代局部規則。",
+      "must_preserve": [
+        "既有 HTTP Contract",
+        "通知、取消與儲存順序",
+        "其他優先級工作項目的既有行為"
+      ],
+      "gold_files": [
+        "src/AiCleanCode.Api/Controllers/WorkItemsController.cs",
+        "tests/AiCleanCode.Api.Tests/ProcessOverdueBehaviorTests.cs"
+      ],
+      "allowed_diff": [
+        "src/AiCleanCode.Api/Controllers/WorkItemsController.cs",
+        "src/AiCleanCode.Application/WorkItems/OverdueWorkItemProcessor.cs",
+        "tests/AiCleanCode.Api.Tests/ProcessOverdueBehaviorTests.cs"
+      ],
+      "oracle_commands": [
+        "dotnet test AiCleanCode.sln --no-restore",
+        "dotnet format AiCleanCode.sln --verify-no-changes --no-restore"
+      ],
+      "rubrics": [
+        "context-and-locality.md",
+        "behavior-and-validation.md",
+        "decision-and-escalation.md"
+      ]
+    },
+    {
+      "id": "behavior-validation",
+      "tag": "day-13-clean-acceptance-tests-baseline",
+      "commit": "9b8c94c79a18eea24645aaee268e81783d94886f",
+      "task": "補上可讀的驗收測試，覆蓋剛好到期、通知失敗仍儲存，以及重跑不產生重複副作用三種情境。測試必須保留既有 HTTP Contract、通知失敗語意、取消與儲存順序，並以獨立行為 Oracle 證明結果。",
+      "must_preserve": [
+        "既有 HTTP Contract",
+        "通知失敗仍儲存的語意",
+        "取消與儲存順序",
+        "重跑不重複外部副作用"
+      ],
+      "gold_files": [
+        "src/AiCleanCode.Application/WorkItems/OverdueWorkItemProcessor.cs",
+        "tests/AiCleanCode.Api.Tests/ProcessOverdueBehaviorTests.cs"
+      ],
+      "allowed_diff": [
+        "src/AiCleanCode.Application/WorkItems/OverdueWorkItemProcessor.cs",
+        "tests/AiCleanCode.Api.Tests/ProcessOverdueBehaviorTests.cs"
+      ],
+      "oracle_commands": [
+        "dotnet test AiCleanCode.sln --no-restore",
+        "dotnet format AiCleanCode.sln --verify-no-changes --no-restore"
+      ],
+      "rubrics": [
+        "context-and-locality.md",
+        "behavior-and-validation.md",
+        "decision-and-escalation.md"
+      ]
+    },
+    {
+      "id": "dependency-boundary",
+      "tag": "day-16-solid-lsp-isp-dip-baseline",
+      "commit": "ccbc136daa59cfcd430d44ebd4cb62b57b4ab72d",
+      "task": "新增可替換的通知 Provider，讓 Use Case 不依賴特定通知實作。必須保留既有 API、通知失敗語意與 Consumer 所需契約；只新增支撐這個變更來源的抽象與 Contract Tests，不得擴散至無關層。",
+      "must_preserve": [
+        "既有 API",
+        "通知失敗語意",
+        "Consumer 所需契約",
+        "既有逾期處理行為"
+      ],
+      "gold_files": [
+        "src/AiCleanCode.Application/Notifications/NotificationGateway.cs",
+        "src/AiCleanCode.Application/WorkItems/OverdueWorkItemProcessor.cs",
+        "tests/AiCleanCode.Api.Tests/NotificationGatewayContractTests.cs"
+      ],
+      "allowed_diff": [
+        "src/AiCleanCode.Application/Notifications/NotificationGateway.cs",
+        "src/AiCleanCode.Application/Notifications/INotificationGateway.cs",
+        "src/AiCleanCode.Application/WorkItems/OverdueWorkItemProcessor.cs",
+        "src/AiCleanCode.Infrastructure/Notifications/",
+        "tests/AiCleanCode.Api.Tests/NotificationGatewayContractTests.cs",
+        "tests/AiCleanCode.Api.Tests/ProcessOverdueBehaviorTests.cs"
+      ],
+      "oracle_commands": [
+        "dotnet test AiCleanCode.sln --no-restore",
+        "dotnet format AiCleanCode.sln --verify-no-changes --no-restore"
+      ],
+      "rubrics": [
+        "context-and-locality.md",
+        "behavior-and-validation.md",
+        "decision-and-escalation.md"
+      ]
+    },
+    {
+      "id": "concurrency-side-effects",
+      "tag": "day-18-continuous-design",
+      "commit": "be987152555b651532e4ba68ba1029aa777fb40e",
+      "task": "當 HTTP 與 Background Worker 同時處理同一筆 Work Item 時避免重複通知。必須保留 Retry 與 Lost ACK 語意，並維持既有 HTTP Contract、取消與儲存順序；需以測試或其他獨立 Oracle 驗證競態下的外部副作用不重複。",
+      "must_preserve": [
+        "既有 HTTP Contract",
+        "Retry 語意",
+        "Lost ACK 語意",
+        "取消與儲存順序",
+        "每筆 Work Item 不重複通知"
+      ],
+      "gold_files": [
+        "src/AiCleanCode.Application/WorkItems/OverdueWorkItemProcessor.cs",
+        "src/AiCleanCode.Worker/OverdueProcessingWorker.cs",
+        "src/AiCleanCode.Infrastructure/Persistence/WorkItemsDbContext.cs",
+        "tests/AiCleanCode.Api.Tests/ProcessOverdueBehaviorTests.cs"
+      ],
+      "allowed_diff": [
+        "src/AiCleanCode.Application/WorkItems/OverdueWorkItemProcessor.cs",
+        "src/AiCleanCode.Worker/OverdueProcessingWorker.cs",
+        "src/AiCleanCode.Infrastructure/Persistence/WorkItemsDbContext.cs",
+        "src/AiCleanCode.Infrastructure/Persistence/WorkItem.cs",
+        "tests/AiCleanCode.Api.Tests/ProcessOverdueBehaviorTests.cs",
+        "tests/AiCleanCode.Api.Tests/OverdueProcessingWorkerTests.cs"
+      ],
+      "oracle_commands": [
+        "dotnet test AiCleanCode.sln --no-restore",
+        "dotnet format AiCleanCode.sln --verify-no-changes --no-restore"
+      ],
+      "rubrics": [
+        "context-and-locality.md",
+        "behavior-and-validation.md",
+        "decision-and-escalation.md"
+      ]
+    }
+  ]
+}
