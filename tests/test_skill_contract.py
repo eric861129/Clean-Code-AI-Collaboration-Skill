@@ -190,6 +190,21 @@ class SkillContractTests(unittest.TestCase):
         self.assertIn("upgrade", content.lower())
         self.assertIn("must not downgrade", content.lower())
 
+    def test_entrypoint_excludes_tasks_without_repository_tradeoffs(self) -> None:
+        content = SKILL_PATH.read_text(encoding="utf-8")
+        section = content.split("## Do Not Use", maxsplit=1)[1]
+        section = section.split("## ", maxsplit=1)[0]
+
+        for term in {
+            "syntax",
+            "conceptual explanation",
+            "standalone example",
+            "formatter",
+            "more specialized Skill",
+        }:
+            with self.subTest(term=term):
+                self.assertIn(term.lower(), section.lower())
+
     def test_delivery_readiness_does_not_lower_risk_or_authority(self) -> None:
         content = SKILL_PATH.read_text(encoding="utf-8")
         section = content.split("## Delivery Readiness", maxsplit=1)[1]
@@ -394,7 +409,7 @@ class SkillContractTests(unittest.TestCase):
             "keep the Diff local",
             "report validation blind spots",
             "stop at authorization boundaries",
-            "allow_implicit_invocation: true",
+            "allow_implicit_invocation: false",
         }
 
         for term in required_terms:

@@ -14,6 +14,10 @@ metadata:
 
 Repository facts control Context; Clean Code supplies quality judgment; CLEAN defines User-Agent responsibilities. Evidence supports decisions, never authorization.
 
+## Do Not Use
+
+Skip this Skill for syntax-only questions, repository-free conceptual explanations, standalone example code, formatting decided by an existing formatter, or work covered by a more specialized Skill without added behavior, boundary, side-effect, or Clean Code trade-off.
+
 ## Path Selection
 
 Evaluate Full Audit, then Standard, then Lightweight. Evidence may upgrade a path; it must not downgrade one to shorten the report.
