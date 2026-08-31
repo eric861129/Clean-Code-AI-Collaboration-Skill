@@ -153,7 +153,7 @@ mkdir -p "$skills_root"
 cp -R "./clean-code-ai-collaboration" "$target"
 ```
 
-Codex 通常會自動偵測新加入的 Skill；如果 Skill 清單沒有出現，再重新啟動 Codex。
+目前公開評測會在 Prompt 中明確載入這個 Skill，Codex adapter 的結構也已通過契約測試。自動偵測、implicit invocation 與重新啟動行為尚待實機驗證；如果 Skill 清單沒有出現，請先重新啟動 Codex，再確認安裝路徑。
 
 ### Client 支援狀態
 
@@ -161,7 +161,7 @@ Agent Skills 的檔案格式可以攜帶內容，不代表每個 Client 的載�
 
 | Client | 內容與格式 | 本專案驗證狀態 |
 | --- | --- | --- |
-| Codex | 可使用 Skill 核心與 Codex adapter | 已以 `gpt-5.6-sol`、`high` 完成目前公開評測 |
+| Codex | Skill 核心可用，並提供 Codex adapter | 核心評測已完成，adapter 結構已驗證；自動偵測與 implicit invocation 尚待實機驗證 |
 | GitHub Copilot | 核心 Markdown 內容可移植 | 尚未完成實機驗證；安裝位置與觸發方式請以 Client 官方文件為準 |
 | Claude Code | 核心 Markdown 內容可移植 | 尚未完成實機驗證；安裝位置與觸發方式請以 Client 官方文件為準 |
 | 其他 Agent Skills 相容 Client | 原則與參考文件可移植 | 尚未驗證，不宣稱工具、授權或輸出行為相容 |

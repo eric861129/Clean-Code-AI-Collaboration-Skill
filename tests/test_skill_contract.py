@@ -187,9 +187,28 @@ class SkillContractTests(unittest.TestCase):
         workflow = (REPOSITORY_ROOT / ".github" / "workflows" / "validate.yml").read_text(
             encoding="utf-8"
         )
+        public_plan = (
+            REPOSITORY_ROOT
+            / "docs"
+            / "superpowers"
+            / "plans"
+            / "2026-08-31-clean-code-ai-collaboration-v0.2.0.md"
+        ).read_text(encoding="utf-8")
 
         self.assertIn("結構契約", readme)
         self.assertIn("Structural Contract", workflow)
+        self.assertIn("python -m unittest discover -s tests -v", workflow)
+        self.assertIn(
+            "agentskills validate clean-code-ai-collaboration",
+            workflow,
+        )
+        self.assertNotIn("skills-ref validate", workflow)
+        self.assertNotIn("skills-ref validate", public_plan)
+        self.assertNotIn("quick_validate.py", public_plan)
+        self.assertGreaterEqual(
+            public_plan.count("agentskills validate clean-code-ai-collaboration"),
+            7,
+        )
 
     def test_readme_documents_portability_evidence_and_limits(self) -> None:
         readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
@@ -258,7 +277,10 @@ class SkillContractTests(unittest.TestCase):
         )
         self.assertIn("Copy-Item -LiteralPath $skillSource", readme)
         self.assertIn('cp -R "$skill_source" "$target"', readme)
-        self.assertIn("如果 Skill 清單沒有出現，再重新啟動 Codex", readme)
+        self.assertIn(
+            "自動偵測、implicit invocation 與重新啟動行為尚待實機驗證",
+            readme,
+        )
         self.assertIn("請先確認內容，不要直接覆寫", readme)
         self.assertIn("內容與格式", readme)
         self.assertIn("尚未完成實機驗證", readme)
@@ -314,6 +336,11 @@ class SkillContractTests(unittest.TestCase):
             "E — Explicit Intent and Boundaries",
             "A — Auditable by Evidence",
             "N — Non-Surprising Behavior",
+            "C — Context-Aware Code（情境感知）",
+            "L — Localized Change（局部變更）",
+            "E — Explicit Intent and Boundaries（意圖明確）",
+            "A — Auditable by Evidence（實據可審）",
+            "N — Non-Surprising Behavior（符合預期）",
             "clean-code-for-agent-legibility.md",
         }
         for term in required:

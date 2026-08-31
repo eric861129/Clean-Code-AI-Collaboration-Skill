@@ -18,7 +18,7 @@
 - Repository 事實優先於 Skill 範例；Evidence 不會擴張授權範圍。
 - Token、Tool Call、經過時間與生成行數只比較已通過相同行為與品質 Gate 的候選。
 - 目前 Working Tree 的 `README.md` 安裝路徑修改屬於既有 User 內容；實作必須以該內容為基礎，不得覆蓋或遺失。
-- `D:\MySelf\AI-CleanCode\AI-CleanCode-API-Demo` 在本計畫中只作唯讀 Benchmark Fixture。除非 User 另行授權，不修改、Commit 或 Push 該 Repository。
+- `<benchmark-fixture-repository>` 在本計畫中代表唯讀的 `AI-CleanCode-API-Demo` Fixture。除非 User 另行授權，不修改、Commit 或 Push 該 Repository。
 - Agent 行為測試使用 Fresh Context，完整記錄模型、Reasoning Effort、Client、工具權限、Repository Commit、Prompt、Diff、命令、Exit Code、Oracle 與 Blind Spot。
 - 缺少 Token Telemetry 時記錄 `not available`，不以字數或估算值替代。
 - 所有檔案使用 UTF-8；不得加入 Token、Secret、內部資料或無法公開的 Evidence。
@@ -271,7 +271,7 @@ Result JSON 使用以下結構：
 $runId = "context-locality-control-r01"
 $commitSha = "1583af33b5e517530871ff3ee724cdcad4e4c5c0"
 $runRoot = Join-Path $env:TEMP "clean-code-skill-eval-$runId"
-git -C "D:\MySelf\AI-CleanCode\AI-CleanCode-API-Demo" worktree add --detach $runRoot $commitSha
+git -C "<benchmark-fixture-repository>" worktree add --detach $runRoot $commitSha
 ```
 
 每次執行都從 Manifest 讀取對應的 Run ID 與固定 Commit。工作結束後先確認 Diff 已寫入 Result，再使用 `git worktree remove` 移除該 Worktree；不可刪除 Demo Repository 或共用資料夾。
@@ -431,10 +431,10 @@ Run:
 
 ```powershell
 py -3 -m unittest discover -s tests -v
-py -3 "C:\Users\erichuang\.codex\skills\.system\skill-creator\scripts\quick_validate.py" ".\clean-code-ai-collaboration"
+agentskills validate clean-code-ai-collaboration
 ```
 
-Expected: 全部 Unit Tests PASS，Validator 顯示 `Skill is valid!`，Skill Body 不超過 500 個英文單字。
+Expected: 全部 Unit Tests PASS，Validator 顯示 `Valid skill: clean-code-ai-collaboration`，Skill Body 不超過 500 個英文單字。
 
 - [ ] **Step 6: Commit Skill Core**
 
@@ -607,10 +607,10 @@ policy:
 
 ```powershell
 py -3 -m unittest discover -s tests -v
-py -3 "C:\Users\erichuang\.codex\skills\.system\skill-creator\scripts\quick_validate.py" ".\clean-code-ai-collaboration"
+agentskills validate clean-code-ai-collaboration
 ```
 
-Expected: PASS；Validator 顯示 `Skill is valid!`。
+Expected: PASS；Validator 顯示 `Valid skill: clean-code-ai-collaboration`。
 
 - [ ] **Step 5: Commit Adapter**
 
@@ -687,7 +687,7 @@ skills-ref==0.1.1
       - name: Unit and Contract Tests
         run: python -m unittest discover -s tests -v
       - name: Agent Skills Specification
-        run: skills-ref validate clean-code-ai-collaboration
+        run: agentskills validate clean-code-ai-collaboration
 ```
 
 Workflow Name 維持 `Validate Skill Structural Contract`，Job Name 改為 `Open Standard and Repository Contracts`，避免把 CI 誤寫成 Agent Behavior Benchmark。
@@ -697,7 +697,7 @@ Workflow Name 維持 `Validate Skill Structural Contract`，Job Name 改為 `Ope
 ```powershell
 py -3 -m pip install -r requirements-dev.txt
 py -3 -m unittest discover -s tests -v
-skills-ref validate clean-code-ai-collaboration
+agentskills validate clean-code-ai-collaboration
 ```
 
 Expected: 全部 PASS；若 CLI 名稱實際為 `agentskills`，先用 `Get-Command skills-ref, agentskills` 查證 `skills-ref==0.1.1` 安裝結果，再讓 CI 與本機使用同一個已存在命令。
@@ -785,7 +785,7 @@ Micro-eval 不修改 Repository。結果放入 `v0.2.0-initial.json` 的 `micro_
 
 ```powershell
 py -3 -m unittest discover -s tests -v
-skills-ref validate clean-code-ai-collaboration
+agentskills validate clean-code-ai-collaboration
 git diff --check
 ```
 
@@ -889,7 +889,7 @@ git diff v0.1.0 -- README.md
 
 ```powershell
 py -3 -m unittest discover -s tests -v
-skills-ref validate clean-code-ai-collaboration
+agentskills validate clean-code-ai-collaboration
 git diff --check
 ```
 
@@ -919,7 +919,7 @@ git commit -m "docs: explain cross-platform use and benchmark evidence"
 
 ```powershell
 py -3 -m unittest discover -s tests -v
-skills-ref validate clean-code-ai-collaboration
+agentskills validate clean-code-ai-collaboration
 git diff --check
 git status --short
 ```
@@ -939,7 +939,7 @@ rg -n '0\.1\.0|0\.2\.0|clean-code-ai-collaboration|\.agents\\skills' README.md c
 ```powershell
 git diff v0.1.0 -- .
 git status --short --ignored
-rg -n 'AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{20,}|BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|D:\\Project\\Kcislk' .
+rg -n 'AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{20,}|BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|[A-Za-z]:[\\/][^[:space:]]+' .
 ```
 
 Expected: 沒有 Secret、雇主內部路徑、未追蹤 Raw Worktree 或 `__pycache__` 被納入 Commit。正常文章／文件文字命中需人工判讀，不能只靠 Match Count。

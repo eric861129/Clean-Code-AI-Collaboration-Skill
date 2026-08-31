@@ -1111,14 +1111,20 @@ class EvalContractTests(unittest.TestCase):
         )
         serialized = json.dumps(result, ensure_ascii=False)
         self.assertNotRegex(serialized, r"(?<![A-Za-z0-9])[A-Za-z]:[\\/]")
-        self.assertNotIn("/Users/", serialized)
-        self.assertNotIn("/home/", serialized)
-        self.assertNotIn("erichuang", serialized.lower())
         self.assertNotIn("\ufffd", serialized)
         self.assert_no_aggregate_scores(result)
 
     def test_repository_markdown_is_utf8_and_local_links_exist(self) -> None:
         failures: list[str] = []
+        windows_personal_path_pattern = re.compile(
+            r"(?i)(?<![A-Za-z0-9])[A-Za-z]:[\\/]+(?:Users|MySelf|Project)[\\/]+"
+        )
+        unix_home_pattern = re.compile(r"(?<![A-Za-z0-9._-])/(?:Users|home)/")
+
+        self.assertRegex(r"C:\Users\example\project", windows_personal_path_pattern)
+        self.assertRegex("/home/example/project", unix_home_pattern)
+        self.assertNotRegex(r"C:\path\to\project", windows_personal_path_pattern)
+        self.assertNotRegex("docs/Users/guide.md", unix_home_pattern)
 
         for markdown_path in ROOT.rglob("*.md"):
             relative_path = markdown_path.relative_to(ROOT)
@@ -1135,6 +1141,10 @@ class EvalContractTests(unittest.TestCase):
 
             if "\ufffd" in content:
                 failures.append(f"{relative_path}: contains Unicode replacement character")
+            if windows_personal_path_pattern.search(content):
+                failures.append(f"{relative_path}: contains a Windows personal path")
+            if unix_home_pattern.search(content):
+                failures.append(f"{relative_path}: contains a Unix personal path")
 
             for raw_target in MARKDOWN_LINK_PATTERN.findall(content):
                 target = raw_target.strip()
@@ -1188,8 +1198,6 @@ class EvalContractTests(unittest.TestCase):
                     r"(?<![A-Za-z0-9])[A-Za-z]:[\\/]",
                 )
                 self.assertNotRegex(serialized, unix_home_pattern)
-                self.assertNotIn("erichuang", serialized.lower())
-                self.assertNotIn("kcislk", serialized.lower())
 
 
 if __name__ == "__main__":

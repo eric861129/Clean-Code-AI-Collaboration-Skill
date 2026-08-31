@@ -33,11 +33,11 @@ Read [clean-code-for-agent-legibility.md](references/clean-code-for-agent-legibi
 
 Use CLEAN as the User's review lens for an Agent's work. It is not a score that claims automatic compliance.
 
-- **C — Context-Aware Code（脈絡感知程式碼）:** establish Context from repository facts before change.
-- **L — Localized Change（局部化變更）:** state the Expected Diff and keep the change boundary local.
-- **E — Explicit Intent and Boundaries（明確意圖與邊界）:** make Intent, contracts, and ownership visible.
-- **A — Auditable by Evidence（可由證據稽核）:** connect Evidence to validation and known gaps.
-- **N — Non-Surprising Behavior（非意外行為）:** preserve Behavior, including failures and side effects.
+- **C — Context-Aware Code（情境感知）:** establish Context from repository facts before change.
+- **L — Localized Change（局部變更）:** state the Expected Diff and keep the change boundary local.
+- **E — Explicit Intent and Boundaries（意圖明確）:** make Intent, contracts, and ownership visible.
+- **A — Auditable by Evidence（實據可審）:** connect Evidence to validation and known gaps.
+- **N — Non-Surprising Behavior（符合預期）:** preserve Behavior, including failures and side effects.
 
 ## Authorization Gate
 
