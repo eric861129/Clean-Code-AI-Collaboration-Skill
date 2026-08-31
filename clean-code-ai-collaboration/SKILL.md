@@ -2,7 +2,7 @@
 name: clean-code-ai-collaboration
 description: Use when a coding agent must plan, implement, refactor, or review repository changes where readability, behavior preservation, tests, design boundaries, side effects, dependencies, handoffs, or estimates require repository-aware Clean Code judgment.
 license: MIT
-compatibility: Agent Skills-compatible coding agents. Optional Codex metadata is provided in agents/openai.yaml.
+compatibility: Agent Skills-compatible coding agents.
 metadata:
   author: eric861129
   version: "0.2.0"

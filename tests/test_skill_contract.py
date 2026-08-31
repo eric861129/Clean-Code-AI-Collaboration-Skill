@@ -151,6 +151,20 @@ class SkillContractTests(unittest.TestCase):
             with self.subTest(term=term):
                 self.assertIn(term, content)
 
+    def test_skill_core_stays_platform_neutral(self) -> None:
+        content = SKILL_PATH.read_text(encoding="utf-8")
+        frontmatter = re.match(
+            r"---\n(?P<frontmatter>.*?)\n---\n",
+            content,
+            re.DOTALL,
+        ).group("frontmatter")
+
+        self.assertIn(
+            "compatibility: Agent Skills-compatible coding agents.",
+            frontmatter,
+        )
+        self.assertNotIn("Codex", content)
+
 
 if __name__ == "__main__":
     unittest.main()
