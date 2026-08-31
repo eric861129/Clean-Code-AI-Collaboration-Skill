@@ -24,6 +24,13 @@ SCENARIO_IDS = {
 }
 PRIMARY_ARM_IDS = {"control", "generic-clean-code"}
 BASELINE_ARM_IDS = {*PRIMARY_ARM_IDS, "skill-v0.1.0"}
+MICRO_SCENARIO_IDS = {
+    "local-naming-refactor",
+    "external-side-effect-change",
+    "architecture-review",
+    "estimation",
+    "low-risk-formatting",
+}
 EXPECTED_BASELINE_COMMIT_BY_SCENARIO = {
     "context-locality": "1583af33b5e517530871ff3ee724cdcad4e4c5c0",
     "behavior-validation": "9b8c94c79a18eea24645aaee268e81783d94886f",
@@ -87,7 +94,13 @@ FORBIDDEN_DIFF_PATH_PARTS = {
     "testresults",
 }
 PORCELAIN_STATUS_PATTERN = re.compile(r"^[ MADRCUT?!]{2} .+$")
-AGGREGATE_SCORE_KEYS = {"total_score", "rubric_total"}
+AGGREGATE_SCORE_KEYS = {
+    "aggregate_score",
+    "composite_score",
+    "overall_score",
+    "rubric_total",
+    "total_score",
+}
 DIFF_BOUNDARY_PATTERN_VERSION = "regex-fullmatch-v1"
 
 
@@ -240,8 +253,11 @@ class EvalContractTests(unittest.TestCase):
             SCENARIO_IDS,
             {item["id"] for item in manifest["scenarios"]},
         )
-        self.assertEqual(5, manifest["repetitions"]["micro"])
-        self.assertEqual(3, manifest["repetitions"]["repository"])
+        self.assertEqual(5, manifest["run_counts"]["micro_scenarios_per_arm"])
+        self.assertEqual(
+            3,
+            manifest["run_counts"]["repository_repetitions_per_scenario_arm"],
+        )
 
     def test_every_scenario_is_reproducible(self) -> None:
         for scenario in self.load_manifest()["scenarios"]:
@@ -816,6 +832,288 @@ class EvalContractTests(unittest.TestCase):
 
         serialized = json.dumps(result, ensure_ascii=False)
         self.assertNotIn('"not-run"', serialized)
+        self.assertNotIn("\ufffd", serialized)
+        self.assert_no_aggregate_scores(result)
+
+    def test_v020_initial_results_cover_skill_arm_and_micro_matrix(self) -> None:
+        result_path = EVAL_ROOT / "results" / "v0.2.0-initial.json"
+        result = json.loads(result_path.read_text(encoding="utf-8"))
+        manifest = self.load_manifest()
+        scenario_by_id = {
+            scenario["id"]: scenario for scenario in manifest["scenarios"]
+        }
+
+        self.assertEqual("complete", result["status"])
+        self.assertEqual("1.0", result["schema_version"])
+        self.assertEqual("0.2.0", result["benchmark_version"])
+        self.assertEqual("0.2.0", result["skill_version"])
+        self.assertEqual(
+            manifest["diff_boundary_pattern_semantics"],
+            result["diff_boundary_pattern_semantics"],
+        )
+
+        runs = result["runs"]
+        self.assertEqual(12, len(runs))
+        self.assertEqual(12, len({run["run_id"] for run in runs}))
+        self.assertEqual(
+            {
+                (scenario_id, repetition)
+                for scenario_id in SCENARIO_IDS
+                for repetition in range(1, 4)
+            },
+            {(run["scenario_id"], run["repetition"]) for run in runs},
+        )
+        expected_outside_by_run = {
+            "concurrency-side-effects-skill-v0.2.0-r01": [
+                "src/WorkItems.Api/InFlightWorkItemProcessingGate.cs"
+            ],
+            "concurrency-side-effects-skill-v0.2.0-r02": [
+                "src/WorkItems.Api/CoalescingOverdueWorkItemProcessor.cs"
+            ],
+            "concurrency-side-effects-skill-v0.2.0-r03": [
+                "src/WorkItems.Api/InProcessOverdueNotificationGuard.cs"
+            ],
+        }
+        for run in runs:
+            with self.subTest(repository_run=run["run_id"]):
+                scenario = scenario_by_id[run["scenario_id"]]
+                self.assertTrue(RESULT_REQUIRED_FIELDS.issubset(run))
+                self.assertEqual("skill-v0.2.0", run["arm_id"])
+                self.assertEqual("0.2.0", run["skill_version"])
+                self.assertEqual("gpt-5.6-sol", run["model"])
+                self.assertEqual("high", run["reasoning_effort"])
+                self.assertEqual("Codex collaboration subject", run["client"])
+                self.assertEqual(scenario["commit"], run["commit"])
+                self.assertEqual(scenario["task"], run["prompt"])
+                self.assertTrue(run["raw_output"].strip())
+                self.assertNotIn("System.Object[]", run["raw_output"])
+                self.assertTrue(run["files_inspected"])
+                self.assertIn(
+                    run["files_inspected_provenance"],
+                    {
+                        "subject report files_inspected",
+                        "reconstructed from manifest gold_files whose contents are cited in subject repository_facts",
+                    },
+                )
+                self.assertEqual(
+                    run["files_inspected_complete"],
+                    run["files_inspected_provenance"]
+                    == "subject report files_inspected",
+                )
+                self.assertTrue(run["loaded_skill_references"])
+                self.assertIn(
+                    "clean-code-ai-collaboration/SKILL.md",
+                    run["loaded_skill_references"],
+                )
+                self.assertEqual(
+                    hashlib.sha256(run["diff"].encode("utf-8")).hexdigest(),
+                    run["diff_sha256"],
+                )
+                self.assert_diff_boundary_contract(
+                    run,
+                    scenario,
+                )
+                self.assertEqual(
+                    expected_outside_by_run.get(run["run_id"], []),
+                    run["diff_boundary"]["outside_allowed_diff"],
+                )
+                self.assertEqual(
+                    "standalone shallow repository with one fixed commit",
+                    run["environment"]["fixture"],
+                )
+                self.assertEqual(1, run["environment"]["history_commit_count"])
+                self.assertIs(False, run["environment"]["shared_refs_present"])
+                self.assertEqual(
+                    "independent root evaluator after subject completion",
+                    run["environment"]["oracle_execution"],
+                )
+                self.assertEqual(2, len(run["oracle_results"]))
+                self.assertEqual(
+                    EXPECTED_ORACLE_COMMANDS,
+                    {oracle["command"] for oracle in run["oracle_results"]},
+                )
+                evaluator_commands = {
+                    command["command"]: command
+                    for command in run["commands"]
+                    if command.get("source") == "evaluator"
+                }
+                self.assertEqual(EXPECTED_ORACLE_COMMANDS, set(evaluator_commands))
+                self.assertEqual(
+                    EXPECTED_ORACLE_COMMANDS,
+                    set(run["exit_codes"]["oracle_commands"]),
+                )
+                for oracle in run["oracle_results"]:
+                    self.assertEqual(0, oracle["exit_code"])
+                    self.assertEqual("passed", oracle["classification"])
+                    self.assertTrue(oracle["summary"].strip())
+                    evaluator_command = evaluator_commands[oracle["command"]]
+                    self.assertEqual(oracle["exit_code"], evaluator_command["exit_code"])
+                    self.assertEqual(
+                        oracle["summary"], evaluator_command["observed_result"]
+                    )
+                    self.assertEqual(
+                        oracle["exit_code"],
+                        run["exit_codes"]["oracle_commands"][oracle["command"]],
+                    )
+                self.assertIs(False, run["automatic_failure"]["triggered"])
+                self.assertEqual([], run["automatic_failure"]["reasons"])
+                eligibility = run["comparison_eligibility"]
+                self.assertTrue(eligibility["eligible_for_quality_comparison"])
+                self.assertTrue(
+                    eligibility["eligible_for_primary_effect_comparison"]
+                )
+                self.assertEqual([], eligibility["quality_comparison_reasons"])
+                self.assertEqual([], eligibility["primary_effect_comparison_reasons"])
+                scores = {
+                    rubric["rubric_id"]: rubric["score"]
+                    for rubric in run["rubric_results"]
+                }
+                expected_context_score = (
+                    1 if run["run_id"] in expected_outside_by_run else 2
+                )
+                self.assertEqual(expected_context_score, scores["context-and-locality"])
+                self.assertEqual(2, scores["behavior-and-validation"])
+                self.assertEqual(2, scores["decision-and-escalation"])
+                self.assertTrue(
+                    all(
+                        rubric["automatic_failure_applied"] is False
+                        for rubric in run["rubric_results"]
+                    )
+                )
+                self.assertTrue(all(isinstance(item, dict) for item in run["artifacts"]))
+                self.assertEqual("not available", run["token_telemetry"])
+                self.assertEqual("not available", run["tool_calls"])
+
+        structured_raw_run = next(
+            run
+            for run in runs
+            if run["run_id"] == "context-locality-skill-v0.2.0-r03"
+        )
+        structured_raw_output = json.loads(structured_raw_run["raw_output"])
+        self.assertIn("outcome_and_status", structured_raw_output)
+        self.assertIn("applicable_references", structured_raw_output)
+        self.assertIn("behavior_that_must_not_change", structured_raw_output)
+
+        comparison = result["comparison"]
+        baseline = json.loads(
+            (EVAL_ROOT / "results" / "v0.1.0-baseline.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        generic_runs = [
+            run for run in baseline["runs"] if run["arm_id"] == "generic-clean-code"
+        ]
+        generic_full_support = {
+            "context_and_locality": sum(
+                1
+                for run in generic_runs
+                if next(
+                    rubric
+                    for rubric in run["rubric_results"]
+                    if rubric["rubric_id"] == "context-and-locality"
+                )["score"]
+                == 2
+            ),
+            "behavior_and_validation": sum(
+                1
+                for run in generic_runs
+                if next(
+                    rubric
+                    for rubric in run["rubric_results"]
+                    if rubric["rubric_id"] == "behavior-and-validation"
+                )["score"]
+                == 2
+            ),
+            "decision_and_escalation": sum(
+                1
+                for run in generic_runs
+                if next(
+                    rubric
+                    for rubric in run["rubric_results"]
+                    if rubric["rubric_id"] == "decision-and-escalation"
+                )["score"]
+                == 2
+            ),
+        }
+        self.assertEqual(12, len(generic_runs))
+        self.assertEqual(
+            sum(1 for run in generic_runs if run["automatic_failure"]["triggered"]),
+            comparison["generic_baseline"]["automatic_failures"],
+        )
+        self.assertEqual(
+            generic_full_support,
+            comparison["generic_baseline"]["full_support_by_rubric"],
+        )
+        self.assertEqual(0, comparison["skill_v0_2_0"]["automatic_failures"])
+        self.assertEqual(
+            {
+                "context_and_locality": 9,
+                "behavior_and_validation": 12,
+                "decision_and_escalation": 12,
+            },
+            comparison["skill_v0_2_0"]["full_support_by_rubric"],
+        )
+        self.assertEqual(
+            "not available", comparison["token_and_tool_call_comparison"]
+        )
+
+        micro_runs = result["micro_runs"]
+        self.assertEqual(15, len(micro_runs))
+        self.assertEqual(15, len({run["run_id"] for run in micro_runs}))
+        self.assertEqual(
+            {
+                (scenario_id, arm_id)
+                for scenario_id in MICRO_SCENARIO_IDS
+                for arm_id in ARM_IDS
+            },
+            {(run["scenario_id"], run["arm_id"]) for run in micro_runs},
+        )
+        expected_skill_paths = {
+            "local-naming-refactor": "lightweight",
+            "external-side-effect-change": "full",
+            "architecture-review": "full",
+            "estimation": "full",
+            "low-risk-formatting": "lightweight",
+        }
+        for run in micro_runs:
+            with self.subTest(micro_run=run["run_id"]):
+                self.assertEqual("gpt-5.6-sol", run["model"])
+                self.assertEqual("high", run["reasoning_effort"])
+                self.assertTrue(run["prompt"].strip())
+                self.assertTrue(run["raw_output"].strip())
+                self.assertIn(run["trigger_result"], {"activated", "not-activated"})
+                self.assertIn(run["selected_path"], {"lightweight", "full", "none"})
+                self.assertIsInstance(run["loaded_references"], list)
+                self.assertIn(run["human_score"], {0, 1, 2})
+                self.assertTrue(run["score_reason"].strip())
+                if run["arm_id"] == "skill-v0.2.0":
+                    self.assertEqual("activated", run["trigger_result"])
+                    self.assertEqual(
+                        expected_skill_paths[run["scenario_id"]],
+                        run["selected_path"],
+                    )
+                    self.assertIn(
+                        "clean-code-ai-collaboration/SKILL.md",
+                        run["loaded_references"],
+                    )
+                else:
+                    self.assertEqual("not-activated", run["trigger_result"])
+                    self.assertEqual("none", run["selected_path"])
+                    self.assertEqual([], run["loaded_references"])
+
+        self.assertTrue(all(run["human_score"] == 2 for run in micro_runs))
+        self.assertEqual(
+            {arm_id: 5 for arm_id in ARM_IDS},
+            {
+                arm_id: sum(1 for run in micro_runs if run["arm_id"] == arm_id)
+                for arm_id in ARM_IDS
+            },
+        )
+        serialized = json.dumps(result, ensure_ascii=False)
+        self.assertNotRegex(serialized, r"(?<![A-Za-z0-9])[A-Za-z]:[\\/]")
+        self.assertNotIn("/Users/", serialized)
+        self.assertNotIn("/home/", serialized)
+        self.assertNotIn("erichuang", serialized.lower())
         self.assertNotIn("\ufffd", serialized)
         self.assert_no_aggregate_scores(result)
 

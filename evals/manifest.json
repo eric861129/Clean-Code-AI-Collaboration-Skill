@@ -13,9 +13,9 @@
     "url": "https://github.com/eric861129/AI-CleanCode-API-Demo.git",
     "read_only": true
   },
-  "repetitions": {
-    "micro": 5,
-    "repository": 3
+  "run_counts": {
+    "micro_scenarios_per_arm": 5,
+    "repository_repetitions_per_scenario_arm": 3
   },
   "result_required_fields": [
     "schema_version",
