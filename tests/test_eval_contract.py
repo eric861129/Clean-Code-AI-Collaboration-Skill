@@ -1,3 +1,4 @@
+from copy import deepcopy
 import hashlib
 import json
 from pathlib import Path
@@ -86,20 +87,46 @@ FORBIDDEN_DIFF_PATH_PARTS = {
     "testresults",
 }
 PORCELAIN_STATUS_PATTERN = re.compile(r"^[ MADRCUT?!]{2} .+$")
+AGGREGATE_SCORE_KEYS = {"total_score", "rubric_total"}
 
 
 class EvalContractTests(unittest.TestCase):
     def load_manifest(self) -> dict:
         return json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
 
-    def assert_no_total_score(self, value: object, location: str = "result") -> None:
+    def assert_no_aggregate_scores(
+        self, value: object, location: str = "result"
+    ) -> None:
         if isinstance(value, dict):
-            self.assertNotIn("total_score", value, location)
+            aggregate_score_keys = AGGREGATE_SCORE_KEYS.intersection(value)
+            self.assertFalse(
+                aggregate_score_keys,
+                f"{location}: aggregate score aliases are forbidden: "
+                f"{sorted(aggregate_score_keys)}",
+            )
             for key, child in value.items():
-                self.assert_no_total_score(child, f"{location}.{key}")
+                self.assert_no_aggregate_scores(child, f"{location}.{key}")
         elif isinstance(value, list):
             for index, child in enumerate(value):
-                self.assert_no_total_score(child, f"{location}[{index}]")
+                self.assert_no_aggregate_scores(child, f"{location}[{index}]")
+
+    def assert_diff_boundary_contract(self, run: dict, scenario: dict) -> None:
+        boundary = run["diff_boundary"]
+        allowed_diff = boundary["allowed_diff"]
+        actual_product_paths = boundary["actual_product_paths"]
+        outside_allowed_diff = boundary["outside_allowed_diff"]
+
+        self.assertEqual(scenario["allowed_diff"], allowed_diff)
+        self.assertEqual(run["files_modified"], actual_product_paths)
+        for paths in (allowed_diff, actual_product_paths, outside_allowed_diff):
+            self.assertEqual(len(paths), len(set(paths)))
+
+        allowed_diff_set = set(allowed_diff)
+        expected_outside_allowed_diff = [
+            path for path in actual_product_paths if path not in allowed_diff_set
+        ]
+        self.assertEqual(expected_outside_allowed_diff, outside_allowed_diff)
+        self.assertTrue(set(outside_allowed_diff).issubset(actual_product_paths))
 
     def test_manifest_defines_fixed_arms_and_scenarios(self) -> None:
         manifest = self.load_manifest()
@@ -158,6 +185,90 @@ class EvalContractTests(unittest.TestCase):
             self.assertIn("## Scoring", content)
             self.assertIn("## Evidence Required", content)
             self.assertIn("## Automatic Failure", content)
+
+    def test_locality_boundary_rejects_manifest_and_outside_diff_drift(self) -> None:
+        manifest = self.load_manifest()
+        scenario = next(
+            item for item in manifest["scenarios"] if item["id"] == "context-locality"
+        )
+        result = json.loads(
+            (EVAL_ROOT / "results" / "v0.1.0-baseline.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        run = next(
+            item
+            for item in result["runs"]
+            if item["run_id"] == "context-locality-control-r01"
+        )
+
+        mutations = {
+            "manifest allowed_diff drift": {
+                "allowed_diff": ["src/WorkItems.Api/Unexpected.cs"]
+            },
+            "false outside_allowed_diff entry": {
+                "outside_allowed_diff": run["diff_boundary"][
+                    "actual_product_paths"
+                ]
+            },
+        }
+        for label, boundary_mutation in mutations.items():
+            with self.subTest(mutation=label):
+                mutated_run = deepcopy(run)
+                mutated_run["diff_boundary"].update(boundary_mutation)
+                with self.assertRaises(AssertionError):
+                    self.assert_diff_boundary_contract(mutated_run, scenario)
+
+    def test_locality_boundary_rejects_duplicate_path_lists(self) -> None:
+        manifest = self.load_manifest()
+        scenario = next(
+            item for item in manifest["scenarios"] if item["id"] == "context-locality"
+        )
+        result = json.loads(
+            (EVAL_ROOT / "results" / "v0.1.0-baseline.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        run = next(
+            item
+            for item in result["runs"]
+            if item["run_id"] == "context-locality-control-r01"
+        )
+        product_path = run["diff_boundary"]["actual_product_paths"][0]
+
+        for path_list_name in (
+            "allowed_diff",
+            "actual_product_paths",
+            "outside_allowed_diff",
+        ):
+            with self.subTest(path_list=path_list_name):
+                mutated_run = deepcopy(run)
+                mutated_scenario = deepcopy(scenario)
+                if path_list_name == "allowed_diff":
+                    duplicated_paths = [
+                        *scenario["allowed_diff"],
+                        scenario["allowed_diff"][0],
+                    ]
+                    mutated_scenario["allowed_diff"] = duplicated_paths
+                else:
+                    duplicated_paths = [product_path, product_path]
+
+                mutated_run["diff_boundary"][path_list_name] = duplicated_paths
+                if path_list_name == "actual_product_paths":
+                    mutated_run["files_modified"] = duplicated_paths
+
+                with self.assertRaises(AssertionError):
+                    self.assert_diff_boundary_contract(
+                        mutated_run,
+                        mutated_scenario,
+                    )
+
+    def test_aggregate_score_aliases_are_forbidden_recursively(self) -> None:
+        for aggregate_score_key in AGGREGATE_SCORE_KEYS:
+            with self.subTest(key=aggregate_score_key):
+                mutation = {"nested": [{aggregate_score_key: 6}]}
+                with self.assertRaises(AssertionError):
+                    self.assert_no_aggregate_scores(mutation)
 
     def test_baseline_results_are_complete(self) -> None:
         result_path = EVAL_ROOT / "results" / "v0.1.0-baseline.json"
@@ -237,11 +348,7 @@ class EvalContractTests(unittest.TestCase):
                 )
 
                 actual_product_paths = run["diff_boundary"]["actual_product_paths"]
-                self.assertEqual(run["files_modified"], actual_product_paths)
-                self.assertEqual(
-                    len(actual_product_paths),
-                    len(set(actual_product_paths)),
-                )
+                self.assert_diff_boundary_contract(run, scenario)
                 self.assertEqual(
                     hashlib.sha256(run["diff"].encode("utf-8")).hexdigest(),
                     run["diff_sha256"],
@@ -416,7 +523,7 @@ class EvalContractTests(unittest.TestCase):
         serialized = json.dumps(result, ensure_ascii=False)
         self.assertNotIn('"not-run"', serialized)
         self.assertNotIn("\ufffd", serialized)
-        self.assert_no_total_score(result)
+        self.assert_no_aggregate_scores(result)
 
     def test_repository_markdown_is_utf8_and_local_links_exist(self) -> None:
         failures: list[str] = []
