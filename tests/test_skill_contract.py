@@ -11,6 +11,7 @@ REFERENCE_NAMES = {
     "testing-and-change-safety.md",
     "design-and-dependency-boundaries.md",
     "collaboration-and-estimation.md",
+    "clean-code-for-agent-legibility.md",
     "repository-context-template.md",
     "review-output-contract.md",
 }
@@ -127,6 +128,28 @@ class SkillContractTests(unittest.TestCase):
         content = (SKILL_ROOT / "agents" / "openai.yaml").read_text(encoding="utf-8")
 
         self.assertIn("$clean-code-ai-collaboration", content)
+
+    def test_v020_metadata_and_clean_lenses_are_discoverable(self) -> None:
+        content = SKILL_PATH.read_text(encoding="utf-8")
+        frontmatter = re.match(
+            r"---\n(?P<frontmatter>.*?)\n---\n",
+            content,
+            re.DOTALL,
+        ).group("frontmatter")
+        required = {
+            "license: MIT",
+            "compatibility:",
+            'version: "0.2.0"',
+            "C — Context-Aware Code",
+            "L — Localized Change",
+            "E — Explicit Intent and Boundaries",
+            "A — Auditable by Evidence",
+            "N — Non-Surprising Behavior",
+            "clean-code-for-agent-legibility.md",
+        }
+        for term in required:
+            with self.subTest(term=term):
+                self.assertIn(term, content)
 
 
 if __name__ == "__main__":
