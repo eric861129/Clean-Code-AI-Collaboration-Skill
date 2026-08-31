@@ -87,16 +87,53 @@ class SkillContractTests(unittest.TestCase):
                 self.assertIn("## Common Misjudgments", content)
                 self.assertIn("## Stop Conditions", content)
 
-    def test_review_contract_leads_with_status_and_keeps_blind_spots(self) -> None:
+    def test_full_audit_contract_leads_with_status_and_keeps_blind_spots(self) -> None:
         content = (SKILL_ROOT / "references" / "review-output-contract.md").read_text(
             encoding="utf-8"
         )
+        full_audit = content.split("## Full Audit Output Contract", maxsplit=1)[1]
+
         self.assertLess(
-            content.index("## Outcome and Status"),
-            content.index("## Repository Facts Used"),
+            full_audit.index("### Outcome and Status"),
+            full_audit.index("### Repository Facts Used"),
         )
-        self.assertIn("## Validation Blind Spots", content)
-        self.assertIn("## Human Decisions Required", content)
+        self.assertIn("### Validation Blind Spots", full_audit)
+        self.assertIn("### Human Decisions Required", full_audit)
+
+    def test_standard_output_is_concise_and_full_audit_remains_traceable(
+        self,
+    ) -> None:
+        content = (SKILL_ROOT / "references" / "review-output-contract.md").read_text(
+            encoding="utf-8"
+        )
+        standard, full_audit = content.split("## Full Audit Output Contract", maxsplit=1)
+
+        self.assertIn("## Standard Output Contract", standard)
+        for field in {
+            "Outcome and Status",
+            "Decision Basis",
+            "Selected Approach",
+            "Behavior, Diff, and Validation",
+            "Stop or Human Decision",
+        }:
+            with self.subTest(standard_field=field):
+                self.assertIn(field, standard)
+
+        self.assertNotIn("`None; Sources checked: ...`", standard)
+        self.assertNotIn("`Not investigated`", standard)
+        for term in {
+            "F1",
+            "A1",
+            "U1",
+            "O1",
+            "E1",
+            "`None; Sources checked: ...`",
+            "`Not investigated`",
+            "Validation Blind Spots",
+            "Human Decisions Required",
+        }:
+            with self.subTest(full_audit_term=term):
+                self.assertIn(term, full_audit)
 
     def test_review_contract_distinguishes_all_empty_sections_from_not_investigated(
         self,
@@ -138,13 +175,20 @@ class SkillContractTests(unittest.TestCase):
                     self.assertRegex(block, experiment_permalink)
                     self.assertIn("\n\nSupports: ", block)
 
-    def test_entrypoint_has_lightweight_and_full_paths(self) -> None:
+    def test_entrypoint_defines_three_risk_paths_and_one_way_escalation(
+        self,
+    ) -> None:
         content = SKILL_PATH.read_text(encoding="utf-8")
 
-        self.assertIn("Lightweight Path", content)
-        self.assertIn("Full Path", content)
+        for path_name in {"Lightweight Path", "Standard Path", "Full Audit Path"}:
+            with self.subTest(path_name=path_name):
+                self.assertIn(path_name, content)
+
         self.assertIn("public contract", content)
-        self.assertIn("side effect", content)
+        self.assertIn("external side effect", content)
+        self.assertIn("critical unknown", content)
+        self.assertIn("upgrade", content.lower())
+        self.assertIn("must not downgrade", content.lower())
 
     def test_authorization_gate_is_always_loaded(self) -> None:
         content = SKILL_PATH.read_text(encoding="utf-8")
@@ -325,7 +369,7 @@ class SkillContractTests(unittest.TestCase):
             with self.subTest(term=term):
                 self.assertIn(term, content)
 
-    def test_v020_metadata_and_clean_lenses_are_discoverable(self) -> None:
+    def test_v030_metadata_and_clean_lenses_are_discoverable(self) -> None:
         content = SKILL_PATH.read_text(encoding="utf-8")
         frontmatter = re.match(
             r"---\n(?P<frontmatter>.*?)\n---\n",
@@ -335,7 +379,7 @@ class SkillContractTests(unittest.TestCase):
         required = {
             "license: MIT",
             "compatibility:",
-            'version: "0.2.0"',
+            'version: "0.3.0"',
             "C — Context-Aware Code",
             "L — Localized Change",
             "E — Explicit Intent and Boundaries",
