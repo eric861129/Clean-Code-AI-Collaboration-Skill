@@ -1181,6 +1181,31 @@ class EvalContractTests(unittest.TestCase):
 
         self.assertEqual([], failures, "\n".join(failures))
 
+    def test_benchmark_external_validity_matrix_separates_evidence_from_plans(
+        self,
+    ) -> None:
+        content = (EVAL_ROOT / "benchmark.md").read_text(encoding="utf-8")
+        section = content.split("## External Validity Expansion Matrix", maxsplit=1)[1]
+
+        for state in {"已驗證", "規劃中", "尚未支持"}:
+            with self.subTest(state=state):
+                self.assertIn(state, section)
+
+        for dimension in {
+            "public .NET Demo",
+            "large .NET Legacy",
+            "TypeScript / React",
+            "Python",
+            "Java / Spring",
+            "AGENTS.md",
+            "Blind Review",
+        }:
+            with self.subTest(dimension=dimension):
+                self.assertIn(dimension, section)
+
+        self.assertIn("v0.2.0-initial.json", section)
+        self.assertIn("沒有 Result 的項目不得寫成已驗證", section)
+
     def test_public_result_files_do_not_expose_personal_paths(self) -> None:
         result_paths = sorted((EVAL_ROOT / "results").glob("*.json"))
         unix_home_pattern = r"(?<![A-Za-z0-9._-])/(?:Users|home)/"

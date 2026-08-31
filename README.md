@@ -56,6 +56,22 @@ CLEAN 是本專案從 Clean Code 精神與 AI Coding 實務歸納出的協作原
 
 實務上可以讓 Skill 指引 Agent 如何判斷，把專案特有規則留在 `AGENTS.md` 或其他 Repository Instruction，再由自動化 Gate 執行不能靠提醒帶過的檢查。
 
+Skill 會先盤點 Repository 既有的 Formatter、Linter、Static Analysis、Build、Test、Dependency／Security Scan 與其他 Gate，再選擇真正能觀察這次風險的工具。它不會因為某項工具流行就自行安裝，也不會把全綠結果擴張成 Oracle 未涵蓋的保證。
+
+## 如何選擇執行深度與交付成熟度
+
+先依風險選路徑，再標示成果準備被怎麼使用：
+
+| 判斷 | 適用情境 |
+| --- | --- |
+| Lightweight | 局部、可逆，而且不影響行為與邊界的可讀性修改 |
+| Standard | 已知 Repository 邊界內的一般功能、測試、修正與重構 |
+| Full Audit | 公開契約、正式資料、外部副作用、第三方依賴、並行、安全、部署、權責不明或正式稽核 |
+| Prototype | 回答一個隔離且可丟棄的問題；必須列出尚未通過的正式 Gate |
+| Production-Ready | 準備合併、發布或長期維護；必須完成 Repository 要求且與修改相關的 Gate |
+
+Prototype／Production-Ready 不會覆蓋風險路徑。實驗若碰到正式資料、Provider、安全或公開契約，仍需 Full Audit 與對應授權。
+
 ## 安裝
 
 先取得 Repository：
@@ -153,7 +169,7 @@ mkdir -p "$skills_root"
 cp -R "./clean-code-ai-collaboration" "$target"
 ```
 
-安裝完成後，建議先在任務中明確指定 `$clean-code-ai-collaboration`，再依實際需求補上 Repository 路徑、修改範圍與驗收條件。目前公開評測同樣採用明確載入方式，Codex adapter 的結構也已通過契約測試。自動偵測、implicit invocation 與重新啟動行為尚待實機驗證；如果 Skill 清單沒有出現，請先重新啟動 Codex，再確認安裝路徑。
+安裝完成後，建議先在任務中明確指定 `$clean-code-ai-collaboration`；這也是 `v0.3.0` 的正式使用方式。Codex adapter 設定為 `allow_implicit_invocation: false`。如果 Skill 清單沒有出現，請重新啟動 Client，再確認安裝路徑與 Skill Frontmatter。
 
 ### Client 支援狀態
 
@@ -161,7 +177,7 @@ Agent Skills 的檔案格式可以攜帶內容，不代表每個 Client 的載�
 
 | Client | 內容與格式 | 本專案驗證狀態 |
 | --- | --- | --- |
-| Codex | Skill 核心可用，並提供 Codex adapter | 核心評測已完成，adapter 結構已驗證；自動偵測與 implicit invocation 尚待實機驗證 |
+| Codex | Skill 核心可用，並提供 Codex adapter | 核心評測已完成，adapter 結構已驗證；v0.3.0 採 explicit-only，尚未以觸發準確率評測重新開啟 implicit invocation |
 | GitHub Copilot | 核心 Markdown 內容可移植 | 尚未完成實機驗證；安裝位置與觸發方式請以 Client 官方文件為準 |
 | Claude Code | 核心 Markdown 內容可移植 | 尚未完成實機驗證；安裝位置與觸發方式請以 Client 官方文件為準 |
 | 其他 Agent Skills 相容 Client | 原則與參考文件可移植 | 尚未驗證，不宣稱工具、授權或輸出行為相容 |
@@ -202,6 +218,8 @@ Agent Skills 的檔案格式可以攜帶內容，不代表每個 Client 的載�
 - [評測情境與契約](evals/manifest.json)
 - [v0.1.0 行為基準](evals/results/v0.1.0-baseline.json)
 - [v0.2.0 初始評測](evals/results/v0.2.0-initial.json)
+
+`v0.3.0` 的三層路由尚未產生新 Result；下列數字仍來自 `v0.2.0` 的固定情境。
 
 目前 Repository 情境評測的觀察如下：
 

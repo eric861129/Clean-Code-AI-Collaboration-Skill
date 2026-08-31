@@ -79,3 +79,28 @@ Micro-eval 的每組對照各執行五個情境；每組完整 Repository Scenar
 - 部分 Fresh Fixture 的 Subject-side `dotnet test` 曾先因 Restore 或 Runner 環境失敗；修復執行環境後，獨立 Evaluator 的固定 Test 與 Format Oracle 全部通過。這只能證明最終候選，不應改寫成每一步都成功。
 - v0.1 Baseline 的 Oracle 是在 Testhost Cache 修復後依序執行；v0.2 Skill Arm 改由 Subject 結束後的獨立 Root Evaluator 執行。命令與固定 Commit 相同，但 Evaluator Procedure 並非完全相同，因此比較結果仍可能包含 Harness 差異。
 - 6 筆 Subject Report 沒有保存完整 `files_inspected`。公開結果只依 Subject 的 `repository_facts` 回補其確實引用的 Manifest Gold Files，並以 `files_inspected_complete=false` 標記為已知下限，不把它冒充完整查閱清單。
+
+## External Validity Expansion Matrix
+
+這張表區分目前公開 Evidence 與後續研究方向。沒有 Result 的項目不得寫成已驗證，也不得由格式相容推論成行為相容。
+
+| Dimension | Status | Evidence or next gate |
+| --- | --- | --- |
+| public .NET Demo | 已驗證 | 固定 Repository、模型、Client 與明確載入條件；見 [v0.2.0 initial result](results/v0.2.0-initial.json) |
+| large .NET Legacy | 規劃中 | 需要可公開或經授權的固定 Fixture、Characterization Oracle 與小型／Migration 情境 |
+| TypeScript / React | 規劃中 | 需要固定 Lint、Type Check、Unit／Component／E2E Gate 與可重現 Diff Boundary |
+| Python | 規劃中 | 需要固定 Formatter、Linter、Type Check、Test 與 Package Boundary 情境 |
+| Java / Spring | 尚未支持 | 前三種技術棧完成後，再依可維護 Fixture 與外部貢獻決定優先順序 |
+| with / without AGENTS.md | 規劃中 | 對照 Repository Instruction 是否改變 Context 定位、停止判斷與誤觸率 |
+| strong / weak test suite | 規劃中 | 對照可靠 Oracle、缺少測試與錯誤測試資料下的行為與 Blind Spot |
+| additional models and clients | 規劃中 | 固定其他變因後，分開測量模型與 Client；格式相容不算完成 |
+| real-team Blind Review | 規劃中 | 固定候選材料並隱藏實驗組別，測量風險發現率、誤判與 Reviewer 決策時間 |
+
+### Expansion Order
+
+1. 先驗證 Lightweight／Standard／Full Audit 的路由、必要欄位遺漏與輸出成本。
+2. 再加入 large .NET Legacy、TypeScript / React 與 Python Repository。
+3. 執行契約穩定後才比較其他模型、Reasoning Effort 與 Client。
+4. 最後執行 real-team Blind Review。
+
+缺少 Token Telemetry 時只記錄可取得的輸出長度、Tool Call 與經過時間，不換算或宣稱 Token 節省。

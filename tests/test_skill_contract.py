@@ -323,11 +323,30 @@ class SkillContractTests(unittest.TestCase):
             with self.subTest(term=term):
                 self.assertIn(term, readme)
 
+        for term in {
+            "Lightweight",
+            "Standard",
+            "Full Audit",
+            "Prototype",
+            "Production-Ready",
+            "allow_implicit_invocation: false",
+            "明確指定 `$clean-code-ai-collaboration`",
+            "Repository 既有",
+        }:
+            with self.subTest(v030_readme_term=term):
+                self.assertIn(term, readme)
+
+        self.assertNotIn(
+            "自動偵測、implicit invocation 與重新啟動行為尚待實機驗證",
+            readme,
+        )
+
         ordered_sections = [
             "## 這個 Skill 解決什麼問題",
             "## Clean Code 如何改善 AI Coding",
             "## CLEAN 五原則",
             "## Skill、Repository Policy 與自動化 Gate 的分工",
+            "## 如何選擇執行深度與交付成熟度",
             "## 安裝",
             "## 使用方式",
             "## Benchmark",
@@ -369,10 +388,6 @@ class SkillContractTests(unittest.TestCase):
         )
         self.assertIn("Copy-Item -LiteralPath $skillSource", readme)
         self.assertIn('cp -R "$skill_source" "$target"', readme)
-        self.assertIn(
-            "自動偵測、implicit invocation 與重新啟動行為尚待實機驗證",
-            readme,
-        )
         self.assertIn(
             "安裝完成後，建議先在任務中明確指定 `$clean-code-ai-collaboration`",
             readme,
