@@ -197,6 +197,7 @@ class SkillContractTests(unittest.TestCase):
 
         self.assertIn("結構契約", readme)
         self.assertIn("Structural Contract", workflow)
+        self.assertIn("cache-dependency-path: requirements-dev.txt", workflow)
         self.assertIn("python -m unittest discover -s tests -v", workflow)
         self.assertIn(
             "agentskills validate clean-code-ai-collaboration",
