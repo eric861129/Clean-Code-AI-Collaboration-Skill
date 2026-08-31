@@ -18,6 +18,42 @@ SCENARIO_IDS = {
     "dependency-boundary",
     "concurrency-side-effects",
 }
+RESULT_REQUIRED_FIELDS = {
+    "schema_version",
+    "benchmark_version",
+    "run_id",
+    "date",
+    "executor",
+    "skill_version",
+    "arm_id",
+    "scenario_id",
+    "repository_url",
+    "commit",
+    "working_tree_status",
+    "model",
+    "reasoning_effort",
+    "client",
+    "tool_permissions",
+    "prompt",
+    "loaded_skill_references",
+    "raw_output",
+    "files_inspected",
+    "files_modified",
+    "files_validated",
+    "diff",
+    "commands",
+    "environment",
+    "exit_codes",
+    "artifacts",
+    "oracle_results",
+    "rubric_results",
+    "blind_spots",
+    "human_decisions_required",
+    "token_telemetry",
+    "tool_calls",
+    "elapsed_time",
+    "generated_lines",
+}
 
 
 class EvalContractTests(unittest.TestCase):
@@ -46,6 +82,13 @@ class EvalContractTests(unittest.TestCase):
                     scenario["oracle_commands"],
                 )
                 self.assertEqual(RUBRIC_NAMES, set(scenario["rubrics"]))
+
+    def test_result_contract_requires_fresh_context_evidence(self) -> None:
+        manifest = self.load_manifest()
+        benchmark = (EVAL_ROOT / "benchmark.md").read_text(encoding="utf-8")
+
+        self.assertEqual(RESULT_REQUIRED_FIELDS, set(manifest["result_required_fields"]))
+        self.assertIn("`result_required_fields`", benchmark)
 
     def test_rubric_files_exist_and_define_scoring(self) -> None:
         actual = {path.name for path in (EVAL_ROOT / "rubrics").glob("*.md")}

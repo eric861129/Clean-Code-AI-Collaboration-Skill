@@ -32,7 +32,7 @@
 
 每次結果必須分別報告任務正確性、Context 定位、修改局部性、行為穩定性、驗證品質、決策品質與執行成本。不得把這些維度壓成單一總分。
 
-結果必須引用 `schema_version`、`benchmark_version`、Scenario ID、對照組 ID、Repository URL、Commit SHA、Run ID、Rubric 結果、Oracle 結果與 Evidence 位置。結果只支持該記錄條件下的觀察；不得據此保證 Skill 效果、品質、成本節省或外部採用狀態。
+每筆結果必須在同一筆 Evidence 中完整填入 `manifest.json` 的 `result_required_fields`，包括模型、Reasoning Effort、Client、工具權限、完整 Prompt、Diff、命令、Exit Code 與 Blind Spots，讓每個 Fresh Context 的條件可稽核。結果只支持該記錄條件下的觀察；不得據此保證 Skill 效果、品質、成本節省或外部採用狀態。
 
 ## Contract Boundaries
 
