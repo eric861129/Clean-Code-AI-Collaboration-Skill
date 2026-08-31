@@ -71,6 +71,33 @@ class SkillContractTests(unittest.TestCase):
             with self.subTest(field=field):
                 self.assertIn(field, content)
 
+    def test_decision_references_define_tradeoffs_and_stop_conditions(self) -> None:
+        names = {
+            "code-readability.md",
+            "testing-and-change-safety.md",
+            "design-and-dependency-boundaries.md",
+            "collaboration-and-estimation.md",
+        }
+        for name in names:
+            content = (SKILL_ROOT / "references" / name).read_text(encoding="utf-8")
+            with self.subTest(reference=name):
+                self.assertIn("## Use This Reference When", content)
+                self.assertIn("## Selection Rules", content)
+                self.assertIn("## When Another Option Fits Better", content)
+                self.assertIn("## Common Misjudgments", content)
+                self.assertIn("## Stop Conditions", content)
+
+    def test_review_contract_leads_with_status_and_keeps_blind_spots(self) -> None:
+        content = (SKILL_ROOT / "references" / "review-output-contract.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertLess(
+            content.index("## Outcome and Status"),
+            content.index("## Repository Facts Used"),
+        )
+        self.assertIn("## Validation Blind Spots", content)
+        self.assertIn("## Human Decisions Required", content)
+
     def test_entrypoint_has_lightweight_and_full_paths(self) -> None:
         content = SKILL_PATH.read_text(encoding="utf-8")
 
