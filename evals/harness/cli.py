@@ -222,7 +222,7 @@ def _prepare(manifest: BenchmarkManifest, paths: HarnessPaths) -> None:
         "reasoning_effort": manifest.reasoning_effort,
         "contract_sha256": contract_sha256,
         "contract": contract,
-        "codex_version": _codex_version(),
+        **_subject_client_contract(manifest),
         "pilot_run_ids": [
             slot.run_id for slot in pilot_slots(build_run_slots(manifest))
         ],
@@ -1481,7 +1481,7 @@ def _freeze_document(
         "schema_version": "1.0",
         "manifest_sha256": _file_sha256(MANIFEST_PATH),
         "harness_sha256": _source_tree_sha256(ROOT / "evals" / "harness"),
-        "codex_version": _codex_version(),
+        **_subject_client_contract(manifest),
         "fixture_commit": manifest.fixture_commit,
         "skill_commit": manifest.skill_commit,
         "prompts": prompts,
@@ -1509,12 +1509,13 @@ def _scenario_contract_sha256(
     scenario_contract = {
         "schema_version": "1.0",
         "harness_sha256": contract["harness_sha256"],
-        "codex_version": contract["codex_version"],
+        "client": contract["client"],
+        "client_version": contract["client_version"],
+        "subject_executor": contract["subject_executor"],
         "fixture_commit": manifest.fixture_commit,
         "skill_commit": manifest.skill_commit,
         "model": manifest.model,
         "reasoning_effort": manifest.reasoning_effort,
-        "client": manifest.client,
         "subject_timeout_seconds": manifest.subject_timeout_seconds,
         "oracle_timeout_seconds": manifest.oracle_timeout_seconds,
         "repetitions": manifest.repetitions,
@@ -1817,9 +1818,12 @@ def _freeze_path(contract_sha256: str) -> Path:
     return FREEZE_ROOT / f"{contract_sha256}.json"
 
 
-def _codex_version() -> str:
-    result = run_process(["codex", "--version"], ROOT, timeout_seconds=30)
-    return result.stdout.strip() if result.exit_code == 0 else "not_available"
+def _subject_client_contract(manifest: BenchmarkManifest) -> dict[str, object]:
+    return {
+        "client": manifest.client,
+        "client_version": "not_available",
+        "subject_executor": dict(manifest.subject_executor),
+    }
 
 
 def _run_checked(args: list[str], cwd: Path, timeout_seconds: int) -> CommandResult:

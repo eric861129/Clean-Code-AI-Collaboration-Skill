@@ -14,6 +14,7 @@ from evals.harness.cli import (
     _require_no_inflight_desktop_attempts,
     _run_document_path,
     _sanitize_persisted_text,
+    _subject_client_contract,
     _validate_terminal_document,
 )
 from evals.harness.cli import (
@@ -707,6 +708,16 @@ class CrossLanguageHarnessTests(unittest.TestCase):
             harness_main(["pilot"])
         with self.assertRaisesRegex(RuntimeError, "stage --phase full"):
             harness_main(["full"])
+
+    def test_desktop_contract_does_not_depend_on_unrelated_cli_version(self) -> None:
+        manifest = load_manifest(MANIFEST_PATH)
+
+        client = _subject_client_contract(manifest)
+
+        self.assertEqual("codex-desktop-collaboration", client["client"])
+        self.assertEqual("not_available", client["client_version"])
+        self.assertEqual(manifest.subject_executor, client["subject_executor"])
+        self.assertNotIn("codex_version", client)
 
     def test_baseline_red_rejects_unrelated_extra_failure(self) -> None:
         result = CommandResult(
