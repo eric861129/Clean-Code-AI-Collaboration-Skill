@@ -6,7 +6,7 @@
 
 **Architecture:** Fixture 與 Hidden Evaluator 存放在獨立公開 Repository；每次 Run 只匯出單一 Subject Fixture 到獨立 Git 工作區。Skill Repository 保存版本化 Manifest、Planner、Subject Runner、Oracle Runner、匿名 Review Packet 與公開 Result，原始 JSONL 留在 Git 忽略的 `.benchmark-runs/`。
 
-**Tech Stack:** Python 3.12+ 標準函式庫與 `unittest`、Codex CLI `0.145.0`、`gpt-5.6-sol`／`high`、Git、Node.js 24、React 19、TypeScript 7、Vitest 4、Testing Library、ESLint 10、FastAPI 0.141、Pydantic 2.13、pytest 9、Ruff 0.16。
+**Tech Stack:** Python 3.12+ 標準函式庫與 `unittest`、Codex CLI `0.145.0`、`gpt-5.6-sol`／`high`、Git、Node.js 24、React 19、TypeScript 6、Vitest 4、Testing Library、ESLint 10、FastAPI 0.141、Pydantic 2.13、pytest 9、Ruff 0.16。
 
 **Spec:** `docs/superpowers/specs/2026-09-01-cross-language-benchmark-design.md`
 
@@ -301,8 +301,8 @@ git commit -m "test(fixtures): define cross-language fixture contract"
 - Create: `fixtures/react-overdue-rule/src/workItem.ts`
 - Create: `fixtures/react-overdue-rule/src/overdue.ts`
 - Create: `fixtures/react-overdue-rule/src/WorkItemList.tsx`
-- Create: `fixtures/react-overdue-rule/src/overdue.public.test.ts`
-- Create: `evaluators/react-overdue-rule/preservation.test.ts`
+- Create: `fixtures/react-overdue-rule/src/overdue.public.test.tsx`
+- Create: `evaluators/react-overdue-rule/preservation.test.tsx`
 - Create: `evaluators/react-overdue-rule/acceptance.test.ts`
 - Create: `evaluators/react-overdue-rule/completed-status.patch`
 - Modify: `fixture-contract.json`
@@ -337,7 +337,7 @@ Expected: FAIL，因四種命令目前為空。
 
 - [ ] **Step 2: 建立固定 Node 專案與 Baseline Code**
 
-`package.json` 固定依賴版本：React／React DOM `19.2.8`、TypeScript `7.0.2`、Vite `8.2.2`、Vitest `4.1.11`、Testing Library React `16.3.3`、Jest DOM `7.0.1`、ESLint `10.9.1`、typescript-eslint `8.69.0`、jsdom `30.0.1`。Scripts 固定為：
+`package.json` 固定依賴版本：React／React DOM `19.2.8`、TypeScript `6.0.3`、Vite `8.2.2`、Vitest `4.1.11`、Testing Library React `16.3.3`、Jest DOM `7.0.1`、ESLint `10.9.1`、typescript-eslint `8.69.0`、jsdom `30.0.1`。TypeScript 固定在 `6.0.3`，因 `typescript-eslint 8.69.0` 的 Peer Dependency 上限為 `<6.1.0`；Benchmark 不使用 `--force` 或 `--legacy-peer-deps` 繞過工具鏈契約。Scripts 固定為：
 
 ```json
 {
@@ -415,10 +415,10 @@ describe("High Priority grace period", () => {
 
 ```json
 {
-  "public": [["npm", "test", "--", "src/overdue.public.test.ts"], ["npm", "run", "typecheck"], ["npm", "run", "lint"]],
-  "preservation": [["npm", "test", "--", ".benchmark-oracle/preservation.test.ts"]],
-  "acceptance": [["npm", "test", "--", ".benchmark-oracle/acceptance.test.ts"]],
-  "mutation": [["git", "apply", ".benchmark-oracle/completed-status.patch"], ["npm", "test", "--", ".benchmark-oracle/preservation.test.ts"]]
+  "public": [["npm", "test", "--", "src/overdue.public.test.tsx"], ["npm", "run", "typecheck"], ["npm", "run", "lint"]],
+  "preservation": [["npm", "test", "--", ".benchmark-oracle/preservation.test.tsx"]],
+  "acceptance": [["npm", "test", "--", "--reporter=verbose", ".benchmark-oracle/acceptance.test.ts"]],
+  "mutation": [["git", "apply", ".benchmark-oracle/completed-status.patch"], ["npm", "test", "--", ".benchmark-oracle/preservation.test.tsx"]]
 }
 ```
 
