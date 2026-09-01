@@ -7,6 +7,9 @@ from collections.abc import Iterable
 from evals.harness.models import DiffEvidence, Rename, Workspace
 from evals.harness.process import run_process
 
+SUBJECT_REPORT_PATHSPEC = ":(exclude).benchmark-subject-report.json"
+DIFF_PATHS = (".", SUBJECT_REPORT_PATHSPEC)
+
 
 def classify_paths(
     changed: Iterable[str],
@@ -44,12 +47,27 @@ def capture_diff(
     scenario: dict[str, object],
 ) -> DiffEvidence:
     _run_git(["add", "-N", "--", "."], workspace)
+    # 不依賴 .gitignore：Subject report 永遠不屬於 Candidate Diff。
     diff = _run_git(
-        ["diff", "--binary", "--no-ext-diff", workspace.baseline_commit],
+        [
+            "diff",
+            "--binary",
+            "--no-ext-diff",
+            workspace.baseline_commit,
+            "--",
+            *DIFF_PATHS,
+        ],
         workspace,
     )
     name_status = _run_git(
-        ["diff", "--name-status", "-M", workspace.baseline_commit],
+        [
+            "diff",
+            "--name-status",
+            "-M",
+            workspace.baseline_commit,
+            "--",
+            *DIFF_PATHS,
+        ],
         workspace,
     )
     changed: list[str] = []

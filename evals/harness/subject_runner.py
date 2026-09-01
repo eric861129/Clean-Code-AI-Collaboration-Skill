@@ -14,9 +14,15 @@ from evals.harness.models import (
 )
 from evals.harness.process import run_process
 
+IMPLEMENTATION_AUTHORIZATION = (
+    "\n\n你已獲授權在目前提供的獨立 Repository 直接實作這項需求。"
+    "只修改完成任務所需的檔案，保留既有契約與行為；"
+    "完成後執行 Repository Gate，並如實回報未完成或無法驗證的部分。"
+)
+
 
 def build_prompt(scenario: dict[str, object], arm_id: str) -> str:
-    task = str(scenario["task"])
+    task = str(scenario["task"]) + IMPLEMENTATION_AUTHORIZATION
     if arm_id == "control":
         return task
     if arm_id == "generic-clean-code":

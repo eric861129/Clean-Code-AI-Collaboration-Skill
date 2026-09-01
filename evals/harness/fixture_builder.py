@@ -167,7 +167,8 @@ def _write_workspace_gitignore(workspace_root: Path) -> None:
         ".ruff_cache/\n"
         "__pycache__/\n"
         "*.pyc\n"
-        ".benchmark-oracle/\n",
+        ".benchmark-oracle/\n"
+        ".benchmark-subject-report.json\n",
         encoding="utf-8",
     )
 

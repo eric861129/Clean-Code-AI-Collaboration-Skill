@@ -6,10 +6,18 @@ import json
 import re
 import secrets
 import subprocess
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from evals.harness.anonymizer import RUBRIC_IDS, write_review_packet
+from evals.harness.desktop_subject import (
+    DesktopSubjectValidationError,
+    build_desktop_observation,
+    desktop_subject_instruction,
+    load_desktop_dispatch,
+    stage_desktop_subject,
+    write_attempt_receipt,
+)
 from evals.harness.diff_boundary import capture_diff
 from evals.harness.evidence_recorder import record_subject_evidence
 from evals.harness.fixture_builder import build_workspace
@@ -17,8 +25,10 @@ from evals.harness.manifest import load_manifest
 from evals.harness.models import (
     BenchmarkManifest,
     CommandResult,
+    DiffEvidence,
     HarnessPaths,
     RunSlot,
+    SubjectDispatch,
 )
 from evals.harness.oracle_runner import run_oracles
 from evals.harness.planner import build_run_slots, full_slots, pilot_slots
@@ -36,6 +46,8 @@ FREEZE_ROOT = RUNS_ROOT / "contract-freezes"
 CAMPAIGN_STATE_PATH = RUNS_ROOT / "campaign-state.json"
 INVALIDATIONS_ROOT = RUNS_ROOT / "invalidations"
 TIMEOUT_ADJUDICATIONS_ROOT = RUNS_ROOT / "timeout-adjudications"
+DISPATCH_ROOT = RUNS_ROOT / "desktop-dispatches"
+ATTEMPT_RECEIPTS_ROOT = RUNS_ROOT / "desktop-attempt-receipts"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -52,8 +64,19 @@ def main(argv: list[str] | None = None) -> int:
     if command == "prepare":
         _prepare(manifest, paths)
     elif command == "pilot":
-        _require_preflight(manifest, paths)
-        _run_slots(manifest, paths, pilot_slots(build_run_slots(manifest)))
+        _desktop_execution_requires_stage_collect(manifest, "pilot")
+    elif command == "stage":
+        _stage_desktop_slots(manifest, paths, args.phase, args.run_id)
+    elif command == "collect":
+        _collect_desktop_dispatch(
+            manifest,
+            paths,
+            args.dispatch_id,
+            args.outcome,
+            args.reason,
+            args.elapsed_seconds,
+            args.subject_thread_id,
+        )
     elif command == "freeze":
         _write_freeze(manifest, paths, args.decision_note)
     elif command == "invalidate-pilot":
@@ -67,8 +90,7 @@ def main(argv: list[str] | None = None) -> int:
             args.reason,
         )
     elif command == "full":
-        _verify_freeze(manifest, paths)
-        _run_slots(manifest, paths, full_slots(build_run_slots(manifest)))
+        _desktop_execution_requires_stage_collect(manifest, "full")
     elif command == "review-packets":
         _write_review_packets(manifest, paths, args.phase)
     elif command == "build-result":
@@ -89,6 +111,19 @@ def _build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("prepare")
     subparsers.add_parser("pilot")
+    stage = subparsers.add_parser("stage")
+    stage.add_argument("--phase", choices=("pilot", "full"), required=True)
+    stage.add_argument("--run-id")
+    collect = subparsers.add_parser("collect")
+    collect.add_argument("--dispatch-id", required=True)
+    collect.add_argument(
+        "--outcome",
+        choices=("completed", "timeout", "infrastructure_failure"),
+        required=True,
+    )
+    collect.add_argument("--reason", default="desktop_subject_completed")
+    collect.add_argument("--elapsed-seconds", type=float)
+    collect.add_argument("--subject-thread-id")
     freeze = subparsers.add_parser("freeze")
     freeze.add_argument("--decision-note", required=True)
     invalidation = subparsers.add_parser("invalidate-pilot")
@@ -197,6 +232,640 @@ def _prepare(manifest: BenchmarkManifest, paths: HarnessPaths) -> None:
     print(_console_json(document))
     if status != "passed":
         raise RuntimeError("preflight failed")
+
+
+def _desktop_execution_requires_stage_collect(
+    manifest: BenchmarkManifest,
+    phase: str,
+) -> None:
+    if manifest.client == "codex-desktop-collaboration":
+        raise RuntimeError(
+            "Desktop collaboration subjects require explicit "
+            f"stage --phase {phase} and collect; {phase} cannot launch "
+            "nested Codex CLI sessions."
+        )
+    raise RuntimeError("this benchmark only supports Desktop collaboration")
+
+
+def _stage_desktop_slots(
+    manifest: BenchmarkManifest,
+    paths: HarnessPaths,
+    phase: str,
+    run_id: str | None,
+) -> None:
+    if manifest.client != "codex-desktop-collaboration":
+        raise RuntimeError("stage requires the Desktop collaboration executor")
+    if phase == "pilot":
+        _require_preflight(manifest, paths)
+        slots = pilot_slots(build_run_slots(manifest))
+    else:
+        _verify_freeze(manifest, paths)
+        slots = full_slots(build_run_slots(manifest))
+    if run_id is not None:
+        slots = tuple(slot for slot in slots if slot.run_id == run_id)
+        if not slots:
+            raise ValueError(f"run is not in {phase}: {run_id}")
+
+    _ensure_fixture_clone(manifest, paths)
+    _verify_skill_revision(manifest, paths)
+    contract_sha256 = _canonical_sha256(_freeze_document(manifest, paths))
+    staged: list[dict[str, object]] = []
+    pending: list[str] = []
+    skipped: list[str] = []
+    for slot in slots:
+        if contract_sha256 != _canonical_sha256(_freeze_document(manifest, paths)):
+            raise RuntimeError("benchmark contract changed during Desktop staging")
+        generation = _active_generation(slot.scenario_id)
+        scenario_contract_sha256 = _scenario_contract_sha256(
+            manifest,
+            paths,
+            slot.scenario_id,
+        )
+        _require_generation_contract_change(
+            slot.scenario_id,
+            scenario_contract_sha256,
+        )
+        run_document = _run_document_path(slot, generation)
+        if run_document.is_file():
+            _validate_terminal_document(
+                slot,
+                _read_json(run_document),
+                scenario_contract_sha256,
+            )
+            skipped.append(slot.run_id)
+            continue
+        attempt = _next_desktop_attempt(slot, generation)
+        dispatch_id = _desktop_dispatch_id(slot, generation, attempt)
+        dispatch_index = _dispatch_index_path(dispatch_id)
+        if dispatch_index.is_file():
+            if not _attempt_receipt_path(slot, generation, attempt).is_file():
+                pending.append(dispatch_id)
+                continue
+            raise RuntimeError(
+                "Desktop dispatch already has a receipt but was not finalized: "
+                f"{dispatch_id}"
+            )
+        physical_slot = RunSlot(
+            run_id=_physical_run_id(
+                slot.run_id,
+                generation,
+                scenario_contract_sha256,
+                attempt,
+            ),
+            scenario_id=slot.scenario_id,
+            language=slot.language,
+            arm_id=slot.arm_id,
+            repetition=slot.repetition,
+            order_index=slot.order_index,
+        )
+        workspace = build_workspace(physical_slot, manifest, paths)
+        dispatch = stage_desktop_subject(
+            slot,
+            manifest,
+            workspace,
+            generation=generation,
+            attempt=attempt,
+            physical_run_id=physical_slot.run_id,
+            contract_sha256=contract_sha256,
+            scenario_contract_sha256=scenario_contract_sha256,
+        )
+        _write_dispatch_index(dispatch)
+        staged.append(
+            {
+                "dispatch_id": dispatch.dispatch_id,
+                "dispatch_path": str(
+                    dispatch.dispatch_path.relative_to(paths.runs_root)
+                ).replace("\\", "/"),
+                "instruction": desktop_subject_instruction(dispatch),
+            }
+        )
+    print(
+        _console_json(
+            {
+                "phase": phase,
+                "staged": staged,
+                "pending": pending,
+                "skipped_terminal": skipped,
+            }
+        )
+    )
+
+
+def _collect_desktop_dispatch(
+    manifest: BenchmarkManifest,
+    paths: HarnessPaths,
+    dispatch_id: str,
+    outcome: str,
+    reason: str,
+    elapsed_seconds: float | None,
+    subject_thread_id: str | None,
+) -> None:
+    if elapsed_seconds is not None and elapsed_seconds < 0:
+        raise ValueError("desktop subject elapsed seconds cannot be negative")
+    dispatch = _load_dispatch_by_id(dispatch_id)
+    slot = _slot_for_run_id(manifest, dispatch.logical_run_id)
+    generation = _active_generation(slot.scenario_id)
+    scenario_contract_sha256 = _scenario_contract_sha256(
+        manifest,
+        paths,
+        slot.scenario_id,
+    )
+    if dispatch.generation != generation:
+        raise ValueError("desktop dispatch generation is no longer active")
+    if dispatch.attempt not in {1, 2}:
+        raise ValueError("desktop dispatch attempt is invalid")
+    if dispatch.scenario_contract_sha256 != scenario_contract_sha256:
+        raise ValueError("desktop dispatch belongs to another scenario contract")
+    contract_sha256 = _canonical_sha256(_freeze_document(manifest, paths))
+    if dispatch.contract_sha256 != contract_sha256:
+        raise ValueError("desktop dispatch belongs to another benchmark contract")
+    if _run_document_path(slot, generation).is_file():
+        raise FileExistsError("terminal run document already exists")
+    receipt_path = _attempt_receipt_path(slot, generation, dispatch.attempt)
+    if receipt_path.is_file():
+        raise FileExistsError("desktop dispatch already has an immutable receipt")
+
+    effective_outcome = (
+        "timeout"
+        if elapsed_seconds is not None
+        and elapsed_seconds > manifest.subject_timeout_seconds
+        else outcome
+    )
+    effective_reason = reason.strip() or "desktop_subject_completed"
+    if effective_outcome == "timeout":
+        effective_reason = "timeout"
+    candidate_failure_reason: str | None = None
+    try:
+        observation = build_desktop_observation(
+            dispatch,
+            outcome=effective_outcome,
+            elapsed_seconds=elapsed_seconds,
+            subject_thread_id=subject_thread_id,
+        )
+    except DesktopSubjectValidationError as error:
+        candidate_failure_reason = error.reason
+        observation = build_desktop_observation(
+            dispatch,
+            outcome="candidate_failure",
+            elapsed_seconds=elapsed_seconds,
+            subject_thread_id=subject_thread_id,
+            validate=False,
+        )
+    except ValueError:
+        if effective_outcome != "completed":
+            raise
+        effective_outcome = "infrastructure_failure"
+        effective_reason = "environment_error"
+        observation = build_desktop_observation(
+            dispatch,
+            outcome=effective_outcome,
+            elapsed_seconds=elapsed_seconds,
+            subject_thread_id=subject_thread_id,
+        )
+
+    artifact_directory = str(
+        dispatch.workspace.artifact_dir.relative_to(paths.runs_root)
+    ).replace("\\", "/")
+    if candidate_failure_reason is not None:
+        try:
+            subject_evidence = record_subject_evidence(observation, dispatch.workspace)
+            diff = capture_diff(dispatch.workspace, _scenario_for(manifest, slot))
+            subject_evidence_name = subject_evidence.name
+        except (OSError, RuntimeError, subprocess.SubprocessError, ValueError):
+            diff = _empty_diff()
+            subject_evidence_name = "not_available"
+        _finalize_desktop_candidate_failure(
+            manifest,
+            slot,
+            dispatch,
+            contract_sha256,
+            scenario_contract_sha256,
+            generation,
+            candidate_failure_reason,
+            elapsed_seconds,
+            subject_thread_id,
+            artifact_directory,
+            subject_evidence_name,
+            diff,
+        )
+        return
+    try:
+        subject_evidence = record_subject_evidence(observation, dispatch.workspace)
+        diff = capture_diff(dispatch.workspace, _scenario_for(manifest, slot))
+    except (OSError, RuntimeError, subprocess.SubprocessError, ValueError):
+        _finalize_desktop_infrastructure_failure(
+            manifest,
+            paths,
+            slot,
+            dispatch,
+            contract_sha256,
+            scenario_contract_sha256,
+            generation,
+            "harness_error",
+            elapsed_seconds,
+            subject_thread_id,
+            artifact_directory,
+            "not_available",
+        )
+        return
+
+    if effective_outcome == "infrastructure_failure":
+        _finalize_desktop_infrastructure_failure(
+            manifest,
+            paths,
+            slot,
+            dispatch,
+            contract_sha256,
+            scenario_contract_sha256,
+            generation,
+            effective_reason,
+            elapsed_seconds,
+            subject_thread_id,
+            artifact_directory,
+            subject_evidence.name,
+        )
+        return
+
+    if effective_outcome == "completed":
+        scenario = _scenario_for(manifest, slot)
+        try:
+            oracle = run_oracles(
+                dispatch.workspace,
+                scenario,
+                paths.fixture_clone / str(scenario["evaluator_path"]),
+                manifest.oracle_timeout_seconds,
+            )
+            oracle_evidence = _save_oracle_evidence(
+                oracle,
+                dispatch.workspace.artifact_dir,
+            )
+        except (OSError, RuntimeError, subprocess.SubprocessError, ValueError):
+            _finalize_desktop_infrastructure_failure(
+                manifest,
+                paths,
+                slot,
+                dispatch,
+                contract_sha256,
+                scenario_contract_sha256,
+                generation,
+                "harness_error",
+                elapsed_seconds,
+                subject_thread_id,
+                artifact_directory,
+                subject_evidence.name,
+            )
+            return
+
+    write_attempt_receipt(
+        dispatch,
+        ATTEMPT_RECEIPTS_ROOT,
+        outcome=effective_outcome,
+        reason=effective_reason,
+        elapsed_seconds=elapsed_seconds,
+        subject_thread_id=subject_thread_id,
+        artifact_directory=artifact_directory,
+        subject_evidence=subject_evidence.name,
+    )
+    attempts = _desktop_attempts(slot, generation)
+    if effective_outcome == "timeout":
+        document = _run_document(
+            manifest,
+            slot,
+            contract_sha256,
+            scenario_contract_sha256,
+            generation,
+            diff,
+            attempts,
+            terminal_state="timeout",
+            reasons=["timeout"],
+            oracle_results=[],
+            telemetry=_read_subject_telemetry(subject_evidence),
+        )
+    else:
+        reasons = list(oracle.automatic_failure_reasons)
+        if diff.outside_boundary:
+            reasons.append("outside_boundary")
+        document = _run_document(
+            manifest,
+            slot,
+            contract_sha256,
+            scenario_contract_sha256,
+            generation,
+            diff,
+            attempts,
+            terminal_state=(
+                "infrastructure_failure"
+                if "oracle_timeout_unclassified" in reasons
+                else "automatic_failure"
+                if reasons
+                else "passed"
+            ),
+            reasons=reasons,
+            oracle_results=_serialize_oracles(oracle, dispatch.workspace.root),
+            telemetry=_read_subject_telemetry(subject_evidence),
+        )
+        document["attempts"][-1]["oracle_evidence"] = str(
+            oracle_evidence.relative_to(dispatch.workspace.artifact_dir)
+        ).replace("\\", "/")
+    _write_json(_run_document_path(slot, generation), document)
+    print(
+        _console_json(
+            {
+                "dispatch_id": dispatch.dispatch_id,
+                "terminal_state": document["terminal_state"],
+            }
+        )
+    )
+
+
+def _finalize_desktop_infrastructure_failure(
+    manifest: BenchmarkManifest,
+    paths: HarnessPaths,
+    slot: RunSlot,
+    dispatch: SubjectDispatch,
+    contract_sha256: str,
+    scenario_contract_sha256: str,
+    generation: int,
+    reason: str,
+    elapsed_seconds: float | None,
+    subject_thread_id: str | None,
+    artifact_directory: str,
+    subject_evidence: str,
+) -> None:
+    write_attempt_receipt(
+        dispatch,
+        ATTEMPT_RECEIPTS_ROOT,
+        outcome="infrastructure_failure",
+        reason=reason,
+        elapsed_seconds=elapsed_seconds,
+        subject_thread_id=subject_thread_id,
+        artifact_directory=artifact_directory,
+        subject_evidence=subject_evidence,
+    )
+    attempts = _desktop_attempts(slot, generation)
+    if can_retry(reason, dispatch.attempt):
+        print(
+            _console_json(
+                {
+                    "dispatch_id": dispatch.dispatch_id,
+                    "state": "retry_required",
+                    "next_attempt": dispatch.attempt + 1,
+                }
+            )
+        )
+        return
+    document = _infrastructure_document(
+        manifest,
+        slot,
+        contract_sha256,
+        scenario_contract_sha256,
+        generation,
+        attempts,
+        reason,
+    )
+    _write_json(_run_document_path(slot, generation), document)
+    print(
+        _console_json(
+            {
+                "dispatch_id": dispatch.dispatch_id,
+                "terminal_state": document["terminal_state"],
+            }
+        )
+    )
+
+
+def _finalize_desktop_candidate_failure(
+    manifest: BenchmarkManifest,
+    slot: RunSlot,
+    dispatch: SubjectDispatch,
+    contract_sha256: str,
+    scenario_contract_sha256: str,
+    generation: int,
+    reason: str,
+    elapsed_seconds: float | None,
+    subject_thread_id: str | None,
+    artifact_directory: str,
+    subject_evidence: str,
+    diff: Any,
+) -> None:
+    """不可變 Subject 契約被違反時，直接留下不可重跑的失敗證據。"""
+
+    if reason not in {"candidate_incomplete", "invalid_claim"}:
+        raise ValueError(f"invalid desktop candidate failure reason: {reason}")
+    write_attempt_receipt(
+        dispatch,
+        ATTEMPT_RECEIPTS_ROOT,
+        outcome="candidate_failure",
+        reason=reason,
+        elapsed_seconds=elapsed_seconds,
+        subject_thread_id=subject_thread_id,
+        artifact_directory=artifact_directory,
+        subject_evidence=subject_evidence,
+    )
+    attempts = _desktop_attempts(slot, generation)
+    document = _run_document(
+        manifest,
+        slot,
+        contract_sha256,
+        scenario_contract_sha256,
+        generation,
+        diff,
+        attempts,
+        terminal_state="automatic_failure",
+        reasons=[reason],
+        oracle_results=[],
+        telemetry="not_available",
+    )
+    _write_json(_run_document_path(slot, generation), document)
+    print(
+        _console_json(
+            {
+                "dispatch_id": dispatch.dispatch_id,
+                "terminal_state": document["terminal_state"],
+            }
+        )
+    )
+
+
+def _empty_diff() -> DiffEvidence:
+    return DiffEvidence(
+        diff="",
+        diff_sha256=hashlib.sha256(b"").hexdigest(),
+        changed_paths=(),
+        renamed_paths=(),
+        outside_boundary=(),
+    )
+
+
+def _next_desktop_attempt(
+    slot: RunSlot,
+    generation: int,
+    receipts_root: Path = ATTEMPT_RECEIPTS_ROOT,
+) -> int:
+    receipts = _desktop_attempts(slot, generation, receipts_root)
+    if not receipts:
+        return 1
+    last = receipts[-1]
+    attempt = last.get("attempt")
+    reason = last.get("reason")
+    if isinstance(attempt, int) and isinstance(reason, str) and can_retry(
+        reason, attempt
+    ):
+        return attempt + 1
+    raise RuntimeError(
+        "Desktop run has a non-retryable attempt but no terminal document"
+    )
+
+
+def _desktop_attempts(
+    slot: RunSlot,
+    generation: int,
+    receipts_root: Path = ATTEMPT_RECEIPTS_ROOT,
+) -> list[dict[str, object]]:
+    attempts: list[dict[str, object]] = []
+    for attempt in (1, 2):
+        path = _attempt_receipt_path(slot, generation, attempt, receipts_root)
+        if not path.is_file():
+            continue
+        receipt = _read_json(path)
+        if (
+            receipt.get("logical_run_id") != slot.run_id
+            or receipt.get("generation") != generation
+            or receipt.get("attempt") != attempt
+        ):
+            raise ValueError("desktop attempt receipt does not match its run")
+        attempts.append(
+            {
+                "attempt": attempt,
+                "physical_run_id": receipt.get("physical_run_id"),
+                "outcome": receipt.get("outcome"),
+                "reason": receipt.get("reason"),
+                "artifact_directory": receipt.get("artifact_directory"),
+                "subject_evidence": receipt.get("subject_evidence"),
+                "receipt": str(path.relative_to(receipts_root.parent)).replace(
+                    "\\", "/"
+                ),
+            }
+        )
+    return attempts
+
+
+def _require_no_inflight_desktop_attempts(
+    slot: RunSlot,
+    generation: int,
+    dispatch_root: Path = DISPATCH_ROOT,
+    receipts_root: Path = ATTEMPT_RECEIPTS_ROOT,
+    run_documents_root: Path = RUN_DOCUMENTS,
+) -> None:
+    """作廢 Generation 前，拒絕遺漏任何正在進行或等待重試的 Attempt。"""
+
+    terminal = (
+        run_documents_root
+        / slot.scenario_id
+        / f"{slot.run_id}--g{generation:02d}.json"
+    )
+    if terminal.is_file():
+        return
+
+    receipts: list[dict[str, object]] = []
+    for attempt in (1, 2):
+        dispatch = dispatch_root / (
+            f"{_desktop_dispatch_id(slot, generation, attempt)}.json"
+        )
+        receipt_path = receipts_root / slot.run_id / (
+            f"g{generation:02d}--a{attempt:02d}.json"
+        )
+        if dispatch.is_file() and not receipt_path.is_file():
+            raise RuntimeError(
+                f"cannot invalidate a pending Desktop dispatch: {dispatch.stem}"
+            )
+        if receipt_path.is_file() and not dispatch.is_file():
+            raise RuntimeError("Desktop attempt receipt has no dispatch index")
+        if receipt_path.is_file():
+            receipts.append(_read_json(receipt_path))
+
+    if not receipts:
+        return
+    latest = receipts[-1]
+    attempt = latest.get("attempt")
+    reason = latest.get("reason")
+    if isinstance(attempt, int) and isinstance(reason, str) and can_retry(
+        reason, attempt
+    ):
+        raise RuntimeError("cannot invalidate a retry-required Desktop attempt")
+    raise RuntimeError("Desktop attempt receipt has no terminal run document")
+
+
+def _attempt_receipt_path(
+    slot: RunSlot,
+    generation: int,
+    attempt: int,
+    receipts_root: Path = ATTEMPT_RECEIPTS_ROOT,
+) -> Path:
+    return receipts_root / slot.run_id / (
+        f"g{generation:02d}--a{attempt:02d}.json"
+    )
+
+
+def _desktop_dispatch_id(slot: RunSlot, generation: int, attempt: int) -> str:
+    return f"desktop-dispatch-{slot.run_id}--g{generation:02d}--a{attempt:02d}"
+
+
+def _dispatch_index_path(dispatch_id: str) -> Path:
+    if re.fullmatch(r"desktop-dispatch-[A-Za-z0-9_.-]+", dispatch_id) is None:
+        raise ValueError("invalid desktop dispatch ID")
+    return DISPATCH_ROOT / f"{dispatch_id}.json"
+
+
+def _write_dispatch_index(dispatch: SubjectDispatch) -> Path:
+    dispatch_id = dispatch.dispatch_id
+    path = _dispatch_index_path(dispatch_id)
+    _write_json(
+        path,
+        {
+            "schema_version": "desktop-dispatch-index/v1",
+            "dispatch_id": dispatch_id,
+            "dispatch_sha256": str(dispatch.dispatch_sha256),
+            "dispatch_path": str(
+                dispatch.dispatch_path.relative_to(RUNS_ROOT)
+            ).replace("\\", "/"),
+        },
+    )
+    return path
+
+
+def _load_dispatch_by_id(dispatch_id: str) -> SubjectDispatch:
+    index = _read_json(_dispatch_index_path(dispatch_id))
+    if index.get("dispatch_id") != dispatch_id:
+        raise ValueError("desktop dispatch index ID mismatch")
+    dispatch_path = index.get("dispatch_path")
+    if not isinstance(dispatch_path, str):
+        raise ValueError("desktop dispatch index path is invalid")
+    relative_path = PurePosixPath(dispatch_path.replace("\\", "/"))
+    if relative_path.is_absolute() or ".." in relative_path.parts:
+        raise ValueError("desktop dispatch index path must be relative")
+    dispatch = load_desktop_dispatch(RUNS_ROOT.joinpath(*relative_path.parts))
+    if dispatch.dispatch_id != dispatch_id:
+        raise ValueError("desktop dispatch ID mismatch")
+    if index.get("dispatch_sha256") != dispatch.dispatch_sha256:
+        raise ValueError("desktop dispatch index hash mismatch")
+    expected_workspace = RUNS_ROOT / "workspaces" / dispatch.physical_run_id
+    expected_artifact = RUNS_ROOT / "artifacts" / dispatch.physical_run_id
+    expected_dispatch = expected_artifact / "desktop-dispatch.json"
+    if (
+        dispatch.workspace.root.resolve() != expected_workspace.resolve()
+        or dispatch.workspace.artifact_dir.resolve() != expected_artifact.resolve()
+        or dispatch.dispatch_path.resolve() != expected_dispatch.resolve()
+    ):
+        raise ValueError("desktop dispatch path does not match its physical run")
+    return dispatch
+
+
+def _slot_for_run_id(manifest: BenchmarkManifest, run_id: str) -> RunSlot:
+    try:
+        return next(slot for slot in build_run_slots(manifest) if slot.run_id == run_id)
+    except StopIteration as error:
+        raise ValueError(f"unknown run ID: {run_id}") from error
 
 
 def _run_slots(
@@ -631,6 +1300,7 @@ def _invalidate_pilot(
     )
     evidence: list[dict[str, object]] = []
     for slot in slots:
+        _require_no_inflight_desktop_attempts(slot, generation)
         path = _run_document_path(slot, generation)
         if not path.is_file():
             continue

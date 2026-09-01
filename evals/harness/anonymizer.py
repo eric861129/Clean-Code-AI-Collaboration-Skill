@@ -116,6 +116,7 @@ def _redact_for_review(value: object, run_id: str) -> object:
         "skill-v0.3.0",
         "generic-clean-code",
         "clean-code-ai-collaboration",
+        "codex-desktop-collaboration",
     ):
         if sensitive:
             redacted = re.sub(
@@ -124,10 +125,40 @@ def _redact_for_review(value: object, run_id: str) -> object:
                 redacted,
                 flags=re.IGNORECASE,
             )
-    return re.sub(
+    redacted = re.sub(
         r"(?:[A-Za-z]:[/\\]|/)[^\s\"']*?[.]benchmark-runs"
         r"(?:[/\\][^\s\"']*)?",
         "[private-run-path]",
+        redacted,
+        flags=re.IGNORECASE,
+    )
+    redacted = re.sub(
+        r"(?:[A-Za-z]:[/\\][^\s\"']+|/(?:Users|home|tmp|var|private)(?:/[^\s\"']*)?)",
+        "[private-path]",
+        redacted,
+        flags=re.IGNORECASE,
+    )
+    redacted = re.sub(
+        r"desktop-dispatch-[A-Za-z0-9_.-]+",
+        "[redacted]",
+        redacted,
+        flags=re.IGNORECASE,
+    )
+    redacted = re.sub(
+        r"run-[0-9a-f]{16}",
+        "[redacted]",
+        redacted,
+        flags=re.IGNORECASE,
+    )
+    redacted = re.sub(
+        r"\bthread[-_][A-Za-z0-9_-]+\b",
+        "[redacted]",
+        redacted,
+        flags=re.IGNORECASE,
+    )
+    return re.sub(
+        r"thread(?:_id|[- ]id)?[=:][^\s\"']+",
+        "thread_id=[redacted]",
         redacted,
         flags=re.IGNORECASE,
     )

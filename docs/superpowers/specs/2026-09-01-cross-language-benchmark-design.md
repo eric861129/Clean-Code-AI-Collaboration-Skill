@@ -3,12 +3,52 @@
 ## 文件狀態
 
 - 日期：2026-09-01
-- 狀態：聊天室設計已核准，等待書面規格確認
+- 狀態：Desktop Subject Protocol 已實作並通過本機單元／契約測試；尚未執行 Capability Probe、Pilot 或 Full Run
 - Skill 版本：`v0.3.0`
-- Benchmark 版本：`0.3.0-cross-language-initial`
+- Benchmark 版本：`0.3.0-cross-language-desktop-subject`
 - Fixture 版本：`cross-language-v1`
 - 主要 Repository：`Clean-Code-AI-Collaboration-Skill`
-- Fixture Repository：`Clean-Code-AI-Collaboration-Benchmark-Fixtures`（規劃中的公開 Repository）
+- Fixture Repository：`Clean-Code-AI-Collaboration-Benchmark-Fixtures`
+
+## 執行機制修訂：Desktop Collaboration Subject Protocol
+
+本節取代本文件中所有「Subject 由 nested Codex CLI 的
+`workspace-write` Sandbox 執行」的描述。實機確認後，Desktop 內的 nested
+CLI 寫入工作區會被強制降為唯讀；繼續宣稱能以 CLI Sandbox 完成公平比較，會把
+環境限制誤寫成受控條件。
+
+因此 Manifest 固定使用 `codex-desktop-collaboration` 與
+`external-collaboration-subagent`。Harness 不直接啟動 Subject，而是採取兩段式
+不可覆寫協定：
+
+1. `stage --phase <pilot|full> --run-id <logical-run-id>` 建立唯一的 Fixture
+   Workspace、Baseline Commit、Prompt、`desktop-dispatch.json`、已預填不可變欄位的
+   `subject-report.template.json` 與私有 Dispatch Index。Dispatch 綁定
+   Benchmark／Scenario／Prompt Hash、Baseline、Generation、Attempt 與實體 Run ID。
+2. 外層編排者以 fresh context 的 Codex Desktop collaboration SubAgent 執行該份
+   Dispatch；SubAgent 可在該 Workspace 讀寫任務所需檔案。Workspace 外唯一允許讀取
+   的例外是本次 staged 的 Prompt、Dispatch 與 Report Template 三個明確路徑；它不得
+   讀取其他 Run、Harness、Evaluator 或 Review 資料。完成後它以 Template 為起點寫入
+   ignored 的 `.benchmark-subject-report.json`，不可改寫其中預填的不可變欄位。
+3. `collect --dispatch-id <id> --outcome <...>` 重讀不可變 Dispatch，驗證 Report
+   的 Dispatch／Prompt／Benchmark／Scenario Hash、Baseline、Generation 與 Attempt，
+   再由 Harness 擷取 Diff 並獨立執行 Oracle。Report 是交接資料，不是成功證據。
+
+`pilot` 與 `full` 指令在 Desktop Manifest 下必須 fail closed，並明確要求先
+`stage`、外部 SubAgent、再 `collect`；兩者絕不退回 nested CLI。外層編排者必須
+使用 fresh context、`gpt-5.6-sol`／`high`，並自行停止超過 480 秒的 Subject；
+Harness 若收到超過上限的 elapsed time，仍記為 Timeout。
+
+Desktop 無法由此 Harness 強制或可靠證明網路限制、Sandbox 細節、Token、Tool Call
+與檔案查閱 telemetry。這些欄位固定為 `not_available`，不從 Subject 自述、字數或
+Diff 推估。Dispatch、Thread ID、絕對 Workspace 路徑與完整 Report 都留在 Git
+忽略的 `.benchmark-runs/`；匿名 Review Packet 必須遮罩它們。
+
+Report 遺漏或結構不完整標為 `candidate_incomplete`；Report Hash、Baseline、Generation、
+Attempt 不符，或 Subject 自行 Commit 使 HEAD 漂移，標為 `invalid_claim`。兩者都產生
+Automatic Failure、保留 immutable Attempt Receipt，且不得按環境失敗重跑。第一個可重跑的
+Infrastructure 失敗才可產生 Attempt 2；Timeout、候選失敗與 Oracle 判定失敗不可重跑。既有 CLI 產生的 Evidence
+與所有 Invalidation 保留為歷史資料，不能被新的 Desktop 流程覆寫或納入新結果。
 
 ## 背景
 
@@ -86,16 +126,19 @@ Pilot 只有在 Fixture、Prompt、Oracle、允許修改邊界與評分方式完
 
 - Model：`gpt-5.6-sol`
 - Reasoning Effort：`high`
-- Client：Codex CLI
-- Context：每次使用全新、暫時且獨立的 Git Repository
-- Session：`codex exec --ephemeral --json --ignore-user-config`
+- Client：Codex Desktop collaboration（`external-collaboration-subagent`）
+- Context：每次使用全新 Context 的 SubAgent 與唯一、暫時且獨立的 Git Repository
+- Session：Harness `stage` 後，由外層編排者啟動一個對應 Dispatch 的 Desktop SubAgent，再由 Harness `collect`
 - Agent Session 上限：8 分鐘
 - Fixture 安裝／準備上限：2 分鐘
 - 獨立 Oracle 上限：2 分鐘
-- 網路：Baseline 準備階段可依 Lockfile 下載與快取套件；Subject 可操作的 Repository Sandbox 關閉網路，不得臨時下載套件、查詢解答或讀取 Fixture Repository 的其他內容
-- 權限：三組使用相同 Sandbox 與工具權限
+- 網路：Baseline 準備階段可依 Lockfile 下載與快取套件；Desktop Subject 的網路強制狀態為 `not_available`，不得宣稱 Harness 已關閉網路
+- 權限：三組使用相同 Desktop collaboration 執行條件；SubAgent 僅被派發到單一 staged Workspace
 
-`--ignore-user-config` 用來降低個人 Codex 設定污染比較；共同 Repository Instruction 仍由 Fixture 明確提供。Skill 組只載入固定的 `v0.3.0` 內容，不讀取開發中的工作目錄版本。
+共同 Repository Instruction 仍由 Fixture 明確提供。Skill 組只載入固定的
+`v0.3.0` staged 內容，不讀取開發中的工作目錄版本。Desktop 無法可靠輸出
+Token、Tool Call、檔案查閱或 Sandbox telemetry，因此這些資料固定標示
+`not_available`，不參與成本比較。
 
 ## Fixture Repository 設計
 
@@ -208,9 +251,14 @@ evals/
 
 1. **Planner**：驗證 Manifest，產生 36 個 Run Slot 與可重現的打散順序。
 2. **Fixture Builder**：由固定 Tag／Commit 匯出單一 Fixture，建立乾淨暫時 Git Repository，完成 Baseline Gate。
-3. **Subject Runner**：依對照組組合 Prompt 與 Skill，執行 Codex Fresh Context Session，套用時間與權限限制。
+3. **Desktop Subject Protocol**：依對照組組合 Prompt 與 Skill，Stage 不可覆寫
+   Dispatch；外層編排者以 Fresh Context Desktop SubAgent 執行，Collect 驗證
+   Report、Baseline 與 Hash。舊 `subject_runner.py` 僅保留歷史 CLI Evidence 與
+   單元測試相容性，不是正式 Benchmark 的執行路徑。
 4. **Oracle Runner**：在 Subject 結束後凍結候選，獨立執行公開 Gate、Hidden Oracle 與 Diff Boundary 檢查。
-5. **Evidence Recorder**：保存 JSONL、Prompt、Diff、命令、Exit Code、環境、時間與錯誤。
+5. **Evidence Recorder**：保存 Prompt、Dispatch／Report Hash、Git Status、Diff、
+   Oracle、Attempt Receipt、時間與錯誤；Desktop 不要求 JSONL。Desktop 無法可靠取得的
+   命令、Token、Tool Call 與檔案查閱資料必須標示 `not_available`。
 6. **Anonymizer／Result Builder**：隱藏 Arm 身分，產生人工審查材料，彙整分維度結果與公開 JSON。
 
 元件以檔案與結構化 JSON 交換資料，不依賴常駐服務或外部資料庫。每個 Run 先寫入獨立暫存結果，最後才產生不可手動覆寫的彙整檔，避免中途失敗破壞其他 Run。
@@ -222,8 +270,14 @@ evals/
 3. 匯出單一 Fixture，建立暫時 Git Repository，確認工作目錄乾淨。
 4. 在 Subject 介入前執行公開 Gate 與 Preservation Oracle，兩者必須通過；再執行 Acceptance Oracle，確認至少一項測試因預期需求缺口呈現 RED。若失敗原因不符合這項契約，停止該 Fixture，不產生 Subject 結果。
 5. 依 Arm 建立 Prompt：Control 只含任務；Generic 加入一句 Clean Code 指示；Skill 安裝固定版本並明確呼叫。
-6. 使用相同模型、Reasoning Effort、Sandbox、權限與時間限制執行 Subject。
-7. Session 結束或逾時後凍結工作目錄，保存原始 JSONL、最後輸出、Git Status、Diff 與雜湊。
+6. 使用相同模型、Reasoning Effort 與 Desktop collaboration 條件，Stage 單一
+   Workspace，再由外層編排者啟動對應的 Fresh Context Subject；不得以 nested CLI
+   取代這個步驟。
+7. Session 結束或逾時後，Collect 對所有 Outcome 都驗證實際 Git HEAD 是否仍是
+   Baseline，並驗證不可變 Dispatch 與完成 Report 的 Hash。Report 遺漏／不完整為
+   `candidate_incomplete`，Hash／Baseline／自行 Commit 不符為 `invalid_claim`；兩者直接
+   Automatic Failure、不做環境重跑。Collect 保存 Git Status、Diff、Attempt Receipt 與
+   可取得的時間資料。
 8. 在 Subject 外執行公開 Gate、Preservation Oracle、Acceptance Oracle、允許修改邊界與禁止行為檢查。
 9. 將 Arm 匿名化，交由一位 Reviewer 依三份既有 Rubric 分別評估。
 10. 36 個 Run Slot 都取得 Terminal State 後，產生機器可讀結果與人類可讀摘要。
@@ -238,6 +292,8 @@ evals/
 - Preservation Oracle、Acceptance Oracle 或必要 Repository Gate 失敗。
 - 產生禁止的重複外部副作用。
 - 未執行驗證卻明確宣稱已通過。
+- Desktop Subject 的 Report 遺漏／不完整（`candidate_incomplete`），或不可變 Hash、
+  Baseline、Generation、Attempt 不符與自行 Commit（`invalid_claim`）。
 - 修改超出事前定義的 Diff Boundary，且無法由任務責任解釋。
 - Session 逾時、Crash，或沒有留下可評估候選。
 
@@ -249,7 +305,7 @@ Agent 超過 8 分鐘即記為 Timeout，不自動重跑。Fixture 安裝或 Ora
 
 ### 可重跑條件
 
-只有明確的 Harness、套件快取、CLI Runner 或基礎環境故障可以重跑一次。重跑不得覆蓋原始失敗，Result 必須同時記錄 Original Attempt、Retry 原因與 Retry 結果。
+只有明確的 Harness、套件快取、Desktop 編排或基礎環境故障可以重跑一次。重跑不得覆蓋原始失敗；不可覆寫的 Attempt Receipt 必須保留 Original Attempt、Retry 原因與 Retry 結果。
 
 Agent 選錯方向、沒有完成、測試失敗、超時或輸出品質不佳都是真實結果，不得以「再給一次機會」改善數字。
 
@@ -277,20 +333,20 @@ Reviewer 看到的是匿名候選、任務、Fixture 公開契約、Diff、Gate 
 
 ### 執行條件
 
-- Codex CLI 版本
+- Codex Desktop collaboration Subject Protocol 與 Dispatch Mode
 - Model 與 Reasoning Effort
-- Sandbox、工具權限與網路條件
+- 可觀察的工具權限與網路條件；無法由 Harness 強制或確認者為 `not_available`
 - 作業系統、Runtime 與套件管理器版本
 - 固定 Seed 與 Run 順序位置
 
 ### Subject 證據
 
 - 完整 Prompt
-- 原始 JSONL 路徑與雜湊
-- 最後輸出
-- 查閱、修改與驗證的檔案（能可靠取得時）
+- Prompt、不可變 Dispatch 與 Report Hash
+- Subject Report 的查閱、修改與驗證宣稱（僅交接資料，不取代 Oracle）
+- JSONL、最後輸出與檔案查閱 telemetry（Desktop 下固定 `not_available`）
 - Git Status、Diff 與 Diff SHA-256
-- Subject 命令、Exit Code 與經過時間
+- 外層回報的完成結果與經過時間；逾時由 Harness 依上限判定
 
 ### Evaluator 證據
 
@@ -307,7 +363,11 @@ Reviewer 看到的是匿名候選、任務、Fixture 公開契約、Diff、Gate 
 - Token、Tool Call 與時間 Telemetry 的取得狀態
 - Comparison Eligibility
 
-無法可靠取得的欄位必須明確記為 `not_available`，不得推估。完整原始 JSONL 預設存放於 Git 忽略的 `.benchmark-runs/`；公開 Result 保存可驗證摘要與雜湊。若原始資料體積適合公開，可在結果發布時另作 GitHub Release Asset，而不是把大量執行紀錄直接塞入主分支。
+無法可靠取得的欄位必須明確記為 `not_available`，不得推估。完整 Dispatch、
+Report、Attempt Receipt 與本機 Workspace 預設存放於 Git 忽略的
+`.benchmark-runs/`；公開 Result 只保存可驗證摘要與雜湊。若原始資料適合公開，
+必須先移除 Dispatch、Thread ID、絕對路徑與其他私有資料，再另作 GitHub Release
+Asset，而不是把大量執行紀錄直接塞入主分支。
 
 ## 報告方式與公開主張
 

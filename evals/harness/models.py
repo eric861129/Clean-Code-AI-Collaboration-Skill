@@ -24,6 +24,7 @@ class BenchmarkManifest:
     model: str
     reasoning_effort: str
     client: str
+    subject_executor: dict[str, object]
     subject_timeout_seconds: int
     fixture_timeout_seconds: int
     oracle_timeout_seconds: int
@@ -53,6 +54,28 @@ class Workspace:
 
 
 @dataclass(frozen=True)
+class SubjectDispatch:
+    """Desktop Subject 的不可變派發契約。"""
+
+    dispatch_id: str
+    logical_run_id: str
+    physical_run_id: str
+    scenario_id: str
+    generation: int
+    attempt: int
+    workspace: Workspace
+    prompt_path: Path
+    report_template_path: Path
+    report_path: Path
+    report_relative_path: str
+    dispatch_path: Path
+    prompt_sha256: str
+    contract_sha256: str
+    scenario_contract_sha256: str
+    dispatch_sha256: str
+
+
+@dataclass(frozen=True)
 class HarnessPaths:
     repository_root: Path
     runs_root: Path
@@ -63,10 +86,19 @@ class HarnessPaths:
 @dataclass(frozen=True)
 class SubjectObservation:
     run_id: str
-    command: CommandResult
+    command: CommandResult | None
     prompt_sha256: str
-    raw_jsonl_path: Path
-    last_message_path: Path
+    raw_jsonl_path: Path | None
+    last_message_path: Path | None
+    executor: str = "codex-cli"
+    completion_outcome: str = "completed"
+    elapsed_seconds: float | None = None
+    dispatch_path: Path | None = None
+    dispatch_sha256: str = "not_available"
+    report_path: Path | None = None
+    report_sha256: str = "not_available"
+    subject_thread_id: str | None = None
+    telemetry: object = "not_available"
 
 
 @dataclass(frozen=True)

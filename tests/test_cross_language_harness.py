@@ -9,12 +9,26 @@ from evals.harness.anonymizer import build_review_packet
 from evals.harness.cli import (
     _build_parser,
     _console_json,
+    _next_desktop_attempt,
     _physical_run_id,
+    _require_no_inflight_desktop_attempts,
     _run_document_path,
     _sanitize_persisted_text,
     _validate_terminal_document,
 )
-from evals.harness.diff_boundary import classify_paths
+from evals.harness.cli import (
+    main as harness_main,
+)
+from evals.harness.desktop_subject import (
+    DesktopSubjectValidationError,
+    build_desktop_observation,
+    desktop_subject_instruction,
+    load_desktop_dispatch,
+    stage_desktop_subject,
+    validate_desktop_report,
+    write_attempt_receipt,
+)
+from evals.harness.diff_boundary import capture_diff, classify_paths
 from evals.harness.evidence_recorder import record_subject_evidence
 from evals.harness.fixture_builder import build_workspace
 from evals.harness.manifest import load_manifest, validate_manifest
@@ -88,6 +102,364 @@ class CrossLanguageHarnessTests(unittest.TestCase):
         self.assertIn("$clean-code-ai-collaboration", skill)
         self.assertNotIn("$clean-code-ai-collaboration", control)
         self.assertNotIn("$clean-code-ai-collaboration", generic)
+        self.assertIn("已獲授權", control)
+
+    def test_stage_desktop_subject_writes_immutable_dispatch_and_ignores_report(
+        self,
+    ) -> None:
+        manifest = load_manifest(MANIFEST_PATH)
+        slot = RunSlot(
+            run_id="react-overdue-rule--control--r01",
+            scenario_id="react-overdue-rule",
+            language="typescript-react",
+            arm_id="control",
+            repetition=1,
+            order_index=0,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workspace_root = root / "workspace"
+            artifact_dir = root / "artifacts"
+            workspace_root.mkdir()
+            artifact_dir.mkdir()
+            (workspace_root / ".gitignore").write_text(
+                ".benchmark-subject-report.json\n", encoding="utf-8"
+            )
+            (workspace_root / "subject.txt").write_text(
+                "baseline\n", encoding="utf-8"
+            )
+            self._git(workspace_root, "init", "--initial-branch=main")
+            self._git(workspace_root, "config", "user.name", "Benchmark Runner")
+            self._git(
+                workspace_root,
+                "config",
+                "user.email",
+                "benchmark@example.invalid",
+            )
+            self._git(workspace_root, "add", "-A")
+            self._git(workspace_root, "commit", "-m", "baseline")
+            baseline_commit = self._git(workspace_root, "rev-parse", "HEAD").strip()
+            workspace = Workspace(workspace_root, artifact_dir, baseline_commit)
+
+            dispatch = stage_desktop_subject(
+                slot,
+                manifest,
+                workspace,
+                generation=3,
+                attempt=1,
+                physical_run_id="run-aabbccddeeff0011",
+                contract_sha256="b" * 64,
+                scenario_contract_sha256="a" * 64,
+            )
+
+            self.assertTrue(dispatch.dispatch_path.is_file())
+            self.assertTrue(dispatch.prompt_path.is_file())
+            self.assertTrue(dispatch.report_template_path.is_file())
+            self.assertEqual(
+                ".benchmark-subject-report.json",
+                dispatch.report_relative_path,
+            )
+            template = json.loads(
+                dispatch.report_template_path.read_text(encoding="utf-8")
+            )
+            self.assertEqual("desktop-subject-report/v1", template["schema_version"])
+            self.assertEqual(dispatch.dispatch_sha256, template["dispatch_sha256"])
+            self.assertEqual(workspace.baseline_commit, template["baseline_commit"])
+            self.assertEqual(dispatch.prompt_sha256, template["prompt_sha256"])
+            self.assertEqual(dispatch.contract_sha256, template["contract_sha256"])
+            self.assertEqual(
+                dispatch.scenario_contract_sha256,
+                template["scenario_contract_sha256"],
+            )
+            self.assertEqual(dispatch.generation, template["generation"])
+            self.assertEqual(dispatch.attempt, template["attempt"])
+            instruction = desktop_subject_instruction(dispatch)
+            self.assertIn(str(dispatch.prompt_path), instruction)
+            self.assertIn(str(dispatch.dispatch_path), instruction)
+            self.assertIn(str(dispatch.report_template_path), instruction)
+            self.assertIn("staged", instruction)
+            self.assertIn("Workspace", instruction)
+            with self.assertRaises(FileExistsError):
+                stage_desktop_subject(
+                    slot,
+                    manifest,
+                    workspace,
+                    generation=3,
+                    attempt=1,
+                    physical_run_id="run-aabbccddeeff0011",
+                    contract_sha256="b" * 64,
+                    scenario_contract_sha256="a" * 64,
+                )
+
+            dispatch.report_path.write_text("{}", encoding="utf-8")
+            self.assertEqual("", self._git(workspace_root, "status", "--short"))
+            diff = capture_diff(workspace, manifest.scenarios[0])
+            self.assertNotIn(
+                ".benchmark-subject-report.json", diff.changed_paths
+            )
+            self.assertNotIn(".benchmark-subject-report.json", diff.diff)
+
+            instruction = desktop_subject_instruction(dispatch)
+            self.assertIn("references", instruction)
+            self.assertIn("不得讀取其他 Skill", instruction)
+
+            dispatch.prompt_path.write_text("tampered prompt", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "prompt hash"):
+                load_desktop_dispatch(dispatch.dispatch_path)
+
+    def test_diff_boundary_excludes_subject_report_without_gitignore(self) -> None:
+        manifest = load_manifest(MANIFEST_PATH)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workspace_root = root / "workspace"
+            artifact_dir = root / "artifacts"
+            workspace_root.mkdir()
+            artifact_dir.mkdir()
+            (workspace_root / "subject.txt").write_text("baseline\n", encoding="utf-8")
+            self._git(workspace_root, "init", "--initial-branch=main")
+            self._git(workspace_root, "config", "user.name", "Benchmark Runner")
+            self._git(
+                workspace_root,
+                "config",
+                "user.email",
+                "benchmark@example.invalid",
+            )
+            self._git(workspace_root, "add", "-A")
+            self._git(workspace_root, "commit", "-m", "baseline")
+            workspace = Workspace(
+                workspace_root,
+                artifact_dir,
+                self._git(workspace_root, "rev-parse", "HEAD").strip(),
+            )
+
+            (workspace_root / ".benchmark-subject-report.json").write_text(
+                '{"unignored": true}', encoding="utf-8"
+            )
+            (workspace_root / "subject.txt").write_text("candidate\n", encoding="utf-8")
+            diff = capture_diff(workspace, manifest.scenarios[0])
+
+            self.assertIn("subject.txt", diff.changed_paths)
+            self.assertNotIn(".benchmark-subject-report.json", diff.changed_paths)
+            self.assertNotIn(".benchmark-subject-report.json", diff.diff)
+
+    def test_desktop_report_requires_dispatch_baseline_and_prompt_hash(
+        self,
+    ) -> None:
+        manifest = load_manifest(MANIFEST_PATH)
+        slot = RunSlot(
+            run_id="react-overdue-rule--control--r01",
+            scenario_id="react-overdue-rule",
+            language="typescript-react",
+            arm_id="control",
+            repetition=1,
+            order_index=0,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workspace_root = root / "workspace"
+            artifact_dir = root / "artifacts"
+            workspace_root.mkdir()
+            artifact_dir.mkdir()
+            (workspace_root / ".gitignore").write_text(
+                ".benchmark-subject-report.json\n", encoding="utf-8"
+            )
+            self._git(workspace_root, "init", "--initial-branch=main")
+            self._git(workspace_root, "config", "user.name", "Benchmark Runner")
+            self._git(
+                workspace_root,
+                "config",
+                "user.email",
+                "benchmark@example.invalid",
+            )
+            self._git(workspace_root, "add", "-A")
+            self._git(workspace_root, "commit", "-m", "baseline")
+            workspace = Workspace(
+                workspace_root,
+                artifact_dir,
+                self._git(workspace_root, "rev-parse", "HEAD").strip(),
+            )
+            dispatch = stage_desktop_subject(
+                slot,
+                manifest,
+                workspace,
+                generation=3,
+                attempt=1,
+                physical_run_id="run-aabbccddeeff0011",
+                contract_sha256="b" * 64,
+                scenario_contract_sha256="a" * 64,
+            )
+            with self.assertRaises(DesktopSubjectValidationError) as missing_report:
+                validate_desktop_report(dispatch)
+            self.assertEqual(
+                "candidate_incomplete", missing_report.exception.reason
+            )
+            self.assertFalse(can_retry(missing_report.exception.reason, 1))
+            report = {
+                "schema_version": "desktop-subject-report/v1",
+                "dispatch_sha256": "wrong",
+                "baseline_commit": workspace.baseline_commit,
+                "prompt_sha256": dispatch.prompt_sha256,
+                "contract_sha256": dispatch.contract_sha256,
+                "scenario_contract_sha256": dispatch.scenario_contract_sha256,
+                "generation": dispatch.generation,
+                "attempt": dispatch.attempt,
+                "completion": "completed",
+                "summary": "完成最小修改。",
+                "files_inspected": ["subject.txt"],
+                "files_modified_claimed": [],
+                "commands_claimed": [],
+                "telemetry": "not_available",
+            }
+            dispatch.report_path.write_text(
+                json.dumps(report, ensure_ascii=False), encoding="utf-8"
+            )
+            with self.assertRaises(DesktopSubjectValidationError) as invalid_report:
+                validate_desktop_report(dispatch)
+            self.assertEqual("invalid_claim", invalid_report.exception.reason)
+            self.assertFalse(can_retry(invalid_report.exception.reason, 1))
+
+            report["dispatch_sha256"] = dispatch.dispatch_sha256
+            dispatch.report_path.write_text(
+                json.dumps(report, ensure_ascii=False), encoding="utf-8"
+            )
+            observation = build_desktop_observation(
+                dispatch,
+                outcome="completed",
+                elapsed_seconds=None,
+                subject_thread_id="thread-private",
+            )
+            self.assertEqual("not_available", observation.telemetry)
+            self.assertEqual("codex-desktop-collaboration", observation.executor)
+            self._git(workspace_root, "commit", "--allow-empty", "-m", "drift")
+            for outcome in ("timeout", "infrastructure_failure"):
+                with self.assertRaises(DesktopSubjectValidationError) as drift:
+                    build_desktop_observation(
+                        dispatch,
+                        outcome=outcome,
+                        elapsed_seconds=None,
+                        subject_thread_id="thread-private",
+                    )
+                self.assertEqual("invalid_claim", drift.exception.reason)
+                self.assertFalse(can_retry(drift.exception.reason, 1))
+
+    def test_desktop_attempt_receipt_is_immutable_and_retry_ready(self) -> None:
+        manifest = load_manifest(MANIFEST_PATH)
+        slot = RunSlot(
+            run_id="react-overdue-rule--control--r01",
+            scenario_id="react-overdue-rule",
+            language="typescript-react",
+            arm_id="control",
+            repetition=1,
+            order_index=0,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workspace_root = root / "workspace"
+            artifact_dir = root / "artifacts"
+            workspace_root.mkdir()
+            artifact_dir.mkdir()
+            (workspace_root / ".gitignore").write_text(
+                ".benchmark-subject-report.json\n", encoding="utf-8"
+            )
+            self._git(workspace_root, "init", "--initial-branch=main")
+            self._git(workspace_root, "config", "user.name", "Benchmark Runner")
+            self._git(
+                workspace_root,
+                "config",
+                "user.email",
+                "benchmark@example.invalid",
+            )
+            self._git(workspace_root, "add", "-A")
+            self._git(workspace_root, "commit", "-m", "baseline")
+            workspace = Workspace(
+                workspace_root,
+                artifact_dir,
+                self._git(workspace_root, "rev-parse", "HEAD").strip(),
+            )
+            dispatch = stage_desktop_subject(
+                slot,
+                manifest,
+                workspace,
+                generation=3,
+                attempt=1,
+                physical_run_id="run-aabbccddeeff0011",
+                contract_sha256="b" * 64,
+                scenario_contract_sha256="a" * 64,
+            )
+            receipt_root = root / "attempts"
+            receipt = write_attempt_receipt(
+                dispatch,
+                receipt_root,
+                outcome="infrastructure_failure",
+                reason="environment_error",
+                elapsed_seconds=None,
+                subject_thread_id="thread-private",
+            )
+
+            self.assertTrue(receipt.is_file())
+            self.assertEqual(2, _next_desktop_attempt(slot, 3, receipt_root))
+            with self.assertRaises(FileExistsError):
+                write_attempt_receipt(
+                    dispatch,
+                    receipt_root,
+                    outcome="infrastructure_failure",
+                    reason="environment_error",
+                    elapsed_seconds=None,
+                    subject_thread_id="thread-private",
+                )
+
+    def test_invalidation_rejects_pending_or_retry_required_desktop_attempt(
+        self,
+    ) -> None:
+        slot = RunSlot(
+            run_id="react-overdue-rule--control--r01",
+            scenario_id="react-overdue-rule",
+            language="typescript-react",
+            arm_id="control",
+            repetition=1,
+            order_index=0,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            dispatch_root = root / "dispatches"
+            receipts_root = root / "receipts"
+            run_documents_root = root / "run-documents"
+            dispatch_root.mkdir()
+            pending = dispatch_root / (
+                "desktop-dispatch-react-overdue-rule--control--r01"
+                "--g03--a01.json"
+            )
+            pending.write_text("{}", encoding="utf-8")
+
+            with self.assertRaisesRegex(RuntimeError, "pending Desktop dispatch"):
+                _require_no_inflight_desktop_attempts(
+                    slot,
+                    3,
+                    dispatch_root,
+                    receipts_root,
+                    run_documents_root,
+                )
+
+            receipt = receipts_root / slot.run_id / "g03--a01.json"
+            receipt.parent.mkdir(parents=True)
+            receipt.write_text(
+                json.dumps(
+                    {
+                        "attempt": 1,
+                        "outcome": "infrastructure_failure",
+                        "reason": "environment_error",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(RuntimeError, "retry-required"):
+                _require_no_inflight_desktop_attempts(
+                    slot,
+                    3,
+                    dispatch_root,
+                    receipts_root,
+                    run_documents_root,
+                )
 
     def test_stub_subject_records_jsonl_last_message_diff_and_terminal_state(
         self,
@@ -156,6 +528,15 @@ class CrossLanguageHarnessTests(unittest.TestCase):
                 {"input_tokens": 5, "output_tokens": 3},
                 evidence["telemetry"]["token_usage"],
             )
+            self.assertEqual(
+                evidence_path,
+                record_subject_evidence(observation, workspace),
+            )
+            (workspace_root / "allowed.txt").write_text(
+                "changed again\n", encoding="utf-8"
+            )
+            with self.assertRaisesRegex(FileExistsError, "immutable"):
+                record_subject_evidence(observation, workspace)
 
     def test_workspace_builder_refuses_to_overwrite_existing_run(self) -> None:
         manifest = load_manifest(MANIFEST_PATH)
@@ -278,6 +659,28 @@ class CrossLanguageHarnessTests(unittest.TestCase):
         self.assertNotIn("D:/repo", serialized)
         self.assertNotIn("/Users/reviewer", serialized)
 
+    def test_review_packet_redacts_desktop_dispatch_and_thread_details(self) -> None:
+        sample_run = {
+            "run_id": "react-overdue-rule--skill-v0.3.0--r01",
+            "arm_id": "skill-v0.3.0",
+            "task": "Change the overdue boundary.",
+            "diff": (
+                "dispatch_id=desktop-dispatch-run-aabbccddeeff0011 "
+                "thread_id=thread-private run-aabbccddeeff0011 "
+                "C:/Users/private/workspace /tmp/private-workspace"
+            ),
+            "oracle_results": [],
+        }
+
+        packet = build_review_packet(sample_run, candidate_id="candidate-7f2a")
+        serialized = json.dumps(packet, ensure_ascii=False)
+
+        self.assertNotIn("desktop-dispatch", serialized)
+        self.assertNotIn("thread-private", serialized)
+        self.assertNotIn("run-aabbccddeeff0011", serialized)
+        self.assertNotIn("C:/Users/private", serialized)
+        self.assertNotIn("/tmp/private-workspace", serialized)
+
     def test_cli_exposes_all_contract_commands(self) -> None:
         parser = _build_parser()
         help_text = parser.format_help()
@@ -285,6 +688,8 @@ class CrossLanguageHarnessTests(unittest.TestCase):
         for command in (
             "prepare",
             "pilot",
+            "stage",
+            "collect",
             "freeze",
             "invalidate-pilot",
             "adjudicate-timeout",
@@ -296,6 +701,12 @@ class CrossLanguageHarnessTests(unittest.TestCase):
             "verify-reviews",
         ):
             self.assertIn(command, help_text)
+
+    def test_desktop_pilot_and_full_fail_closed_without_nested_cli(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "stage --phase pilot"):
+            harness_main(["pilot"])
+        with self.assertRaisesRegex(RuntimeError, "stage --phase full"):
+            harness_main(["full"])
 
     def test_baseline_red_rejects_unrelated_extra_failure(self) -> None:
         result = CommandResult(

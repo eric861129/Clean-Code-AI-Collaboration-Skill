@@ -60,7 +60,11 @@ def build_public_result(
         )
     return {
         "schema_version": "1.0",
-        "benchmark_version": "0.3.0-cross-language-initial",
+        "benchmark_version": "0.3.0-cross-language-desktop-subject",
         "status": "complete",
+        "execution_limitations": [
+            "Desktop collaboration telemetry is not available and is not inferred.",
+            "Desktop network enforcement is not available from this harness.",
+        ],
         "runs": public_runs,
     }

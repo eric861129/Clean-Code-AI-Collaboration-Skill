@@ -13,6 +13,9 @@ EXPECTED_SCENARIO_IDS = {
     "fastapi-overdue-rule",
     "fastapi-provider-boundary",
 }
+DESKTOP_EXECUTOR_KIND = "codex-desktop-collaboration"
+DESKTOP_REPORT_PATH = ".benchmark-subject-report.json"
+DESKTOP_DISPATCH_MODE = "external-collaboration-subagent"
 REQUIRED_SCENARIO_FIELDS = {
     "id",
     "language",
@@ -37,6 +40,7 @@ def validate_manifest(raw: dict[str, object]) -> BenchmarkManifest:
     fixture_repository = _required_mapping(raw, "fixture_repository")
     skill = _required_mapping(raw, "skill")
     execution = _required_mapping(raw, "execution")
+    subject_executor = _required_mapping(execution, "subject_executor")
     arms = _required_mapping_sequence(raw, "arms")
     scenarios = _required_mapping_sequence(raw, "scenarios")
 
@@ -88,6 +92,21 @@ def validate_manifest(raw: dict[str, object]) -> BenchmarkManifest:
     if repetitions != 3:
         raise ValueError("cross-language benchmark requires exactly 3 repetitions")
 
+    if execution.get("client") != DESKTOP_EXECUTOR_KIND:
+        raise ValueError("cross-language benchmark requires Desktop collaboration")
+    if subject_executor.get("kind") != DESKTOP_EXECUTOR_KIND:
+        raise ValueError("subject executor must be Desktop collaboration")
+    if subject_executor.get("protocol_version") != "desktop-subject-v1":
+        raise ValueError("subject executor protocol version is invalid")
+    if subject_executor.get("dispatch_mode") != DESKTOP_DISPATCH_MODE:
+        raise ValueError("subject executor dispatch mode is invalid")
+    if subject_executor.get("report_relative_path") != DESKTOP_REPORT_PATH:
+        raise ValueError("subject executor report path is invalid")
+    if subject_executor.get("network_enforcement") != "not_available":
+        raise ValueError("Desktop network enforcement must be not_available")
+    if subject_executor.get("telemetry") != "not_available":
+        raise ValueError("Desktop telemetry must be not_available")
+
     return BenchmarkManifest(
         schema_version=str(raw.get("schema_version", "")),
         benchmark_version=str(raw.get("benchmark_version", "")),
@@ -99,6 +118,7 @@ def validate_manifest(raw: dict[str, object]) -> BenchmarkManifest:
         model=str(execution.get("model", "")),
         reasoning_effort=str(execution.get("reasoning_effort", "")),
         client=str(execution.get("client", "")),
+        subject_executor=subject_executor,
         subject_timeout_seconds=_positive_integer(
             execution, "subject_timeout_seconds"
         ),

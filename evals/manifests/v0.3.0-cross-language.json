@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "benchmark_version": "0.3.0-cross-language-initial",
+  "benchmark_version": "0.3.0-cross-language-desktop-subject",
   "fixture_repository": {
     "url": "https://github.com/eric861129/Clean-Code-AI-Collaboration-Benchmark-Fixtures.git",
     "tag": "cross-language-v1",
@@ -15,14 +15,22 @@
   "execution": {
     "model": "gpt-5.6-sol",
     "reasoning_effort": "high",
-    "client": "codex-cli",
+    "client": "codex-desktop-collaboration",
+    "subject_executor": {
+      "kind": "codex-desktop-collaboration",
+      "protocol_version": "desktop-subject-v1",
+      "dispatch_mode": "external-collaboration-subagent",
+      "report_relative_path": ".benchmark-subject-report.json",
+      "network_enforcement": "not_available",
+      "telemetry": "not_available"
+    },
     "subject_timeout_seconds": 480,
     "fixture_timeout_seconds": 120,
     "oracle_timeout_seconds": 120,
     "repetitions": 3,
     "random_seed": 560301,
-    "sandbox": "workspace-write",
-    "subject_network": false,
+    "sandbox": "not_available",
+    "subject_network": "not_available",
     "infrastructure_retry_limit": 1
   },
   "arms": [

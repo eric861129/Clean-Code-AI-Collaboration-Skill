@@ -4,29 +4,77 @@
 
 **Goal:** 建立四個小型 TypeScript／React 與 Python／FastAPI Fixture、可重現的本機 Codex Benchmark Harness，以及 36 次匿名評測結果，為 `clean-code-ai-collaboration v0.3.0` 產生第一份跨語言初步證據。
 
-**Architecture:** Fixture 與 Hidden Evaluator 存放在獨立公開 Repository；每次 Run 只匯出單一 Subject Fixture 到獨立 Git 工作區。Skill Repository 保存版本化 Manifest、Planner、Subject Runner、Oracle Runner、匿名 Review Packet 與公開 Result，原始 JSONL 留在 Git 忽略的 `.benchmark-runs/`。
+**Architecture:** Fixture 與 Hidden Evaluator 存放在獨立公開 Repository；每次 Run 只匯出單一 Subject Fixture 到獨立 Git 工作區。Skill Repository 保存版本化 Manifest、Planner、Desktop Subject stage／collect Protocol、Oracle Runner、匿名 Review Packet 與公開 Result。Dispatch、Report、Attempt Receipt 與 Workspace 留在 Git 忽略的 `.benchmark-runs/`；Desktop 不產生可由 Harness 取得的 JSONL，Telemetry 明確標示 `not_available`。
 
-**Tech Stack:** Python 3.12+ 標準函式庫與 `unittest`、Codex CLI `0.145.0`、`gpt-5.6-sol`／`high`、Git、Node.js 24、React 19、TypeScript 6、Vitest 4、Testing Library、ESLint 10、FastAPI 0.141、Pydantic 2.13、pytest 9、Ruff 0.16。
+**Tech Stack:** Python 3.12+ 標準函式庫與 `unittest`、Codex Desktop collaboration SubAgent、`gpt-5.6-sol`／`high`、Git、Node.js 24、React 19、TypeScript 6、Vitest 4、Testing Library、ESLint 10、FastAPI 0.141、Pydantic 2.13、pytest 9、Ruff 0.16。
 
 **Spec:** `docs/superpowers/specs/2026-09-01-cross-language-benchmark-design.md`
 
 ## Global Constraints
 
-- Benchmark 版本固定為 `0.3.0-cross-language-initial`；Fixture Tag 固定為 `cross-language-v1`；Skill 固定使用已發布的 `v0.3.0`，不得改用工作目錄中的新版本。
+- Benchmark 版本固定為 `0.3.0-cross-language-desktop-subject`；Fixture Tag 固定為 `cross-language-v1`；Skill 固定使用已發布的 `v0.3.0`，不得改用工作目錄中的新版本。
 - 主要比較只有 TypeScript／React 與 Python／FastAPI；既有 .NET 結果只作歷史參考；Java／Spring 不進入本次執行。
 - 固定 4 個 Scenario、3 個 Arm、3 次 Repetition，共 36 個 Fresh Context Session；Pilot 先跑 12 次，契約不變才計入正式結果。
-- Model 固定為 `gpt-5.6-sol`，Reasoning Effort 固定為 `high`，CLI 使用 `codex exec --ephemeral --json --ignore-user-config --sandbox workspace-write`。
+- Model 固定為 `gpt-5.6-sol`，Reasoning Effort 固定為 `high`，Subject 由 Codex Desktop collaboration 的 Fresh Context SubAgent 執行；Harness 只負責 Stage／Collect，不啟動 nested CLI。
 - Agent Session 上限 480 秒，Fixture 準備上限 120 秒，Oracle 上限 120 秒；Agent Timeout、功能失敗或品質不佳不自動重跑。
-- 只有 Harness、CLI Runner、套件快取或明確基礎環境故障可重跑一次；原始失敗必須保留。
-- Subject Repository Sandbox 不得臨時下載套件、存取 Fixture Repository 的其他目錄、外部 API、正式資料庫、Secret 或個人設定。
+- 只有 Harness、Desktop 編排、套件快取或明確基礎環境故障可重跑一次；原始失敗必須保留。
+- Desktop 的 Sandbox、網路與 Tool／Token Telemetry 無法由 Harness 強制或驗證，固定為 `not_available`；不得把 Desktop 執行條件誤報為 CLI `workspace-write` Sandbox。
 - Baseline 公開 Gate 與 Preservation Oracle 必須通過；Acceptance Oracle 必須因預期需求缺口呈現 RED；候選完成後三者都必須通過。
 - Automatic Failure、三份 Rubric 與成本資料分開報告；不得建立跨維度總分或「勝率」。
 - Token、Tool Call 或時間 Telemetry 無法可靠取得時記為 `not_available`；不得用輸出字數推估 Token。
 - Fixture、Prompt、Oracle、Diff Boundary、Rubric 或評分方式在 Pilot 後若改變，該 Fixture 三個 Arm 的 Pilot 全部作廢。
-- 四個 Fixture 使用虛構資料；所有公開 Prompt、Diff、JSONL 摘要與錯誤輸出都要通過 Secret 與個人路徑掃描。
+- 四個 Fixture 使用虛構資料；所有公開 Prompt、Diff 與錯誤輸出都要通過 Secret 與個人路徑掃描。
 - Benchmark 建立的 Run 工作區與原始證據先保留，不自動批次刪除；需要清理時另列明確路徑並取得授權。
 - 每個程式 Task 都先完成 RED，再做最小 GREEN、完整回歸與 Conventional Commit。
 - 建立公開 Repository、Push、Tag、Release Asset 與執行 36 次 Session 都是明列的外部操作；只在對應 Task 到達且前置 Gate 通過後執行。
+
+## 2026-09-01 Desktop Subject Protocol（已實作，未執行 Pilot）
+
+Desktop 內 nested Codex CLI 的 Workspace 寫入已實機確認會被強制唯讀，因此原先
+CLI Subject Runner 不可作為正式跨語言評測執行器。以下流程取代本計畫後續所有
+`pilot`／`full` 直接啟動 Subject 的指令；舊 CLI Evidence 與既有 Invalidation 保留，
+不覆寫也不重新解釋。
+
+1. 先通過既有 Baseline Preflight，然後執行：
+
+   ```powershell
+   py -3 -m evals.harness.cli stage --phase pilot --run-id <logical-run-id>
+   ```
+
+   Stage 建立唯一 Workspace、Prompt、`desktop-dispatch.json`、已預填不可變欄位的
+   `subject-report.template.json` 和私有 Dispatch Index。它們都不可覆寫，並綁定
+   Benchmark／Scenario／Prompt Hash、Baseline Commit、Generation、Attempt 與實體 Run ID。
+
+2. 外層 Sol 編排者以 fresh context 啟動一個 `gpt-5.6-sol`／`high` Desktop
+   collaboration SubAgent。SubAgent 可在 Dispatch 指定的 Workspace 讀寫任務所需檔案；
+   Workspace 外只有 staged Prompt、Dispatch 與 Report Template 三個明確路徑可讀取。
+   若 Prompt 要求 Skill，只能讀取 Workspace 中 staged 的固定版本。完成後在 Workspace
+   根目錄寫入 ignored 的
+   `.benchmark-subject-report.json`。Report 是交接資料，不是驗收證據。
+
+3. 編排者帶回完成、Timeout 或 Infrastructure Failure 狀態，再執行：
+
+   ```powershell
+   py -3 -m evals.harness.cli collect --dispatch-id <dispatch-id> --outcome <completed|timeout|infrastructure_failure>
+   ```
+
+   Collect 重新驗證 Dispatch／Prompt／Benchmark／Scenario Hash、實際 Git Baseline、
+   Generation、Attempt 與 Report；接著由 Harness 擷取 Diff 並重跑獨立 Oracle。Report
+   遺漏／不完整標為 `candidate_incomplete`，Hash、Baseline 或自行 Commit 不符標為
+   `invalid_claim`，兩者都直接 Automatic Failure 且不可重跑。超過 480 秒的回報一律列為
+   Timeout。第一個明確 Infrastructure Failure 可以產生第二次 Attempt；Timeout 與候選失敗不可重跑。
+
+4. `pilot` 與 `full` 現在刻意 fail closed，訊息會要求使用上述 stage／外部
+   SubAgent／collect 順序，絕不自動退回 nested CLI。正式 Pilot、Capability Probe
+   與 Full Run 必須由主責代理在這份實作通過驗收後另行授權。
+
+5. 匿名 Packet 與公開 Result 不得包含 Dispatch ID、Thread ID、完整 Report 或絕對
+   Workspace 路徑。Desktop 無法可靠取得的網路強制、Token、Tool Call 與檔案查閱
+   telemetry 固定為 `not_available`，不得推估；JSONL 不作為 Desktop 流程的 Evidence 要求。
+
+> **Follow-up（未納入本次修正）：** Result Builder 目前維持既有公開結果欄位；待完成
+> Capability Probe／Pilot 後，再決定是否以不洩漏 Dispatch 的方式揭露 Desktop Protocol
+> 執行中繼資料。此項不影響本次 stage／collect 的 fail-closed 契約。
 
 ## File Map
 
@@ -53,18 +101,19 @@
 | Path | Responsibility |
 | --- | --- |
 | `evals/manifests/v0.3.0-cross-language.json` | 固定 Fixture、Arm、Prompt、模型、Timeout、Oracle 與 Result 必填欄位 |
-| `evals/harness/models.py` | RunSlot、CommandResult、Workspace、SubjectObservation、DiffEvidence 與 OracleEvidence 型別 |
+| `evals/harness/models.py` | RunSlot、CommandResult、Workspace、Desktop SubjectDispatch、SubjectObservation、DiffEvidence 與 OracleEvidence 型別 |
 | `evals/harness/manifest.py` | Manifest 載入與 Fail-closed 驗證 |
 | `evals/harness/planner.py` | 36 個唯一 Slot 與固定 Seed 打散順序 |
 | `evals/harness/process.py` | 無 Shell 字串插值的命令執行與 Timeout 分類 |
 | `evals/harness/fixture_builder.py` | 匯出單一 Fixture、安裝固定依賴、建立 Baseline Commit 與 Skill Arm |
-| `evals/harness/subject_runner.py` | 建立 Prompt 並執行 Codex Fresh Context Session |
+| `evals/harness/subject_runner.py` | 建立所有 Arm 共用的已授權實作 Prompt；保留歷史 CLI Evidence／測試相容性 |
+| `evals/harness/desktop_subject.py` | Stage 不可覆寫 Dispatch、提供外部 Desktop SubAgent 指令、驗證 ignored Report 與保存 immutable Attempt Receipt |
 | `evals/harness/diff_boundary.py` | 擷取新增、修改、刪除、重新命名與允許範圍 |
 | `evals/harness/oracle_runner.py` | 注入 Evaluator 後重跑公開 Gate、Preservation 與 Acceptance |
-| `evals/harness/evidence_recorder.py` | 保存 JSONL、最後輸出、命令、Diff、雜湊與 Terminal State |
+| `evals/harness/evidence_recorder.py` | 保存 Desktop Dispatch／Report Hash、Git Status、Diff、可取得的時間與 Terminal State；不可取得欄位為 `not_available` |
 | `evals/harness/anonymizer.py` | 建立 Reviewer 看不出 Arm 的候選識別碼與私有映射 |
 | `evals/harness/result_builder.py` | 驗證 36 個 Terminal State，恢復 Arm 並產生公開 Result |
-| `evals/harness/cli.py` | `prepare`、`pilot`、`full`、`review-packets`、`build-result` 入口 |
+| `evals/harness/cli.py` | `prepare`、fail-closed `pilot`／`full`、`stage`、`collect`、`review-packets`、`build-result` 入口 |
 | `tests/test_cross_language_harness.py` | Harness 單元與契約測試 |
 | `evals/results/v0.3.0-cross-language.json` | 完成 36 次 Run 與匿名審查後的公開結果 |
 | `evals/benchmark.md` | 執行方法、觀察、推論、未知、失敗與限制 |
@@ -933,7 +982,12 @@ git commit -m "feat(evals): define cross-language run manifest"
 
 ---
 
-### Task 8: 建立 Fixture Builder、Process Runner 與 Subject Evidence
+### Task 8: 建立 Fixture Builder、Process Runner 與 Subject Evidence（歷史 CLI 實作）
+
+> **已由 Desktop Subject Protocol 取代。** 本 Task 的 CLI Subject Command 與 JSONL
+> Stub 是保留舊 Evidence／單元測試相容性的歷史實作，不得用於新的 Pilot 或 Full
+> Run。正式執行只使用本計畫前段的 `stage` → 外部 Fresh Context Desktop SubAgent →
+> `collect` 流程。
 
 **Files:**
 - Create: `evals/harness/process.py`
@@ -1027,7 +1081,11 @@ class SubjectObservation:
 
 Builder 不刪除既有 Run Workspace；若目標路徑已存在就 Fail Closed，避免覆蓋前一次證據。
 
-- [ ] **Step 4: 實作 Codex Subject Command**
+- [x] **Step 4: 歷史 Codex CLI Subject Command（已由 Desktop Protocol 取代）**
+
+> 以下 Argument List 只用來說明已保存的舊 CLI Evidence 如何產生，不得再用於
+> 新的 Pilot／Full Run。新的有效執行一律採用本文件開頭的 Stage → Desktop
+> SubAgent → Collect Protocol。
 
 固定 Argument List：
 
@@ -1168,11 +1226,12 @@ Result Builder 驗證：36 個目前有效 Generation 的 Slot 全部存在、Ru
 
 ```text
 python -m evals.harness.cli prepare
-python -m evals.harness.cli pilot
+python -m evals.harness.cli stage --phase pilot --run-id <logical-run-id>
+python -m evals.harness.cli collect --dispatch-id <dispatch-id> --outcome <completed|timeout|infrastructure_failure>
 python -m evals.harness.cli freeze --decision-note "..."
 python -m evals.harness.cli invalidate-pilot --scenario <id> --reason "..."
 python -m evals.harness.cli adjudicate-timeout --run-id <id> --source <candidate|infrastructure> --reason "..."
-python -m evals.harness.cli full
+python -m evals.harness.cli stage --phase full --run-id <logical-run-id>
 python -m evals.harness.cli review-packets
 python -m evals.harness.cli build-result
 python -m evals.harness.cli verify
@@ -1180,7 +1239,9 @@ python -m evals.harness.cli verify-freeze
 python -m evals.harness.cli verify-reviews
 ```
 
-`pilot` 只選 Repetition 1；`full` 只選 Repetition 2、3；`build-result` 在 Rubric 尚未填完或不足 36 個 Terminal State 時 Fail Closed。
+`stage --phase pilot` 只選 Repetition 1；`stage --phase full` 只選 Repetition 2、3。
+舊的 `pilot`／`full` 命令會刻意 Fail Closed，避免誤啟動 nested CLI；`build-result`
+在 Rubric 尚未填完或不足 36 個 Terminal State 時同樣 Fail Closed。
 
 - [x] **Step 7: 把 Harness 契約加入 CI 並 Commit**
 
@@ -1222,11 +1283,18 @@ Expected: 四個 Baseline Public／Preservation Green、Acceptance Expected Red�
 
 - [ ] **Step 2: 執行 Pilot**
 
+依固定 Planner 順序，逐一處理每個 Pilot Slot；一個 Slot 完整結束後，才開始下一個：
+
 ```powershell
-py -3 -m evals.harness.cli pilot
+py -3 -m evals.harness.cli stage --phase pilot --run-id <logical-run-id>
+# 依 stage 輸出的 instruction，以一個 fresh Desktop Subject 完成單一 Workspace。
+py -3 -m evals.harness.cli collect --dispatch-id <dispatch-id> --outcome <completed|timeout|infrastructure_failure>
 ```
 
-Expected: 12 個 Slot 各自取得 Passed、Automatic Failure、Timeout 或 Infrastructure Failure；不因結果難看而重跑。單一 Session 最多 480 秒，Harness 每完成一個 Slot 即落盤 Evidence。
+每次 `stage` 都必須對應一個 fresh Subject；不可批次派發後共用 Context，也不可直接執行
+`pilot`。Expected: 12 個 Slot 各自取得 Passed、Automatic Failure、Timeout 或 Infrastructure
+Failure；Report 遺漏／不完整或不可變欄位不符會直接成為不可重跑的 Automatic Failure。單一
+Session 最多 480 秒，Harness 每完成一個 Slot 即落盤 Dispatch、Attempt Receipt、Diff 與 Evidence。
 
 - [ ] **Step 3: 驗證 Pilot 完整性與匿名材料**
 
@@ -1235,7 +1303,7 @@ py -3 -m evals.harness.cli review-packets --phase pilot
 py -3 -m evals.harness.cli verify --phase pilot
 ```
 
-Expected: 12 個 Terminal State、12 個匿名 Candidate ID、Arm 不出現在 Packet；所有 Diff 與 JSONL 有 SHA-256。
+Expected: 12 個 Terminal State、12 個匿名 Candidate ID、Arm 不出現在 Packet；所有 Prompt、Dispatch、Report 與 Diff 都有可驗證 Hash，Desktop 不要求 JSONL。
 
 - [ ] **Step 4: 做契約凍結判斷**
 
@@ -1270,11 +1338,18 @@ Expected: Manifest、Fixture、Prompt、Oracle、Rubric SHA 全部與 Pilot Free
 
 - [ ] **Step 2: 執行 Full Run**
 
+依固定 Planner 順序，對每個剩餘 Full Slot 重複「單一 `stage` → fresh Desktop Subject →
+單一 `collect`」：
+
 ```powershell
-py -3 -m evals.harness.cli full
+py -3 -m evals.harness.cli stage --phase full --run-id <logical-run-id>
+# 依 stage 輸出的 instruction，以一個 fresh Desktop Subject 完成單一 Workspace。
+py -3 -m evals.harness.cli collect --dispatch-id <dispatch-id> --outcome <completed|timeout|infrastructure_failure>
 ```
 
-Expected: 新增 24 個 Terminal State；與有效 Pilot 合計 36。Harness 中斷後重新執行只能跳過已有 Terminal State 的 Slot，不覆寫或刪除舊 Evidence。
+不可直接執行 `full`，也不可讓同一個 Subject 接續處理多個 Slot。Expected: 新增 24 個
+Terminal State；與有效 Pilot 合計 36。Harness 中斷後重新執行只能跳過已有 Terminal State 的
+Slot，不覆寫或刪除舊 Evidence。
 
 - [ ] **Step 3: 產生 36 份匿名 Review Packet**
 
