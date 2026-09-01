@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Benchmark 版本固定為 `0.3.0-cross-language-desktop-subject-v3`；Fixture Tag 固定為 `cross-language-v2`；Skill 固定使用已發布的 `v0.3.0`，不得改用工作目錄中的新版本。
+- Benchmark 版本固定為 `0.3.0-cross-language-desktop-subject-v3`；Fixture Tag 固定為 `cross-language-v3`；Skill 固定使用已發布的 `v0.3.0`，不得改用工作目錄中的新版本。
 - 主要比較只有 TypeScript／React 與 Python／FastAPI；既有 .NET 結果只作歷史參考；Java／Spring 不進入本次執行。
 - 固定 4 個 Scenario、3 個 Arm、3 次 Repetition，共 36 個 Fresh Context Session；Pilot 先跑 12 次，契約不變才計入正式結果。
 - Model 固定為 `gpt-5.6-sol`，Reasoning Effort 固定為 `high`，Subject 由 Codex Desktop collaboration 的 Fresh Context SubAgent 執行；Harness 只負責 Stage／Collect，不啟動 nested CLI。
@@ -74,8 +74,9 @@ CLI Subject Runner 不可作為正式跨語言評測執行器。以下流程取�
    Workspace 路徑。Desktop 無法可靠取得的網路強制、Token、Tool Call 與檔案查閱
    telemetry 固定為 `not_available`，不得推估；JSONL 不作為 Desktop 流程的 Evidence 要求。
 
-6. 首輪 Pilot 使用的 `cross-language-v1` 與 Desktop Subject Protocol v2 已完整作廢。
-   修正版 Fixture v2 與 Protocol v3 先在本機完成驗證；只有 `cross-language-v2` 的
+6. 首輪 Pilot 使用的 `cross-language-v1` 與 Desktop Subject Protocol v2 已完整作廢；
+   第二輪 `cross-language-v2` 又因盲審找到 React Effect Acceptance Oracle 漏測而不得 Freeze。
+   修正版 Fixture v3 與 Protocol v3 先在本機完成驗證；只有 `cross-language-v3` 的
    Annotated Tag 推送到公開 Fixture Repository，且 Manifest 能由遠端解析到相同 Commit
    後，才可重新執行 12 組 Pilot。`prepare` 必須對既有 Fixture Cache 明確 fetch 指定 Tag，
    再驗證 dereferenced Tag 與 Manifest Commit 完全相同；不能因 Cache 已存在就跳過更新。
@@ -225,7 +226,7 @@ Expected: FAIL，原因是 `fixture-contract.json` 與四個目錄尚不存在�
 ```json
 {
   "schema_version": "1.0",
-  "fixture_version": "cross-language-v2",
+  "fixture_version": "cross-language-v3",
   "fixtures": []
 }
 ```
@@ -805,7 +806,7 @@ git commit -m "feat(fixtures): add FastAPI provider-boundary scenario"
 **Files:**
 - Verify only: sibling Fixture Repository entire tree
 - External create: `eric861129/Clean-Code-AI-Collaboration-Benchmark-Fixtures`
-- External tag: `cross-language-v2`（`cross-language-v1` 保留為首輪作廢契約）
+- External tag: `cross-language-v3`（`cross-language-v1` 與 `cross-language-v2` 保留為作廢契約）
 
 **Interfaces:**
 - Consumes: Tasks 1～5 的四個已驗證 Fixture。
@@ -847,10 +848,10 @@ Expected: Repository 為 Public，`origin/main` 與本機 `main` SHA 相同；To
 - [ ] **Step 3: 建立並推送 Annotated Tag**
 
 ```powershell
-git tag -a cross-language-v2 -m "Cross-language benchmark fixtures v2"
-git push origin cross-language-v2
+git tag -a cross-language-v3 -m "Cross-language benchmark fixtures v3"
+git push origin cross-language-v3
 git rev-parse HEAD
-git rev-parse 'cross-language-v2^{}'
+git rev-parse 'cross-language-v3^{}'
 ```
 
 Expected: HEAD 與 Dereferenced Tag 都是相同 40 字元 Commit SHA。記錄這個 SHA，Task 7 必須逐字寫入 Manifest。
@@ -949,7 +950,7 @@ Planner 以 `random.Random(manifest.random_seed).shuffle(slots)` 產生固定順
 Manifest 必須使用 Task 6 的真實 Fixture Commit，不接受空字串、Branch 名或任何示意值。先執行：
 
 ```powershell
-$fixtureCommit = git -C ../Clean-Code-AI-Collaboration-Benchmark-Fixtures rev-parse 'cross-language-v2^{}'
+$fixtureCommit = git -C ../Clean-Code-AI-Collaboration-Benchmark-Fixtures rev-parse 'cross-language-v3^{}'
 if ($fixtureCommit -notmatch '^[0-9a-f]{40}$') {
     throw "Fixture Tag 沒有解析成固定 Commit：$fixtureCommit"
 }
@@ -963,7 +964,7 @@ if ($fixtureCommit -notmatch '^[0-9a-f]{40}$') {
   "benchmark_version": "0.3.0-cross-language-desktop-subject-v3",
   "fixture_repository": {
     "url": "https://github.com/eric861129/Clean-Code-AI-Collaboration-Benchmark-Fixtures.git",
-    "tag": "cross-language-v2"
+    "tag": "cross-language-v3"
   },
   "skill": {"tag": "v0.3.0", "version": "0.3.0"},
   "execution": {
@@ -1502,7 +1503,7 @@ git commit -m "docs(evals): publish cross-language benchmark results"
 
 以 Archive 只收錄可公開的 Prompt、Report 摘要、Diff、命令、Exit Code、Oracle 與匿名 Review；排除 Private Mapping、私有 Controller Dispatch、完整 Subject Report、暫時 Workspace、認證資料與個人絕對路徑。產生 SHA-256，回報 Archive Path、Size 與 Hash。
 
-未再次取得 User 指示前，不 Push Skill Repository、不建立新的 Skill Tag／Release，也不上傳 Evidence Asset。Fixture Repository 的修正版契約固定為 `cross-language-v2`；`cross-language-v1` 保留為首輪作廢契約，不覆寫也不刪除。
+未再次取得 User 指示前，不 Push Skill Repository、不建立新的 Skill Tag／Release，也不上傳 Evidence Asset。Fixture Repository 的修正版契約固定為 `cross-language-v3`；`cross-language-v1` 與 `cross-language-v2` 保留為作廢契約，不覆寫也不刪除。
 
 ---
 

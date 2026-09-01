@@ -3,8 +3,8 @@
   "benchmark_version": "0.3.0-cross-language-desktop-subject-v3",
   "fixture_repository": {
     "url": "https://github.com/eric861129/Clean-Code-AI-Collaboration-Benchmark-Fixtures.git",
-    "tag": "cross-language-v2",
-    "commit": "da0663535612cc4a4bb66fc8bd7e83260aa978f7"
+    "tag": "cross-language-v3",
+    "commit": "604a0652eaa1277cb95e199f39b15feccadf7ec4"
   },
   "skill": {
     "name": "clean-code-ai-collaboration",
@@ -99,10 +99,10 @@
       "language": "typescript-react",
       "fixture_path": "fixtures/react-effect-lifecycle",
       "evaluator_path": "evaluators/react-effect-lifecycle",
-      "task": "調整 WorkItemPreview：相同識別碼的普通重新 Render 不得重複送出預覽請求；識別碼改變時要取消舊請求並正常載入新資料。請保留 Loading、Error、Props 與 API Response Contract。",
+      "task": "調整 WorkItemPreview：Preview Request 的唯一 Key 是 workItemId；相同識別碼的普通重新 Render，即使 density 或 loadPreview Callback Identity 改變，也不得重複送出或取消請求。識別碼改變時，要取消舊請求、使用該次 Render 最新的 loadPreview 載入新資料，且已取消請求的成功或失敗結果都不得覆蓋目前狀態。請保留 Loading、Error、Props 與 API Response Contract。",
       "must_preserve": [
         "識別碼改變時取消舊請求並載入新資料",
-        "Unmount 後舊請求結果不得覆蓋狀態",
+        "已取消請求的成功或失敗結果不得覆蓋目前狀態",
         "Loading 與 Error UI 語意",
         "Component Props 與 API Response Contract"
       ],
@@ -133,9 +133,10 @@
         ]
       },
       "expected_baseline_red_markers": [
-        "does not request the same preview again on an ordinary rerender"
+        "does not request the same preview again on an ordinary rerender",
+        "does not let an aborted request overwrite the latest preview"
       ],
-      "expected_baseline_failure_count": 1
+      "expected_baseline_failure_count": 2
     },
     {
       "id": "fastapi-overdue-rule",

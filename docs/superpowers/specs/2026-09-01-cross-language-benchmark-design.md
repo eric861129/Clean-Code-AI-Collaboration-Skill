@@ -3,10 +3,10 @@
 ## 文件狀態
 
 - 日期：2026-09-01
-- 狀態：Capability Probe 已通過；首輪 Pilot 因 Oracle 與 Subject 交付契約稽核問題整批作廢並保留，Desktop Subject Protocol v3 與 Fixture v2 已完成本機修正，待推送 Fixture v2 不可變 Tag 後重新執行 Pilot
+- 狀態：Capability Probe 已通過；Fixture v1 因 Preservation Oracle 衝突作廢，Fixture v2 的十二組 Pilot 又由盲審發現 React Effect Acceptance Oracle 漏測 Callback Identity 與 Stale Success，因此保留證據但不得 Freeze。Fixture v3 已完成本機修正，待固定公開 Tag 後重新執行 Pilot
 - Skill 版本：`v0.3.0`
 - Benchmark 版本：`0.3.0-cross-language-desktop-subject-v3`
-- Fixture 版本：`cross-language-v2`
+- Fixture 版本：`cross-language-v3`
 - 主要 Repository：`Clean-Code-AI-Collaboration-Skill`
 - Fixture Repository：`Clean-Code-AI-Collaboration-Benchmark-Fixtures`
 
@@ -150,7 +150,7 @@ Token、Tool Call、檔案查閱或 Sandbox telemetry，因此這些資料固定
 
 ## Fixture Repository 設計
 
-四個 Fixture 存放於獨立的公開 Repository `Clean-Code-AI-Collaboration-Benchmark-Fixtures`。首輪 Pilot 使用的 `cross-language-v1` 因 React Effect Preservation Oracle 契約衝突而完整作廢；修正版以 `cross-language-v2` Annotated Tag 固定。這個 Repository 與 Skill Repository 分離，避免 Subject 看見 Harness、答案、匿名對照表或其他情境的 Hidden Oracle。
+四個 Fixture 存放於獨立的公開 Repository `Clean-Code-AI-Collaboration-Benchmark-Fixtures`。`cross-language-v1` 因 React Effect Preservation Oracle 契約衝突而完整作廢；`cross-language-v2` 雖通過自動 Oracle，仍在盲審中暴露 Callback Identity 與 Stale Success 漏測，因此也保留為失效契約。現行修正版固定為 `cross-language-v3` Annotated Tag。這個 Repository 與 Skill Repository 分離，避免 Subject 看見 Harness、答案、匿名對照表或其他情境的 Hidden Oracle。
 
 執行時只匯出當次選定的 Fixture 到暫時 Repository。Subject 不得看見：
 
@@ -456,7 +456,7 @@ Fixture 必須分別有公開 Gate、Preservation Oracle、修改前呈現預期
 
 本次 Benchmark 完成必須同時符合：
 
-1. 獨立公開 Fixture Repository 已建立，四個修正版 Fixture 固定於 `cross-language-v2` Tag；`cross-language-v1` 只保留為首輪作廢契約的歷史證據。
+1. 獨立公開 Fixture Repository 已建立，四個修正版 Fixture 固定於 `cross-language-v3` Tag；`cross-language-v1` 與 `cross-language-v2` 保留為作廢契約與盲審止損的歷史證據。
 2. 每個 Fixture 在乾淨環境通過公開 Gate 與 Preservation Oracle，Acceptance Oracle 因預期需求缺口呈現 RED，且故意破壞既有契約的 Mutation 會被 Evaluator 抓到。
 3. Versioned Manifest 能產生正好 36 個唯一 Run Slot。
 4. Harness 契約測試、格式檢查與既有 Repository CI 全部通過。
