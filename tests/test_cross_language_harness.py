@@ -1249,6 +1249,10 @@ class CrossLanguageHarnessTests(unittest.TestCase):
         self.assertEqual("codex-desktop-collaboration", client["client"])
         self.assertEqual("not_available", client["client_version"])
         self.assertEqual(manifest.subject_executor, client["subject_executor"])
+        self.assertEqual(
+            "desktop-subject-v2",
+            manifest.subject_executor["protocol_version"],
+        )
         self.assertNotIn("codex_version", client)
 
     def test_baseline_red_rejects_unrelated_extra_failure(self) -> None:

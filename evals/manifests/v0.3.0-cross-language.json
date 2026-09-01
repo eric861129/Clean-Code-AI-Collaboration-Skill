@@ -18,7 +18,7 @@
     "client": "codex-desktop-collaboration",
     "subject_executor": {
       "kind": "codex-desktop-collaboration",
-      "protocol_version": "desktop-subject-v1",
+      "protocol_version": "desktop-subject-v2",
       "dispatch_mode": "external-collaboration-subagent",
       "report_relative_path": ".benchmark-subject-report.json",
       "network_enforcement": "not_available",
