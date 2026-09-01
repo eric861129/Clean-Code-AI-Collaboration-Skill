@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 from evals.harness.models import (
@@ -15,7 +16,10 @@ from evals.harness.models import (
 from evals.harness.process import run_process
 from evals.harness.subject_runner import build_prompt
 
-DISPATCH_SCHEMA_VERSION = "desktop-subject-dispatch/v1"
+DISPATCH_SCHEMA_VERSION = "desktop-subject-dispatch/v2"
+LEGACY_DISPATCH_SCHEMA_VERSION = "desktop-subject-dispatch/v1"
+PROMPT_ENCODING = "utf-8"
+PROMPT_LINE_ENDINGS = "lf"
 REPORT_SCHEMA_VERSION = "desktop-subject-report/v1"
 REPORT_FILENAME = ".benchmark-subject-report.json"
 REPORT_TEMPLATE_FILENAME = "subject-report.template.json"
@@ -32,6 +36,28 @@ class DesktopSubjectValidationError(ValueError):
         if reason not in {"candidate_incomplete", "invalid_claim"}:
             raise ValueError(f"invalid desktop candidate failure reason: {reason}")
         self.reason = reason
+
+
+@dataclass(frozen=True)
+class LegacyPendingNewlineDefect:
+    """僅描述 v1 Windows 換行 hash 缺陷的待收集 dispatch。"""
+
+    dispatch_id: str
+    logical_run_id: str
+    physical_run_id: str
+    scenario_id: str
+    generation: int
+    attempt: int
+    workspace_root: Path
+    artifact_directory: Path
+    baseline_commit: str
+    prompt_path: Path
+    report_path: Path
+    prompt_sha256: str
+    prompt_bytes_sha256: str
+    contract_sha256: str
+    scenario_contract_sha256: str
+    dispatch_sha256: str
 
 
 def stage_desktop_subject(
@@ -69,7 +95,8 @@ def stage_desktop_subject(
         raise FileExistsError(f"subject report already exists: {report_path}")
 
     prompt = build_prompt(_scenario_for(manifest, slot.scenario_id), slot.arm_id)
-    prompt_sha256 = _sha256_text(prompt)
+    prompt_bytes = _utf8_lf_bytes(prompt)
+    prompt_sha256 = _sha256_bytes(prompt_bytes)
     prompt_path = workspace.artifact_dir / "prompt.md"
     dispatch_path = workspace.artifact_dir / "desktop-dispatch.json"
     report_template_path = workspace.artifact_dir / REPORT_TEMPLATE_FILENAME
@@ -92,6 +119,8 @@ def stage_desktop_subject(
         "workspace_root": str(workspace.root),
         "artifact_directory": str(workspace.artifact_dir),
         "baseline_commit": workspace.baseline_commit,
+        "prompt_encoding": PROMPT_ENCODING,
+        "prompt_line_endings": PROMPT_LINE_ENDINGS,
         "prompt_sha256": prompt_sha256,
         "contract_sha256": contract_sha256,
         "scenario_contract_sha256": scenario_contract_sha256,
@@ -105,7 +134,7 @@ def stage_desktop_subject(
     }
     dispatch_sha256 = _sha256_json(payload)
     payload["dispatch_sha256"] = dispatch_sha256
-    prompt_path.write_text(prompt, encoding="utf-8")
+    prompt_path.write_bytes(prompt_bytes)
     dispatch_path.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
     )
@@ -177,6 +206,10 @@ def desktop_subject_instruction(dispatch: SubjectDispatch) -> str:
                 "contract_sha256、scenario_contract_sha256、generation、attempt、"
                 "completion、summary、files_inspected、files_modified_claimed、"
                 "commands_claimed 與 telemetry=not_available。"
+            ),
+            (
+                'commands_claimed=[{"command":"...","outcome":'
+                '"passed|failed|not_run"}]；沒有執行命令時使用空陣列。'
             ),
         )
     )
@@ -395,8 +428,9 @@ def load_desktop_dispatch(path: Path) -> SubjectDispatch:
     unsigned.pop("dispatch_sha256", None)
     if not isinstance(expected_hash, str) or expected_hash != _sha256_json(unsigned):
         raise ValueError("desktop dispatch hash mismatch")
+    if payload.get("schema_version") != DISPATCH_SCHEMA_VERSION:
+        raise ValueError("desktop dispatch schema is unsupported; v2 is required")
     required_strings = (
-        "schema_version",
         "dispatch_id",
         "logical_run_id",
         "physical_run_id",
@@ -404,6 +438,8 @@ def load_desktop_dispatch(path: Path) -> SubjectDispatch:
         "workspace_root",
         "artifact_directory",
         "baseline_commit",
+        "prompt_encoding",
+        "prompt_line_endings",
         "prompt_sha256",
         "contract_sha256",
         "scenario_contract_sha256",
@@ -418,8 +454,10 @@ def load_desktop_dispatch(path: Path) -> SubjectDispatch:
         raise ValueError("desktop dispatch has invalid generation or attempt")
     if payload["generation"] <= 0 or payload["attempt"] <= 0:
         raise ValueError("desktop dispatch generation and attempt must be positive")
-    if payload["schema_version"] != DISPATCH_SCHEMA_VERSION:
-        raise ValueError("desktop dispatch schema is invalid")
+    if payload["prompt_encoding"] != PROMPT_ENCODING:
+        raise ValueError("desktop dispatch prompt encoding is invalid")
+    if payload["prompt_line_endings"] != PROMPT_LINE_ENDINGS:
+        raise ValueError("desktop dispatch prompt line endings are invalid")
     _require_sha256(str(payload["prompt_sha256"]), "prompt")
     _require_sha256(str(payload["contract_sha256"]), "contract")
     _require_sha256(str(payload["scenario_contract_sha256"]), "scenario contract")
@@ -438,7 +476,14 @@ def load_desktop_dispatch(path: Path) -> SubjectDispatch:
         baseline_commit=str(payload["baseline_commit"]),
     )
     prompt_path = workspace.artifact_dir / "prompt.md"
-    if not prompt_path.is_file() or _sha256_file(prompt_path) != str(
+    if not prompt_path.is_file():
+        raise ValueError("desktop dispatch prompt hash mismatch")
+    prompt_bytes = prompt_path.read_bytes()
+    try:
+        prompt_bytes.decode(PROMPT_ENCODING)
+    except UnicodeDecodeError as error:
+        raise ValueError("desktop dispatch prompt is not UTF-8") from error
+    if b"\r" in prompt_bytes or _sha256_bytes(prompt_bytes) != str(
         payload["prompt_sha256"]
     ):
         raise ValueError("desktop dispatch prompt hash mismatch")
@@ -471,6 +516,181 @@ def load_desktop_dispatch(path: Path) -> SubjectDispatch:
     )
     _validate_report_template(dispatch)
     return dispatch
+
+
+def inspect_legacy_pending_newline_defect(
+    path: Path,
+) -> LegacyPendingNewlineDefect:
+    """嚴格辨識唯一可恢復的 v1 Windows 換行 hash 缺陷。
+
+    v1 dispatch 不可再進入一般 collect 流程。這個檢查只提供給明確的
+    pre-collection invalidation，任何不完全符合已知簽章的資料都會拒絕。
+    """
+
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        raise ValueError("legacy desktop dispatch is invalid JSON") from error
+    if not isinstance(payload, dict):
+        raise ValueError("legacy desktop dispatch must be an object")
+    expected_hash = payload.get("dispatch_sha256")
+    unsigned = dict(payload)
+    unsigned.pop("dispatch_sha256", None)
+    if not isinstance(expected_hash, str) or expected_hash != _sha256_json(unsigned):
+        raise ValueError("legacy desktop dispatch hash mismatch")
+    if payload.get("schema_version") != LEGACY_DISPATCH_SCHEMA_VERSION:
+        raise ValueError("legacy desktop dispatch must use v1")
+
+    required_strings = (
+        "dispatch_id",
+        "logical_run_id",
+        "physical_run_id",
+        "scenario_id",
+        "workspace_root",
+        "artifact_directory",
+        "baseline_commit",
+        "prompt_sha256",
+        "contract_sha256",
+        "scenario_contract_sha256",
+        "report_relative_path",
+        "report_template_relative_path",
+    )
+    if not all(isinstance(payload.get(name), str) for name in required_strings):
+        raise ValueError("legacy desktop dispatch has invalid string fields")
+    generation = payload.get("generation")
+    attempt = payload.get("attempt")
+    if (
+        not isinstance(generation, int)
+        or not isinstance(attempt, int)
+        or generation <= 0
+        or attempt <= 0
+    ):
+        raise ValueError("legacy desktop dispatch has invalid generation or attempt")
+    _require_sha256(str(payload["prompt_sha256"]), "legacy prompt")
+    _require_sha256(str(payload["contract_sha256"]), "legacy contract")
+    _require_sha256(
+        str(payload["scenario_contract_sha256"]), "legacy scenario contract"
+    )
+    if re.fullmatch(r"[0-9a-f]{40}", str(payload["baseline_commit"])) is None:
+        raise ValueError("legacy desktop dispatch baseline is invalid")
+    _validate_desktop_executor(payload.get("executor"), "legacy desktop dispatch")
+
+    workspace_root = Path(str(payload["workspace_root"]))
+    artifact_directory = Path(str(payload["artifact_directory"]))
+    prompt_path = artifact_directory / "prompt.md"
+    if not prompt_path.is_file():
+        raise ValueError("legacy desktop dispatch prompt is missing")
+    prompt_bytes = prompt_path.read_bytes()
+    if b"\r\n" not in prompt_bytes or b"\r" in prompt_bytes.replace(b"\r\n", b""):
+        raise ValueError(
+            "legacy desktop dispatch does not have the Windows newline defect"
+        )
+    try:
+        prompt_text = prompt_bytes.decode(PROMPT_ENCODING)
+    except UnicodeDecodeError as error:
+        raise ValueError("legacy desktop dispatch prompt is not UTF-8") from error
+    prompt_bytes_sha256 = _sha256_bytes(prompt_bytes)
+    prompt_sha256 = str(payload["prompt_sha256"])
+    legacy_logical_sha256 = _sha256_text(
+        prompt_text.replace("\r\n", "\n").replace("\r", "\n")
+    )
+    if (
+        prompt_sha256 != legacy_logical_sha256
+        or prompt_sha256 == prompt_bytes_sha256
+    ):
+        raise ValueError(
+            "legacy desktop dispatch does not have the Windows newline defect"
+        )
+
+    if payload["report_relative_path"] != REPORT_FILENAME:
+        raise ValueError("legacy desktop dispatch report path is invalid")
+    if payload["report_template_relative_path"] != REPORT_TEMPLATE_FILENAME:
+        raise ValueError("legacy desktop dispatch report template path is invalid")
+    report_path = workspace_root / REPORT_FILENAME
+    _validate_legacy_report(
+        report_path,
+        dispatch_sha256=str(expected_hash),
+        baseline_commit=str(payload["baseline_commit"]),
+        prompt_sha256=prompt_sha256,
+        contract_sha256=str(payload["contract_sha256"]),
+        scenario_contract_sha256=str(payload["scenario_contract_sha256"]),
+        generation=generation,
+        attempt=attempt,
+    )
+    return LegacyPendingNewlineDefect(
+        dispatch_id=str(payload["dispatch_id"]),
+        logical_run_id=str(payload["logical_run_id"]),
+        physical_run_id=str(payload["physical_run_id"]),
+        scenario_id=str(payload["scenario_id"]),
+        generation=generation,
+        attempt=attempt,
+        workspace_root=workspace_root,
+        artifact_directory=artifact_directory,
+        baseline_commit=str(payload["baseline_commit"]),
+        prompt_path=prompt_path,
+        report_path=report_path,
+        prompt_sha256=prompt_sha256,
+        prompt_bytes_sha256=prompt_bytes_sha256,
+        contract_sha256=str(payload["contract_sha256"]),
+        scenario_contract_sha256=str(payload["scenario_contract_sha256"]),
+        dispatch_sha256=str(expected_hash),
+    )
+
+
+def _validate_legacy_report(
+    path: Path,
+    *,
+    dispatch_sha256: str,
+    baseline_commit: str,
+    prompt_sha256: str,
+    contract_sha256: str,
+    scenario_contract_sha256: str,
+    generation: int,
+    attempt: int,
+) -> None:
+    if not path.is_file() or path.stat().st_size > MAX_REPORT_BYTES:
+        raise ValueError("legacy desktop dispatch report is missing or oversized")
+    try:
+        report = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        raise ValueError("legacy desktop dispatch report is invalid JSON") from error
+    if not isinstance(report, dict):
+        raise ValueError("legacy desktop dispatch report must be an object")
+    expected = {
+        "schema_version": REPORT_SCHEMA_VERSION,
+        "dispatch_sha256": dispatch_sha256,
+        "baseline_commit": baseline_commit,
+        "prompt_sha256": prompt_sha256,
+        "contract_sha256": contract_sha256,
+        "scenario_contract_sha256": scenario_contract_sha256,
+        "generation": generation,
+        "attempt": attempt,
+        "completion": "completed",
+        "telemetry": "not_available",
+    }
+    for field, value in expected.items():
+        if report.get(field) != value:
+            raise ValueError(f"legacy desktop dispatch report {field} mismatch")
+    if not isinstance(report.get("summary"), str):
+        raise ValueError("legacy desktop dispatch report summary is invalid")
+    for field in (
+        "files_inspected",
+        "files_modified_claimed",
+        "commands_claimed",
+    ):
+        if not isinstance(report.get(field), list):
+            raise ValueError(f"legacy desktop dispatch report {field} is invalid")
+
+
+def _validate_desktop_executor(value: object, label: str) -> None:
+    if (
+        not isinstance(value, dict)
+        or value.get("kind") != DESKTOP_EXECUTOR
+        or value.get("dispatch_mode") != DESKTOP_DISPATCH_MODE
+        or value.get("network_enforcement") != "not_available"
+        or value.get("telemetry") != "not_available"
+    ):
+        raise ValueError(f"{label} executor is invalid")
 
 
 def _scenario_for(
@@ -581,8 +801,22 @@ def _sha256_text(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
+def _sha256_bytes(value: bytes) -> str:
+    return hashlib.sha256(value).hexdigest()
+
+
 def _sha256_file(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    return _sha256_bytes(path.read_bytes())
+
+
+def canonical_prompt_sha256(value: str) -> str:
+    """以 v2 dispatch 的 UTF-8/LF 實體 bytes 計算 Prompt hash。"""
+
+    return _sha256_bytes(_utf8_lf_bytes(value))
+
+
+def _utf8_lf_bytes(value: str) -> bytes:
+    return value.replace("\r\n", "\n").replace("\r", "\n").encode(PROMPT_ENCODING)
 
 
 def _sha256_json(value: dict[str, object]) -> str:

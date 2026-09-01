@@ -12,8 +12,11 @@ from typing import Any
 from evals.harness.anonymizer import RUBRIC_IDS, write_review_packet
 from evals.harness.desktop_subject import (
     DesktopSubjectValidationError,
+    LegacyPendingNewlineDefect,
     build_desktop_observation,
+    canonical_prompt_sha256,
     desktop_subject_instruction,
+    inspect_legacy_pending_newline_defect,
     load_desktop_dispatch,
     stage_desktop_subject,
     write_attempt_receipt,
@@ -48,6 +51,7 @@ INVALIDATIONS_ROOT = RUNS_ROOT / "invalidations"
 TIMEOUT_ADJUDICATIONS_ROOT = RUNS_ROOT / "timeout-adjudications"
 DISPATCH_ROOT = RUNS_ROOT / "desktop-dispatches"
 ATTEMPT_RECEIPTS_ROOT = RUNS_ROOT / "desktop-attempt-receipts"
+LEGACY_NEWLINE_RECOVERY_REASON = "prompt_hash_newline_defect"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -80,7 +84,13 @@ def main(argv: list[str] | None = None) -> int:
     elif command == "freeze":
         _write_freeze(manifest, paths, args.decision_note)
     elif command == "invalidate-pilot":
-        _invalidate_pilot(manifest, paths, args.scenario, args.reason)
+        _invalidate_pilot(
+            manifest,
+            paths,
+            args.scenario,
+            args.reason,
+            legacy_pending_dispatch=args.legacy_pending_dispatch,
+        )
     elif command == "adjudicate-timeout":
         _adjudicate_timeout(
             manifest,
@@ -129,6 +139,7 @@ def _build_parser() -> argparse.ArgumentParser:
     invalidation = subparsers.add_parser("invalidate-pilot")
     invalidation.add_argument("--scenario", required=True)
     invalidation.add_argument("--reason", required=True)
+    invalidation.add_argument("--legacy-pending-dispatch")
     adjudication = subparsers.add_parser("adjudicate-timeout")
     adjudication.add_argument("--run-id", required=True)
     adjudication.add_argument(
@@ -1277,12 +1288,22 @@ def _invalidate_pilot(
     paths: HarnessPaths,
     scenario_id: str,
     reason: str,
+    legacy_pending_dispatch: str | None = None,
 ) -> None:
     if not reason.strip():
         raise ValueError("invalidation reason must not be empty")
     scenario_ids = {str(item["id"]) for item in manifest.scenarios}
     if scenario_id not in scenario_ids:
         raise ValueError(f"unknown scenario: {scenario_id}")
+    if legacy_pending_dispatch is not None:
+        _invalidate_legacy_pending_newline_defect(
+            manifest,
+            paths,
+            scenario_id,
+            reason,
+            legacy_pending_dispatch,
+        )
+        return
     contract = _freeze_document(manifest, paths)
     contract_sha256 = _canonical_sha256(contract)
     if _freeze_path(contract_sha256).exists():
@@ -1347,6 +1368,191 @@ def _invalidate_pilot(
     }
     _replace_json(CAMPAIGN_STATE_PATH, state)
     print(f"invalidated {scenario_id} generation {generation}")
+
+
+def _invalidate_legacy_pending_newline_defect(
+    manifest: BenchmarkManifest,
+    paths: HarnessPaths,
+    scenario_id: str,
+    reason: str,
+    dispatch_id: str,
+) -> None:
+    """以唯一已知 v1 換行缺陷作廢未收集的 dispatch，不評估候選。"""
+
+    if reason.strip() != LEGACY_NEWLINE_RECOVERY_REASON:
+        raise ValueError(
+            "legacy pending recovery requires reason "
+            f"{LEGACY_NEWLINE_RECOVERY_REASON}"
+        )
+    contract = _freeze_document(manifest, paths)
+    contract_sha256 = _canonical_sha256(contract)
+    if _freeze_path(contract_sha256).exists():
+        raise RuntimeError("cannot invalidate a frozen contract")
+    generation = _active_generation(scenario_id)
+    defect = _load_legacy_pending_newline_defect(dispatch_id)
+    slots = tuple(
+        slot
+        for slot in pilot_slots(build_run_slots(manifest))
+        if slot.scenario_id == scenario_id
+    )
+    try:
+        slot = next(item for item in slots if item.run_id == defect.logical_run_id)
+    except StopIteration as error:
+        raise ValueError(
+            "legacy dispatch does not belong to this pilot scenario"
+        ) from error
+    if (
+        defect.scenario_id != scenario_id
+        or defect.generation != generation
+        or defect.attempt != 1
+        or defect.dispatch_id != _desktop_dispatch_id(slot, generation, 1)
+    ):
+        raise ValueError("legacy dispatch does not match the active pilot slot")
+    workspace_head = _require_legacy_pending_invariants(slot, defect)
+    replacement_scenario_contract_sha256 = _scenario_contract_sha256(
+        manifest,
+        paths,
+        scenario_id,
+    )
+    if replacement_scenario_contract_sha256 == defect.scenario_contract_sha256:
+        raise RuntimeError("legacy recovery requires a revised scenario contract")
+    if contract_sha256 == defect.contract_sha256:
+        raise RuntimeError("legacy recovery requires a revised benchmark contract")
+    for candidate_slot in slots:
+        if candidate_slot.run_id == slot.run_id:
+            continue
+        _require_no_other_pilot_evidence(candidate_slot, generation)
+
+    invalidation_path = (
+        INVALIDATIONS_ROOT
+        / (
+            f"{scenario_id}--g{generation:02d}--pre-collection--"
+            f"{defect.dispatch_sha256[:12]}.json"
+        )
+    )
+    invalidation = {
+        "schema_version": "desktop-pre-collection-invalidation/v1",
+        "classification": "legacy_windows_newline_defect",
+        "candidate_evaluation": "not_run",
+        "scenario_id": scenario_id,
+        "generation": generation,
+        "dispatch_id": defect.dispatch_id,
+        "dispatch_sha256": defect.dispatch_sha256,
+        "baseline_commit": defect.baseline_commit,
+        "workspace_head": workspace_head,
+        "prompt_sha256": defect.prompt_sha256,
+        "prompt_bytes_sha256": defect.prompt_bytes_sha256,
+        "report_sha256": _file_sha256(defect.report_path),
+        "prior_contract_sha256": defect.contract_sha256,
+        "prior_scenario_contract_sha256": defect.scenario_contract_sha256,
+        "replacement_contract_sha256": contract_sha256,
+        "replacement_scenario_contract_sha256": replacement_scenario_contract_sha256,
+        "must_change_from": defect.scenario_contract_sha256,
+        "reason": reason.strip(),
+        "receipt": "absent",
+        "terminal_run_document": "absent",
+    }
+    _write_json(invalidation_path, invalidation)
+
+    state = _campaign_state()
+    scenarios = state.setdefault("scenarios", {})
+    if not isinstance(scenarios, dict):
+        raise ValueError("invalid campaign state")
+    scenarios[scenario_id] = {
+        "generation": generation + 1,
+        "must_change_from": defect.scenario_contract_sha256,
+        "invalidation": str(invalidation_path.relative_to(RUNS_ROOT)).replace(
+            "\\", "/"
+        ),
+    }
+    _replace_json(CAMPAIGN_STATE_PATH, state)
+    print(f"invalidated legacy pending dispatch: {dispatch_id}")
+
+
+def _load_legacy_pending_newline_defect(
+    dispatch_id: str,
+) -> LegacyPendingNewlineDefect:
+    index = _read_json(_dispatch_index_path(dispatch_id))
+    if (
+        index.get("schema_version") != "desktop-dispatch-index/v1"
+        or index.get("dispatch_id") != dispatch_id
+    ):
+        raise ValueError("legacy desktop dispatch index is invalid")
+    dispatch_path = index.get("dispatch_path")
+    if not isinstance(dispatch_path, str):
+        raise ValueError("legacy desktop dispatch index path is invalid")
+    relative_path = PurePosixPath(dispatch_path.replace("\\", "/"))
+    if relative_path.is_absolute() or ".." in relative_path.parts:
+        raise ValueError("legacy desktop dispatch index path must be relative")
+    defect = inspect_legacy_pending_newline_defect(
+        RUNS_ROOT.joinpath(*relative_path.parts)
+    )
+    if index.get("dispatch_sha256") != defect.dispatch_sha256:
+        raise ValueError("legacy desktop dispatch index hash mismatch")
+    expected_workspace = RUNS_ROOT / "workspaces" / defect.physical_run_id
+    expected_artifact = RUNS_ROOT / "artifacts" / defect.physical_run_id
+    expected_dispatch = expected_artifact / "desktop-dispatch.json"
+    if (
+        defect.workspace_root.resolve() != expected_workspace.resolve()
+        or defect.artifact_directory.resolve() != expected_artifact.resolve()
+        or RUNS_ROOT.joinpath(*relative_path.parts).resolve()
+        != expected_dispatch.resolve()
+    ):
+        raise ValueError("legacy desktop dispatch path does not match its physical run")
+    return defect
+
+
+def _require_legacy_pending_invariants(
+    slot: RunSlot,
+    defect: LegacyPendingNewlineDefect,
+) -> str:
+    """確認這筆 v1 dispatch 從未被收集，也沒有任何可重試分支。"""
+
+    head = run_process(
+        ["git", "rev-parse", "HEAD"], defect.workspace_root, timeout_seconds=30
+    )
+    if head.exit_code != 0 or head.stdout.strip() != defect.baseline_commit:
+        raise RuntimeError("legacy pending dispatch workspace baseline mismatch")
+    terminal = _run_document_path(slot, defect.generation)
+    if terminal.is_file():
+        raise RuntimeError(
+            "legacy pending dispatch already has a terminal run document"
+        )
+    for attempt in (1, 2):
+        index_path = _dispatch_index_path(
+            _desktop_dispatch_id(slot, defect.generation, attempt)
+        )
+        receipt_path = _attempt_receipt_path(
+            slot,
+            defect.generation,
+            attempt,
+            ATTEMPT_RECEIPTS_ROOT,
+        )
+        if attempt == defect.attempt:
+            if not index_path.is_file() or receipt_path.is_file():
+                raise RuntimeError("legacy pending dispatch receipt invariant failed")
+            continue
+        if index_path.is_file() or receipt_path.is_file():
+            raise RuntimeError("legacy pending dispatch has another attempt")
+    return head.stdout.strip()
+
+
+def _require_no_other_pilot_evidence(slot: RunSlot, generation: int) -> None:
+    terminal = _run_document_path(slot, generation)
+    if terminal.is_file():
+        raise RuntimeError("legacy recovery found evidence for another pilot slot")
+    for attempt in (1, 2):
+        dispatch = _dispatch_index_path(
+            _desktop_dispatch_id(slot, generation, attempt)
+        )
+        receipt = _attempt_receipt_path(
+            slot,
+            generation,
+            attempt,
+            ATTEMPT_RECEIPTS_ROOT,
+        )
+        if dispatch.is_file() or receipt.is_file():
+            raise RuntimeError("legacy recovery found evidence for another pilot slot")
 
 
 def _adjudicate_timeout(
@@ -1473,7 +1679,7 @@ def _freeze_document(
         for arm in manifest.arms:
             arm_id = str(arm["id"])
             prompt = build_prompt(scenario, arm_id)
-            prompts[f"{scenario_id}/{arm_id}"] = _sha256_text(prompt)
+            prompts[f"{scenario_id}/{arm_id}"] = canonical_prompt_sha256(prompt)
         evaluators[scenario_id] = _tree_sha256(
             paths.fixture_clone / str(scenario["evaluator_path"])
         )

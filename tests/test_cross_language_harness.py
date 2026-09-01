@@ -1,14 +1,19 @@
+import hashlib
 import json
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+import evals.harness.cli as harness_cli
 from evals.harness.anonymizer import build_review_packet
 from evals.harness.cli import (
     _build_parser,
     _console_json,
+    _desktop_dispatch_id,
+    _invalidate_pilot,
     _next_desktop_attempt,
     _physical_run_id,
     _require_no_inflight_desktop_attempts,
@@ -24,6 +29,7 @@ from evals.harness.desktop_subject import (
     DesktopSubjectValidationError,
     build_desktop_observation,
     desktop_subject_instruction,
+    inspect_legacy_pending_newline_defect,
     load_desktop_dispatch,
     stage_desktop_subject,
     validate_desktop_report,
@@ -38,6 +44,7 @@ from evals.harness.models import (
     HarnessPaths,
     Rename,
     RunSlot,
+    SubjectDispatch,
     Workspace,
 )
 from evals.harness.oracle_runner import baseline_acceptance_is_expected
@@ -48,6 +55,56 @@ from evals.harness.subject_runner import build_prompt, run_subject
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = ROOT / "evals" / "manifests" / "v0.3.0-cross-language.json"
+
+
+def _canonical_json_sha256(value: dict[str, object]) -> str:
+    canonical_json = json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(
+        canonical_json.encode("utf-8")
+    ).hexdigest()
+
+
+def _downgrade_to_legacy_newline_defect(
+    dispatch: SubjectDispatch,
+    *,
+    files_inspected: list[str],
+    files_modified_claimed: list[str],
+) -> dict[str, object]:
+    prompt_path = dispatch.prompt_path
+    logical_prompt = prompt_path.read_text(encoding="utf-8")
+    prompt_path.write_bytes(logical_prompt.replace("\n", "\r\n").encode("utf-8"))
+    payload = json.loads(dispatch.dispatch_path.read_text(encoding="utf-8"))
+    payload.pop("prompt_encoding")
+    payload.pop("prompt_line_endings")
+    payload["schema_version"] = "desktop-subject-dispatch/v1"
+    payload["prompt_sha256"] = hashlib.sha256(
+        logical_prompt.encode("utf-8")
+    ).hexdigest()
+    payload.pop("dispatch_sha256")
+    payload["dispatch_sha256"] = _canonical_json_sha256(payload)
+    dispatch.dispatch_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    report = json.loads(dispatch.report_template_path.read_text(encoding="utf-8"))
+    report.update(
+        {
+            "dispatch_sha256": payload["dispatch_sha256"],
+            "prompt_sha256": payload["prompt_sha256"],
+            "summary": "完成最小變更。",
+            "files_inspected": files_inspected,
+            "files_modified_claimed": files_modified_claimed,
+            "commands_claimed": [],
+        }
+    )
+    dispatch.report_path.write_text(
+        json.dumps(report, ensure_ascii=False), encoding="utf-8"
+    )
+    return payload
 
 
 class CrossLanguageHarnessTests(unittest.TestCase):
@@ -156,6 +213,21 @@ class CrossLanguageHarnessTests(unittest.TestCase):
             self.assertTrue(dispatch.dispatch_path.is_file())
             self.assertTrue(dispatch.prompt_path.is_file())
             self.assertTrue(dispatch.report_template_path.is_file())
+            dispatch_payload = json.loads(
+                dispatch.dispatch_path.read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                "desktop-subject-dispatch/v2",
+                dispatch_payload["schema_version"],
+            )
+            self.assertEqual("utf-8", dispatch_payload["prompt_encoding"])
+            self.assertEqual("lf", dispatch_payload["prompt_line_endings"])
+            prompt_bytes = dispatch.prompt_path.read_bytes()
+            self.assertNotIn(b"\r", prompt_bytes)
+            self.assertEqual(
+                hashlib.sha256(prompt_bytes).hexdigest(),
+                dispatch.prompt_sha256,
+            )
             self.assertEqual(
                 ".benchmark-subject-report.json",
                 dispatch.report_relative_path,
@@ -174,12 +246,18 @@ class CrossLanguageHarnessTests(unittest.TestCase):
             )
             self.assertEqual(dispatch.generation, template["generation"])
             self.assertEqual(dispatch.attempt, template["attempt"])
+            reloaded = load_desktop_dispatch(dispatch.dispatch_path)
+            self.assertEqual(dispatch.prompt_sha256, reloaded.prompt_sha256)
             instruction = desktop_subject_instruction(dispatch)
             self.assertIn(str(dispatch.prompt_path), instruction)
             self.assertIn(str(dispatch.dispatch_path), instruction)
             self.assertIn(str(dispatch.report_template_path), instruction)
             self.assertIn("staged", instruction)
             self.assertIn("Workspace", instruction)
+            self.assertIn(
+                'commands_claimed=[{"command":"...","outcome":',
+                instruction,
+            )
             with self.assertRaises(FileExistsError):
                 stage_desktop_subject(
                     slot,
@@ -207,6 +285,444 @@ class CrossLanguageHarnessTests(unittest.TestCase):
             dispatch.prompt_path.write_text("tampered prompt", encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "prompt hash"):
                 load_desktop_dispatch(dispatch.dispatch_path)
+
+    def test_normal_loader_rejects_legacy_v1_dispatch_even_if_text_hash_matches(
+        self,
+    ) -> None:
+        manifest = load_manifest(MANIFEST_PATH)
+        slot = RunSlot(
+            run_id="react-overdue-rule--control--r01",
+            scenario_id="react-overdue-rule",
+            language="typescript-react",
+            arm_id="control",
+            repetition=1,
+            order_index=0,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workspace_root = root / "workspace"
+            artifact_dir = root / "artifacts"
+            workspace_root.mkdir()
+            artifact_dir.mkdir()
+            (workspace_root / ".gitignore").write_text(
+                ".benchmark-subject-report.json\n", encoding="utf-8"
+            )
+            self._git(workspace_root, "init", "--initial-branch=main")
+            self._git(workspace_root, "config", "user.name", "Benchmark Runner")
+            self._git(
+                workspace_root,
+                "config",
+                "user.email",
+                "benchmark@example.invalid",
+            )
+            self._git(workspace_root, "add", "-A")
+            self._git(workspace_root, "commit", "-m", "baseline")
+            workspace = Workspace(
+                workspace_root,
+                artifact_dir,
+                self._git(workspace_root, "rev-parse", "HEAD").strip(),
+            )
+            dispatch = stage_desktop_subject(
+                slot,
+                manifest,
+                workspace,
+                generation=3,
+                attempt=1,
+                physical_run_id="run-aabbccddeeff0011",
+                contract_sha256="b" * 64,
+                scenario_contract_sha256="a" * 64,
+            )
+            legacy_prompt = dispatch.prompt_path.read_text(encoding="utf-8")
+            windows_prompt_bytes = legacy_prompt.replace("\n", "\r\n").encode(
+                "utf-8"
+            )
+            dispatch.prompt_path.write_bytes(windows_prompt_bytes)
+            v2_payload = json.loads(
+                dispatch.dispatch_path.read_text(encoding="utf-8")
+            )
+            v2_payload["prompt_sha256"] = hashlib.sha256(
+                windows_prompt_bytes
+            ).hexdigest()
+            v2_payload.pop("dispatch_sha256")
+            v2_payload["dispatch_sha256"] = _canonical_json_sha256(v2_payload)
+            v2_path = artifact_dir / "v2-crlf-desktop-dispatch.json"
+            v2_path.write_text(
+                json.dumps(v2_payload, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "prompt hash"):
+                load_desktop_dispatch(v2_path)
+
+            legacy_payload = dict(v2_payload)
+            legacy_payload.pop("prompt_encoding")
+            legacy_payload.pop("prompt_line_endings")
+            legacy_payload["schema_version"] = "desktop-subject-dispatch/v1"
+            legacy_payload["prompt_sha256"] = hashlib.sha256(
+                legacy_prompt.encode("utf-8")
+            ).hexdigest()
+            legacy_payload.pop("dispatch_sha256")
+            legacy_payload["dispatch_sha256"] = _canonical_json_sha256(
+                legacy_payload
+            )
+            legacy_path = artifact_dir / "legacy-desktop-dispatch.json"
+            legacy_path.write_text(
+                json.dumps(legacy_payload, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ValueError, "v2"):
+                load_desktop_dispatch(legacy_path)
+
+    def test_legacy_inspector_accepts_only_the_known_windows_newline_defect(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workspace_root = root / "workspace"
+            artifact_dir = root / "artifacts"
+            workspace_root.mkdir()
+            artifact_dir.mkdir()
+            prompt_path = artifact_dir / "prompt.md"
+            prompt_path.write_bytes(b"line one\r\nline two\r\n")
+            baseline = "a" * 40
+            logical_prompt_sha256 = hashlib.sha256(
+                b"line one\nline two\n"
+            ).hexdigest()
+            payload: dict[str, object] = {
+                "schema_version": "desktop-subject-dispatch/v1",
+                "dispatch_id": (
+                    "desktop-dispatch-react-overdue-rule--control--r01--g03--a01"
+                ),
+                "logical_run_id": "react-overdue-rule--control--r01",
+                "physical_run_id": "run-aabbccddeeff0011",
+                "scenario_id": "react-overdue-rule",
+                "generation": 3,
+                "attempt": 1,
+                "workspace_root": str(workspace_root),
+                "artifact_directory": str(artifact_dir),
+                "baseline_commit": baseline,
+                "prompt_sha256": logical_prompt_sha256,
+                "contract_sha256": "b" * 64,
+                "scenario_contract_sha256": "c" * 64,
+                "fixture_commit": "d" * 40,
+                "skill_commit": "e" * 40,
+                "model": "gpt-5.6-sol",
+                "reasoning_effort": "high",
+                "executor": {
+                    "kind": "codex-desktop-collaboration",
+                    "dispatch_mode": "external-collaboration-subagent",
+                    "network_enforcement": "not_available",
+                    "telemetry": "not_available",
+                },
+                "report_relative_path": ".benchmark-subject-report.json",
+                "report_template_relative_path": "subject-report.template.json",
+            }
+            payload["dispatch_sha256"] = _canonical_json_sha256(payload)
+            dispatch_path = artifact_dir / "desktop-dispatch.json"
+            dispatch_path.write_text(
+                json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+            report = {
+                "schema_version": "desktop-subject-report/v1",
+                "dispatch_sha256": payload["dispatch_sha256"],
+                "baseline_commit": baseline,
+                "prompt_sha256": logical_prompt_sha256,
+                "contract_sha256": "b" * 64,
+                "scenario_contract_sha256": "c" * 64,
+                "generation": 3,
+                "attempt": 1,
+                "completion": "completed",
+                "summary": "完成。",
+                "files_inspected": [],
+                "files_modified_claimed": [],
+                "commands_claimed": [
+                    ".venv\\Scripts\\python.exe -m pytest -q tests (passed)"
+                ],
+                "telemetry": "not_available",
+            }
+            (workspace_root / ".benchmark-subject-report.json").write_text(
+                json.dumps(report, ensure_ascii=False), encoding="utf-8"
+            )
+
+            defect = inspect_legacy_pending_newline_defect(dispatch_path)
+            self.assertEqual(logical_prompt_sha256, defect.prompt_sha256)
+            self.assertNotEqual(
+                logical_prompt_sha256,
+                hashlib.sha256(prompt_path.read_bytes()).hexdigest(),
+            )
+
+            prompt_path.write_bytes(b"line one\nline two\n")
+            with self.assertRaisesRegex(ValueError, "newline defect"):
+                inspect_legacy_pending_newline_defect(dispatch_path)
+
+    def test_legacy_pending_newline_defect_creates_precollection_invalidation(
+        self,
+    ) -> None:
+        manifest = load_manifest(MANIFEST_PATH)
+        scenario_id = "fastapi-provider-boundary"
+        slot = next(
+            candidate
+            for candidate in pilot_slots(build_run_slots(manifest))
+            if candidate.scenario_id == scenario_id and candidate.arm_id == "control"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            runs_root = root / ".benchmark-runs"
+            physical_run_id = "run-494c594491bdbf9e"
+            workspace_root = runs_root / "workspaces" / physical_run_id
+            artifact_dir = runs_root / "artifacts" / physical_run_id
+            workspace_root.mkdir(parents=True)
+            artifact_dir.mkdir(parents=True)
+            (workspace_root / ".gitignore").write_text(
+                ".benchmark-subject-report.json\n", encoding="utf-8"
+            )
+            (workspace_root / "app.py").write_text("baseline\n", encoding="utf-8")
+            self._git(workspace_root, "init", "--initial-branch=main")
+            self._git(workspace_root, "config", "user.name", "Benchmark Runner")
+            self._git(
+                workspace_root,
+                "config",
+                "user.email",
+                "benchmark@example.invalid",
+            )
+            self._git(workspace_root, "add", "-A")
+            self._git(workspace_root, "commit", "-m", "baseline")
+            baseline_commit = self._git(
+                workspace_root, "rev-parse", "HEAD"
+            ).strip()
+            prompt_path = artifact_dir / "prompt.md"
+            prompt_path.write_bytes(b"first line\r\nsecond line\r\n")
+            logical_prompt_sha256 = hashlib.sha256(
+                b"first line\nsecond line\n"
+            ).hexdigest()
+            dispatch_id = _desktop_dispatch_id(slot, 3, 1)
+            legacy_payload: dict[str, object] = {
+                "schema_version": "desktop-subject-dispatch/v1",
+                "dispatch_id": dispatch_id,
+                "logical_run_id": slot.run_id,
+                "physical_run_id": physical_run_id,
+                "scenario_id": scenario_id,
+                "generation": 3,
+                "attempt": 1,
+                "workspace_root": str(workspace_root),
+                "artifact_directory": str(artifact_dir),
+                "baseline_commit": baseline_commit,
+                "prompt_sha256": logical_prompt_sha256,
+                "contract_sha256": "b" * 64,
+                "scenario_contract_sha256": "c" * 64,
+                "fixture_commit": manifest.fixture_commit,
+                "skill_commit": manifest.skill_commit,
+                "model": manifest.model,
+                "reasoning_effort": manifest.reasoning_effort,
+                "executor": dict(manifest.subject_executor),
+                "report_relative_path": ".benchmark-subject-report.json",
+                "report_template_relative_path": "subject-report.template.json",
+            }
+            legacy_payload["dispatch_sha256"] = _canonical_json_sha256(
+                legacy_payload
+            )
+            dispatch_path = artifact_dir / "desktop-dispatch.json"
+            dispatch_path.write_text(
+                json.dumps(legacy_payload, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            report = {
+                "schema_version": "desktop-subject-report/v1",
+                "dispatch_sha256": legacy_payload["dispatch_sha256"],
+                "baseline_commit": baseline_commit,
+                "prompt_sha256": logical_prompt_sha256,
+                "contract_sha256": "b" * 64,
+                "scenario_contract_sha256": "c" * 64,
+                "generation": 3,
+                "attempt": 1,
+                "completion": "completed",
+                "summary": "完成最小變更。",
+                "files_inspected": ["app.py"],
+                "files_modified_claimed": ["app.py"],
+                "commands_claimed": [],
+                "telemetry": "not_available",
+            }
+            report_path = workspace_root / ".benchmark-subject-report.json"
+            report_path.write_text(
+                json.dumps(report, ensure_ascii=False), encoding="utf-8"
+            )
+            dispatch_index = (
+                runs_root / "desktop-dispatches" / f"{dispatch_id}.json"
+            )
+            dispatch_index.parent.mkdir(parents=True)
+            dispatch_index.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "desktop-dispatch-index/v1",
+                        "dispatch_id": dispatch_id,
+                        "dispatch_sha256": legacy_payload["dispatch_sha256"],
+                        "dispatch_path": (
+                            f"artifacts/{physical_run_id}/desktop-dispatch.json"
+                        ),
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            campaign_state = runs_root / "campaign-state.json"
+            campaign_state.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "1.0",
+                        "scenarios": {scenario_id: {"generation": 3}},
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            original_dispatch = dispatch_path.read_bytes()
+            original_report = report_path.read_bytes()
+            paths = HarnessPaths(
+                repository_root=root,
+                runs_root=runs_root,
+                fixture_clone=root / "fixture",
+                skill_repository=root,
+            )
+            current_contract = {"schema_version": "test-contract"}
+
+            with (
+                patch.object(harness_cli, "RUNS_ROOT", runs_root),
+                patch.object(
+                    harness_cli,
+                    "DISPATCH_ROOT",
+                    runs_root / "desktop-dispatches",
+                ),
+                patch.object(
+                    harness_cli,
+                    "ATTEMPT_RECEIPTS_ROOT",
+                    runs_root / "desktop-attempt-receipts",
+                ),
+                patch.object(
+                    harness_cli,
+                    "RUN_DOCUMENTS",
+                    runs_root / "run-documents",
+                ),
+                patch.object(
+                    harness_cli,
+                    "INVALIDATIONS_ROOT",
+                    runs_root / "invalidations",
+                ),
+                patch.object(
+                    harness_cli,
+                    "CAMPAIGN_STATE_PATH",
+                    campaign_state,
+                ),
+                patch.object(
+                    harness_cli,
+                    "FREEZE_ROOT",
+                    runs_root / "contract-freezes",
+                ),
+                patch.object(
+                    harness_cli,
+                    "_freeze_document",
+                    return_value=current_contract,
+                ),
+                patch.object(
+                    harness_cli,
+                    "_scenario_contract_sha256",
+                    return_value="f" * 64,
+                ),
+            ):
+                def invalidate() -> None:
+                    _invalidate_pilot(
+                        manifest,
+                        paths,
+                        scenario_id,
+                        "prompt_hash_newline_defect",
+                        legacy_pending_dispatch=dispatch_id,
+                    )
+
+                receipt_path = (
+                    runs_root
+                    / "desktop-attempt-receipts"
+                    / slot.run_id
+                    / "g03--a01.json"
+                )
+                receipt_path.parent.mkdir(parents=True)
+                receipt_path.write_text("{}", encoding="utf-8")
+                with self.assertRaisesRegex(RuntimeError, "receipt invariant"):
+                    invalidate()
+                receipt_path.unlink()
+
+                terminal_path = (
+                    runs_root
+                    / "run-documents"
+                    / scenario_id
+                    / f"{slot.run_id}--g03.json"
+                )
+                terminal_path.parent.mkdir(parents=True)
+                terminal_path.write_text("{}", encoding="utf-8")
+                with self.assertRaisesRegex(RuntimeError, "terminal run document"):
+                    invalidate()
+                terminal_path.unlink()
+
+                other_slot = next(
+                    candidate
+                    for candidate in pilot_slots(build_run_slots(manifest))
+                    if candidate.scenario_id == scenario_id
+                    and candidate.run_id != slot.run_id
+                )
+                other_terminal_path = (
+                    runs_root
+                    / "run-documents"
+                    / scenario_id
+                    / f"{other_slot.run_id}--g03.json"
+                )
+                other_terminal_path.write_text("{}", encoding="utf-8")
+                state_before_rejection = campaign_state.read_bytes()
+                with self.assertRaisesRegex(RuntimeError, "other pilot slot"):
+                    invalidate()
+                self.assertEqual(
+                    state_before_rejection,
+                    campaign_state.read_bytes(),
+                )
+                self.assertEqual(original_dispatch, dispatch_path.read_bytes())
+                self.assertEqual(original_report, report_path.read_bytes())
+                other_terminal_path.unlink()
+
+                invalidate()
+
+            state = json.loads(campaign_state.read_text(encoding="utf-8"))
+            recovered = state["scenarios"][scenario_id]
+            self.assertEqual(4, recovered["generation"])
+            self.assertEqual("c" * 64, recovered["must_change_from"])
+            invalidation_path = runs_root / recovered["invalidation"]
+            invalidation = json.loads(invalidation_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                "desktop-pre-collection-invalidation/v1",
+                invalidation["schema_version"],
+            )
+            self.assertEqual("not_run", invalidation["candidate_evaluation"])
+            self.assertEqual(dispatch_id, invalidation["dispatch_id"])
+            self.assertEqual(baseline_commit, invalidation["workspace_head"])
+            self.assertEqual("c" * 64, invalidation["must_change_from"])
+            self.assertEqual(
+                "f" * 64,
+                invalidation["replacement_scenario_contract_sha256"],
+            )
+            self.assertFalse(
+                (
+                    runs_root
+                    / "run-documents"
+                    / scenario_id
+                    / f"{slot.run_id}--g03.json"
+                ).exists()
+            )
+            self.assertFalse(
+                (
+                    runs_root
+                    / "desktop-attempt-receipts"
+                    / slot.run_id
+                    / "g03--a01.json"
+                ).exists()
+            )
+            self.assertEqual(original_dispatch, dispatch_path.read_bytes())
+            self.assertEqual(original_report, report_path.read_bytes())
 
     def test_diff_boundary_excludes_subject_report_without_gitignore(self) -> None:
         manifest = load_manifest(MANIFEST_PATH)
@@ -702,6 +1218,22 @@ class CrossLanguageHarnessTests(unittest.TestCase):
             "verify-reviews",
         ):
             self.assertIn(command, help_text)
+
+        invalidation = parser.parse_args(
+            [
+                "invalidate-pilot",
+                "--scenario",
+                "fastapi-provider-boundary",
+                "--reason",
+                "prompt_hash_newline_defect",
+                "--legacy-pending-dispatch",
+                "desktop-dispatch-fastapi-provider-boundary--control--r01--g03--a01",
+            ]
+        )
+        self.assertEqual(
+            "desktop-dispatch-fastapi-provider-boundary--control--r01--g03--a01",
+            invalidation.legacy_pending_dispatch,
+        )
 
     def test_desktop_pilot_and_full_fail_closed_without_nested_cli(self) -> None:
         with self.assertRaisesRegex(RuntimeError, "stage --phase pilot"):
