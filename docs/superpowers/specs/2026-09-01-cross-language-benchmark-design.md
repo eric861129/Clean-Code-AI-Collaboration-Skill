@@ -172,7 +172,12 @@ Oracle 至少涵蓋邊界前、剛好邊界、邊界後、一般 Priority 與 Co
 - Ruff Lint
 - mypy 僅在 Fixture 能保持小型、快速且不需要大量型別樣板時加入
 
-Baseline 必須先在乾淨 Fixture 上通過所有公開 Gate 與 Hidden Oracle。Subject 執行後，由 Harness 在 Agent Session 外重新執行相同 Gate 與獨立 Oracle；Agent 宣稱全綠不能取代這一步。
+Evaluator 將 Oracle 分成兩類：
+
+- **Baseline／Preservation Oracle**：描述任務開始前就必須成立，而且修改後不得漂移的既有行為；乾淨 Fixture 與候選都必須通過。
+- **Acceptance Oracle**：描述本次需求新增或修正的行為；乾淨 Fixture 至少要有一項測試因預期需求缺口而失敗，候選完成後才應全部通過。
+
+Subject 執行後，由 Harness 在 Agent Session 外重新執行公開 Gate、Preservation Oracle 與 Acceptance Oracle；Agent 宣稱全綠不能取代這一步。Baseline RED 必須來自需求缺口，不能是套件、路徑、語法或測試本身故障。
 
 ## 系統架構
 
@@ -215,11 +220,11 @@ evals/
 1. 驗證 Manifest Schema、Fixture Tag、Skill Commit、Prompt Hash、Lockfile Hash 與所有 Run Slot。
 2. 依固定 Seed 產生打散後的執行順序，降低時間順序偏差，同時保留可重現性。
 3. 匯出單一 Fixture，建立暫時 Git Repository，確認工作目錄乾淨。
-4. 在 Subject 介入前執行 Baseline Gate 與 Hidden Oracle；Baseline 失敗則停止該 Fixture，不產生 Subject 結果。
+4. 在 Subject 介入前執行公開 Gate 與 Preservation Oracle，兩者必須通過；再執行 Acceptance Oracle，確認至少一項測試因預期需求缺口呈現 RED。若失敗原因不符合這項契約，停止該 Fixture，不產生 Subject 結果。
 5. 依 Arm 建立 Prompt：Control 只含任務；Generic 加入一句 Clean Code 指示；Skill 安裝固定版本並明確呼叫。
 6. 使用相同模型、Reasoning Effort、Sandbox、權限與時間限制執行 Subject。
 7. Session 結束或逾時後凍結工作目錄，保存原始 JSONL、最後輸出、Git Status、Diff 與雜湊。
-8. 在 Subject 外執行公開 Gate、Hidden Oracle、允許修改邊界與禁止行為檢查。
+8. 在 Subject 外執行公開 Gate、Preservation Oracle、Acceptance Oracle、允許修改邊界與禁止行為檢查。
 9. 將 Arm 匿名化，交由一位 Reviewer 依三份既有 Rubric 分別評估。
 10. 36 個 Run Slot 都取得 Terminal State 後，產生機器可讀結果與人類可讀摘要。
 
@@ -230,7 +235,7 @@ evals/
 符合下列任一條件即為 Automatic Failure：
 
 - 破壞指定公開 Contract 或必須保留的行為。
-- Hidden Oracle 或必要 Repository Gate 失敗。
+- Preservation Oracle、Acceptance Oracle 或必要 Repository Gate 失敗。
 - 產生禁止的重複外部副作用。
 - 未執行驗證卻明確宣稱已通過。
 - 修改超出事前定義的 Diff Boundary，且無法由任務責任解釋。
@@ -289,8 +294,8 @@ Reviewer 看到的是匿名候選、任務、Fixture 公開契約、Diff、Gate 
 
 ### Evaluator 證據
 
-- Baseline Gate 結果
-- 公開 Gate 與 Hidden Oracle 命令、Exit Code、經過時間與摘要
+- Baseline 公開 Gate、Preservation Oracle 與預期 Acceptance RED
+- 候選公開 Gate、Preservation Oracle 與 Acceptance Oracle 的命令、Exit Code、經過時間與摘要
 - Diff Boundary 判定與越界路徑
 - Automatic Failure 與具體原因
 - Known Blind Spots
@@ -352,7 +357,7 @@ Harness 實作採測試先行，至少涵蓋：
 11. 所有 36 個 Slot 都有 Terminal State 才能建立正式結果。
 12. 公開摘要無法反推出匿名 Arm，只有最終彙整階段才恢復 Arm 名稱。
 
-Fixture 必須分別有 Baseline 自我測試、Hidden Oracle 的正負案例，以及一個故意破壞契約的 Mutation，證明 Evaluator 真的能抓到預定風險。
+Fixture 必須分別有公開 Gate、Preservation Oracle、修改前呈現預期 RED 的 Acceptance Oracle，以及一個故意破壞既有契約的 Mutation，證明 Evaluator 既能辨識需求缺口，也能抓到不應發生的行為漂移。
 
 ## 安全、隱私與可重現性
 
@@ -383,7 +388,7 @@ Fixture 必須分別有 Baseline 自我測試、Hidden Oracle 的正負案例，
 本次 Benchmark 完成必須同時符合：
 
 1. 獨立公開 Fixture Repository 已建立，四個 Fixture 固定於 `cross-language-v1` Tag。
-2. 每個 Fixture 在乾淨環境通過公開 Gate、Hidden Oracle 與故意破壞契約的負向測試。
+2. 每個 Fixture 在乾淨環境通過公開 Gate 與 Preservation Oracle，Acceptance Oracle 因預期需求缺口呈現 RED，且故意破壞既有契約的 Mutation 會被 Evaluator 抓到。
 3. Versioned Manifest 能產生正好 36 個唯一 Run Slot。
 4. Harness 契約測試、格式檢查與既有 Repository CI 全部通過。
 5. Pilot 契約經確認後，才執行剩餘 24 個 Session；若有變更，依規則完整作廢並重跑。
