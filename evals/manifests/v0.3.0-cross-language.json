@@ -83,7 +83,8 @@
       "expected_baseline_red_markers": [
         "is not overdue one minute before the two-hour boundary",
         "is overdue exactly at the two-hour boundary"
-      ]
+      ],
+      "expected_baseline_failure_count": 2
     },
     {
       "id": "react-effect-lifecycle",
@@ -125,7 +126,8 @@
       },
       "expected_baseline_red_markers": [
         "does not request the same preview again on an ordinary rerender"
-      ]
+      ],
+      "expected_baseline_failure_count": 1
     },
     {
       "id": "fastapi-overdue-rule",
@@ -167,7 +169,8 @@
       "expected_baseline_red_markers": [
         "test_high_priority_is_not_overdue_before_two_hour_boundary",
         "test_high_priority_is_overdue_at_two_hour_boundary"
-      ]
+      ],
+      "expected_baseline_failure_count": 2
     },
     {
       "id": "fastapi-provider-boundary",
@@ -210,7 +213,8 @@
       },
       "expected_baseline_red_markers": [
         "test_route_uses_fastapi_dependency_override"
-      ]
+      ],
+      "expected_baseline_failure_count": 1
     }
   ],
   "pilot": {
@@ -219,10 +223,10 @@
   },
   "retry_policy": {
     "allowed_reasons": [
-      "harness_failure",
-      "package_cache_failure",
-      "cli_runner_failure",
-      "base_environment_failure"
+      "harness_error",
+      "dependency_cache_error",
+      "cli_runner_error",
+      "environment_error"
     ],
     "maximum_retries": 1,
     "preserve_original_attempt": true

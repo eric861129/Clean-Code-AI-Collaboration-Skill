@@ -1081,7 +1081,7 @@ git commit -m "feat(evals): run isolated benchmark subjects"
 - Produces: `capture_diff(workspace, scenario) -> DiffEvidence`、`run_oracles(...) -> OracleEvidence`、`build_review_packet(...) -> dict[str, object]`、`write_review_packet(...) -> Path`、`build_public_result(...) -> dict[str, object]`。
 - Reviewer 私有映射固定在 `.benchmark-runs/review-key.json`，不進 Git；Review Packet 固定在 `.benchmark-runs/review-packets/`。
 
-- [ ] **Step 1: 寫 Diff、Retry、匿名與 Terminal State RED Tests**
+- [x] **Step 1: 寫 Diff、Retry、匿名與 Terminal State RED Tests**
 
 至少加入：
 
@@ -1114,7 +1114,7 @@ def test_review_packet_does_not_reveal_arm(self) -> None:
     self.assertNotIn("generic-clean-code", serialized)
 ```
 
-- [ ] **Step 2: 實作 Diff Capture**
+- [x] **Step 2: 實作 Diff Capture**
 
 在 `models.py` 新增：
 
@@ -1144,7 +1144,7 @@ class OracleEvidence:
 
 Subject 結束、Evaluator 注入前執行 `git add -N -- .`，再以 `git diff --binary --no-ext-diff HEAD` 與 `git diff --name-status -M HEAD` 擷取新增、修改、刪除與重新命名。每個路徑使用 Repository-relative POSIX format；exact 或 Python `re.fullmatch` 才能放行；Rename 來源與目的都要通過。
 
-- [ ] **Step 3: 實作 Oracle Runner**
+- [x] **Step 3: 實作 Oracle Runner**
 
 Oracle Runner 將指定 Evaluator 複製到 Subject Workspace 的 `.benchmark-oracle/`，但 Diff 必須已在注入前凍結。依序執行：
 
@@ -1154,21 +1154,24 @@ Oracle Runner 將指定 Evaluator 複製到 Subject Workspace 的 `.benchmark-or
 
 Candidate 任一必要 Gate 非 0 即 Automatic Failure。Baseline 階段則要求 Public／Preservation Exit 0、Acceptance Exit 非 0 且包含所有預期 Marker。
 
-- [ ] **Step 4: 實作 Infrastructure Retry 判斷**
+- [x] **Step 4: 實作 Infrastructure Retry 判斷**
 
 Retry 只接受列舉值：`harness_error`、`dependency_cache_error`、`cli_runner_error`、`environment_error`。`timeout`、`candidate_test_failure`、`candidate_incomplete`、`invalid_claim` 與 `outside_boundary` 禁止重跑。第二次 Attempt 必須保留第一次 Evidence Path 與原因。
 
-- [ ] **Step 5: 實作匿名 Review Packet**
+- [x] **Step 5: 實作匿名 Review Packet**
 
 使用 `secrets.token_hex(4)` 產生不可由公開 Seed 推回 Arm 的 Candidate ID；Private Mapping 只存在 `.benchmark-runs/review-key.json`。Packet 只含任務、Must Preserve、匿名 ID、Diff、命令、Oracle、Automatic Failure、Blind Spots 與三份空白 Rubric 欄位；不得包含 Arm、Repetition 順序或 Skill 載入路徑。
 
-- [ ] **Step 6: 實作 Result Builder 與 CLI**
+- [x] **Step 6: 實作 Result Builder 與 CLI**
 
-Result Builder 驗證：36 個 Slot 全部存在、Run ID 唯一、Terminal State 合法、Pilot 作廢是三 Arm 成組、無 Aggregate Score Key、Telemetry 缺少時為 `not_available`。CLI：
+Result Builder 驗證：36 個目前有效 Generation 的 Slot 全部存在、Run ID 唯一、Terminal State 合法、舊的作廢 Generation 不得進入結果、無 Aggregate Score Key、Telemetry 缺少時為 `not_available`。CLI：
 
 ```text
 python -m evals.harness.cli prepare
 python -m evals.harness.cli pilot
+python -m evals.harness.cli freeze --decision-note "..."
+python -m evals.harness.cli invalidate-pilot --scenario <id> --reason "..."
+python -m evals.harness.cli adjudicate-timeout --run-id <id> --source <candidate|infrastructure> --reason "..."
 python -m evals.harness.cli full
 python -m evals.harness.cli review-packets
 python -m evals.harness.cli build-result
@@ -1179,7 +1182,7 @@ python -m evals.harness.cli verify-reviews
 
 `pilot` 只選 Repetition 1；`full` 只選 Repetition 2、3；`build-result` 在 Rubric 尚未填完或不足 36 個 Terminal State 時 Fail Closed。
 
-- [ ] **Step 7: 把 Harness 契約加入 CI 並 Commit**
+- [x] **Step 7: 把 Harness 契約加入 CI 並 Commit**
 
 ```powershell
 py -3 -m unittest discover -s tests -v
@@ -1236,9 +1239,9 @@ Expected: 12 個 Terminal State、12 個匿名 Candidate ID、Arm 不出現在 P
 
 - [ ] **Step 4: 做契約凍結判斷**
 
-逐一回答：Baseline RED 是否只來自需求缺口？Oracle 是否抓到真正風險？允許修改範圍是否誤判合理責任？Prompt 三組是否只有預定差異？若全部為是，建立凍結紀錄 `.benchmark-runs/contract-freeze.json`，內容含 Manifest SHA、Fixture SHA、Prompt SHA、Oracle File SHA 與 Rubric SHA。
+逐一回答：Baseline RED 是否只來自需求缺口？Oracle 是否抓到真正風險？允許修改範圍是否誤判合理責任？Prompt 三組是否只有預定差異？若全部為是，在 `.benchmark-runs/contract-freezes/` 建立以 Contract SHA 命名的凍結紀錄，內容含 Manifest、Harness、Codex CLI、Fixture、Skill、Prompt、Oracle 與 Rubric Hash。若 Oracle Timeout 尚未判明是 Candidate 還是 Infrastructure，必須先執行 `adjudicate-timeout`，不得直接凍結。
 
-若任一項需修正，不能只重跑單一 Arm。先將該 Scenario 三個 Pilot Run 標記 `invalidated_pilot`，保存原因，再以 TDD 修正並建立獨立 Commit，最後重跑該 Scenario 的三個 Arm。
+若四項都成立，明確執行 `freeze --decision-note "..."`；`pilot` 本身不得自動凍結。若任一項需修正，不能只重跑單一 Arm。先執行 `invalidate-pilot --scenario <id> --reason "..."`，保存該 Scenario 三個 Pilot Run 的 Hash 與作廢原因，再以 TDD 修正並建立獨立 Commit。Harness 會提升該情境的 Generation，且只有 Scenario Contract Hash 確實改變後，才允許重新執行三個 Arm。舊 Generation 永遠保留，不得進入最終 Result。
 
 - [ ] **Step 5: 停在 Full Run 前回報 Pilot**
 
@@ -1337,7 +1340,7 @@ def test_cross_language_result_is_complete_and_non_aggregate(self) -> None:
     for run in result["runs"]:
         self.assertIn(run["terminal_state"], {
             "passed", "automatic_failure", "timeout",
-            "infrastructure_failure", "invalidated_pilot",
+            "infrastructure_failure",
         })
         self.assertEqual(3, len(run["rubric_results"]))
 ```

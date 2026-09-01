@@ -31,6 +31,7 @@ def run_subject(
     manifest: BenchmarkManifest,
     workspace: Workspace,
     command_override: list[str] | None = None,
+    attempt: int = 1,
 ) -> SubjectObservation:
     scenario = _scenario_for(manifest, slot.scenario_id)
     prompt = build_prompt(scenario, slot.arm_id)
@@ -84,6 +85,7 @@ def run_subject(
         workspace.root,
         manifest.subject_timeout_seconds,
         stdin=prompt,
+        attempt=attempt,
     )
     raw_jsonl_path.write_text(command_result.stdout, encoding="utf-8")
     stderr_path.write_text(command_result.stderr, encoding="utf-8")

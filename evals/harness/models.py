@@ -67,3 +67,26 @@ class SubjectObservation:
     prompt_sha256: str
     raw_jsonl_path: Path
     last_message_path: Path
+
+
+@dataclass(frozen=True)
+class Rename:
+    source: str
+    destination: str
+
+
+@dataclass(frozen=True)
+class DiffEvidence:
+    diff: str
+    diff_sha256: str
+    changed_paths: tuple[str, ...]
+    renamed_paths: tuple[Rename, ...]
+    outside_boundary: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class OracleEvidence:
+    public: tuple[CommandResult, ...]
+    preservation: tuple[CommandResult, ...]
+    acceptance: tuple[CommandResult, ...]
+    automatic_failure_reasons: tuple[str, ...]

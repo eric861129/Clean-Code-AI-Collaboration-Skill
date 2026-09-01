@@ -25,6 +25,7 @@ REQUIRED_SCENARIO_FIELDS = {
     "prohibited_changes",
     "commands",
     "expected_baseline_red_markers",
+    "expected_baseline_failure_count",
 }
 
 
@@ -75,6 +76,13 @@ def validate_manifest(raw: dict[str, object]) -> BenchmarkManifest:
             raise ValueError(
                 "scenario commands must define public, preservation, acceptance"
             )
+        expected_failure_count = scenario["expected_baseline_failure_count"]
+        if (
+            not isinstance(expected_failure_count, int)
+            or isinstance(expected_failure_count, bool)
+            or expected_failure_count <= 0
+        ):
+            raise ValueError("expected baseline failure count must be positive")
 
     repetitions = _positive_integer(execution, "repetitions")
     if repetitions != 3:
