@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Benchmark 版本固定為 `0.3.0-cross-language-desktop-subject`；Fixture Tag 固定為 `cross-language-v1`；Skill 固定使用已發布的 `v0.3.0`，不得改用工作目錄中的新版本。
+- Benchmark 版本固定為 `0.3.0-cross-language-desktop-subject-v3`；Fixture Tag 固定為 `cross-language-v2`；Skill 固定使用已發布的 `v0.3.0`，不得改用工作目錄中的新版本。
 - 主要比較只有 TypeScript／React 與 Python／FastAPI；既有 .NET 結果只作歷史參考；Java／Spring 不進入本次執行。
 - 固定 4 個 Scenario、3 個 Arm、3 次 Repetition，共 36 個 Fresh Context Session；Pilot 先跑 12 次，契約不變才計入正式結果。
 - Model 固定為 `gpt-5.6-sol`，Reasoning Effort 固定為 `high`，Subject 由 Codex Desktop collaboration 的 Fresh Context SubAgent 執行；Harness 只負責 Stage／Collect，不啟動 nested CLI。
@@ -28,7 +28,7 @@
 - 每個程式 Task 都先完成 RED，再做最小 GREEN、完整回歸與 Conventional Commit。
 - 建立公開 Repository、Push、Tag、Release Asset 與執行 36 次 Session 都是明列的外部操作；只在對應 Task 到達且前置 Gate 通過後執行。
 
-## 2026-09-01 Desktop Subject Protocol（已實作，未執行 Pilot）
+## 2026-09-01 Desktop Subject Protocol v3（首輪 Pilot 已稽核作廢）
 
 Desktop 內 nested Codex CLI 的 Workspace 寫入已實機確認會被強制唯讀，因此原先
 CLI Subject Runner 不可作為正式跨語言評測執行器。以下流程取代本計畫後續所有
@@ -41,16 +41,18 @@ CLI Subject Runner 不可作為正式跨語言評測執行器。以下流程取�
    py -3 -m evals.harness.cli stage --phase pilot --run-id <logical-run-id>
    ```
 
-   Stage 建立唯一 Workspace、Prompt、`desktop-dispatch.json`、已預填不可變欄位的
-   `subject-report.template.json` 和私有 Dispatch Index。它們都不可覆寫，並綁定
+   Stage 建立唯一 Workspace、Prompt、已預填不可變欄位的
+   `subject-report.template.json`、Controller-only Dispatch 和 Controller-only Dispatch Index。它們都不可覆寫，並綁定
    Benchmark／Scenario／Prompt Hash、Baseline Commit、Generation、Attempt 與實體 Run ID。
 
 2. 外層 Sol 編排者以 fresh context 啟動一個 `gpt-5.6-sol`／`high` Desktop
-   collaboration SubAgent。SubAgent 可在 Dispatch 指定的 Workspace 讀寫任務所需檔案；
-   Workspace 外只有 staged Prompt、Dispatch 與 Report Template 三個明確路徑可讀取。
+   collaboration SubAgent。SubAgent 可在外層指令指定的 Workspace 讀寫任務所需檔案；
+   Workspace 外只有 staged Prompt 與 Report Template 兩個明確路徑會交付給 Subject。
+   Controller Dispatch 路徑不寫入 Subject instruction，避免主動洩漏 Arm 與 treatment metadata。
    若 Prompt 要求 Skill，只能讀取 Workspace 中 staged 的固定版本。完成後在 Workspace
    根目錄寫入 ignored 的
-   `.benchmark-subject-report.json`。Report 是交接資料，不是驗收證據。
+   `.benchmark-subject-report.json`。Report 的檔案欄位只接受 Workspace-relative POSIX
+   path；外部 staged 檔案不得列入。Report 是交接資料，不是驗收證據。
 
 3. 編排者帶回完成、Timeout 或 Infrastructure Failure 狀態，再執行：
 
@@ -71,6 +73,17 @@ CLI Subject Runner 不可作為正式跨語言評測執行器。以下流程取�
 5. 匿名 Packet 與公開 Result 不得包含 Dispatch ID、Thread ID、完整 Report 或絕對
    Workspace 路徑。Desktop 無法可靠取得的網路強制、Token、Tool Call 與檔案查閱
    telemetry 固定為 `not_available`，不得推估；JSONL 不作為 Desktop 流程的 Evidence 要求。
+
+6. 首輪 Pilot 使用的 `cross-language-v1` 與 Desktop Subject Protocol v2 已完整作廢。
+   修正版 Fixture v2 與 Protocol v3 先在本機完成驗證；只有 `cross-language-v2` 的
+   Annotated Tag 推送到公開 Fixture Repository，且 Manifest 能由遠端解析到相同 Commit
+   後，才可重新執行 12 組 Pilot。`prepare` 必須對既有 Fixture Cache 明確 fetch 指定 Tag，
+   再驗證 dereferenced Tag 與 Manifest Commit 完全相同；不能因 Cache 已存在就跳過更新。
+
+> **隔離限制：** Desktop collaboration 沒有提供可由 Harness 證明的 OS ACL 或獨立帳號
+> Sandbox。Protocol v3 能驗證的是 Subject-visible Prompt、Instruction 與 staged artifacts
+> 沒有主動揭露額外 treatment metadata；不能宣稱 Subject 在檔案系統層級絕對無法掃描其他
+> 路徑。公開結果必須保留這項限制，並與人工 Reviewer 的匿名 Packet 分開描述。
 
 > **Follow-up（未納入本次修正）：** Result Builder 目前維持既有公開結果欄位；待完成
 > Capability Probe／Pilot 後，再決定是否以不洩漏 Dispatch 的方式揭露 Desktop Protocol
@@ -212,7 +225,7 @@ Expected: FAIL，原因是 `fixture-contract.json` 與四個目錄尚不存在�
 ```json
 {
   "schema_version": "1.0",
-  "fixture_version": "cross-language-v1",
+  "fixture_version": "cross-language-v2",
   "fixtures": []
 }
 ```
@@ -792,7 +805,7 @@ git commit -m "feat(fixtures): add FastAPI provider-boundary scenario"
 **Files:**
 - Verify only: sibling Fixture Repository entire tree
 - External create: `eric861129/Clean-Code-AI-Collaboration-Benchmark-Fixtures`
-- External tag: `cross-language-v1`
+- External tag: `cross-language-v2`（`cross-language-v1` 保留為首輪作廢契約）
 
 **Interfaces:**
 - Consumes: Tasks 1～5 的四個已驗證 Fixture。
@@ -834,10 +847,10 @@ Expected: Repository 為 Public，`origin/main` 與本機 `main` SHA 相同；To
 - [ ] **Step 3: 建立並推送 Annotated Tag**
 
 ```powershell
-git tag -a cross-language-v1 -m "Cross-language benchmark fixtures v1"
-git push origin cross-language-v1
+git tag -a cross-language-v2 -m "Cross-language benchmark fixtures v2"
+git push origin cross-language-v2
 git rev-parse HEAD
-git rev-parse 'cross-language-v1^{}'
+git rev-parse 'cross-language-v2^{}'
 ```
 
 Expected: HEAD 與 Dereferenced Tag 都是相同 40 字元 Commit SHA。記錄這個 SHA，Task 7 必須逐字寫入 Manifest。
@@ -936,7 +949,7 @@ Planner 以 `random.Random(manifest.random_seed).shuffle(slots)` 產生固定順
 Manifest 必須使用 Task 6 的真實 Fixture Commit，不接受空字串、Branch 名或任何示意值。先執行：
 
 ```powershell
-$fixtureCommit = git -C ../Clean-Code-AI-Collaboration-Benchmark-Fixtures rev-parse 'cross-language-v1^{}'
+$fixtureCommit = git -C ../Clean-Code-AI-Collaboration-Benchmark-Fixtures rev-parse 'cross-language-v2^{}'
 if ($fixtureCommit -notmatch '^[0-9a-f]{40}$') {
     throw "Fixture Tag 沒有解析成固定 Commit：$fixtureCommit"
 }
@@ -947,16 +960,16 @@ if ($fixtureCommit -notmatch '^[0-9a-f]{40}$') {
 ```json
 {
   "schema_version": "1.0",
-  "benchmark_version": "0.3.0-cross-language-initial",
+  "benchmark_version": "0.3.0-cross-language-desktop-subject-v3",
   "fixture_repository": {
     "url": "https://github.com/eric861129/Clean-Code-AI-Collaboration-Benchmark-Fixtures.git",
-    "tag": "cross-language-v1"
+    "tag": "cross-language-v2"
   },
   "skill": {"tag": "v0.3.0", "version": "0.3.0"},
   "execution": {
     "model": "gpt-5.6-sol",
     "reasoning_effort": "high",
-    "client": "codex-cli",
+    "client": "codex-desktop-collaboration",
     "subject_timeout_seconds": 480,
     "fixture_timeout_seconds": 120,
     "oracle_timeout_seconds": 120,
@@ -1136,7 +1149,7 @@ git commit -m "feat(evals): run isolated benchmark subjects"
 - Modify: `.github/workflows/validate.yml`
 
 **Interfaces:**
-- Produces: `capture_diff(workspace, scenario) -> DiffEvidence`、`run_oracles(...) -> OracleEvidence`、`build_review_packet(...) -> dict[str, object]`、`write_review_packet(...) -> Path`、`build_public_result(...) -> dict[str, object]`。
+- Produces: `capture_diff(workspace, scenario) -> DiffEvidence`、`run_oracles(...) -> OracleEvidence`、`build_review_packet(...) -> dict[str, object]`、`write_review_packet(...) -> Path`、`build_public_result(..., benchmark_version=...) -> dict[str, object]`。
 - Reviewer 私有映射固定在 `.benchmark-runs/review-key.json`，不進 Git；Review Packet 固定在 `.benchmark-runs/review-packets/`。
 
 - [x] **Step 1: 寫 Diff、Retry、匿名與 Terminal State RED Tests**
@@ -1154,9 +1167,14 @@ def test_rename_requires_source_and_destination_to_be_allowed(self) -> None:
     self.assertEqual(["scripts/escape.ts"], evidence.outside_boundary)
 
 def test_result_requires_all_36_terminal_states(self) -> None:
-    slots = build_run_slots(load_manifest(MANIFEST_PATH))
+    manifest = load_manifest(MANIFEST_PATH)
+    slots = build_run_slots(manifest)
     with self.assertRaisesRegex(ValueError, "36 terminal states"):
-        build_public_result(slots, run_documents=[])
+        build_public_result(
+            slots,
+            run_documents=[],
+            benchmark_version=manifest.benchmark_version,
+        )
 
 def test_review_packet_does_not_reveal_arm(self) -> None:
     sample_run = {
@@ -1303,7 +1321,7 @@ py -3 -m evals.harness.cli review-packets --phase pilot
 py -3 -m evals.harness.cli verify --phase pilot
 ```
 
-Expected: 12 個 Terminal State、12 個匿名 Candidate ID、Arm 不出現在 Packet；所有 Prompt、Dispatch、Report 與 Diff 都有可驗證 Hash，Desktop 不要求 JSONL。
+Expected: 12 個 Terminal State、12 個匿名 Candidate ID、Arm 不出現在 Packet；所有 Prompt、Controller-only Dispatch、Report 與 Diff 都有可驗證 Hash，Desktop 不要求 JSONL。Controller Dispatch 不主動交付，也不列入 Subject instruction。
 
 - [ ] **Step 4: 做契約凍結判斷**
 
@@ -1404,7 +1422,17 @@ Expected: 36 份 Review、每份三個維度、無 Aggregate Score、無空理�
 def test_cross_language_result_is_complete_and_non_aggregate(self) -> None:
     path = EVAL_ROOT / "results" / "v0.3.0-cross-language.json"
     result = json.loads(path.read_text(encoding="utf-8"))
-    self.assertEqual("0.3.0-cross-language-initial", result["benchmark_version"])
+    self.assertEqual(
+        "0.3.0-cross-language-desktop-subject-v3",
+        result["benchmark_version"],
+    )
+    for field in (
+        "fixture_repository",
+        "skill",
+        "execution",
+        "contract_sha256",
+    ):
+        self.assertIn(field, result)
     self.assertEqual(36, len(result["runs"]))
     self.assertEqual(36, len({run["run_id"] for run in result["runs"]}))
     self.assertEqual(
@@ -1472,9 +1500,9 @@ git commit -m "docs(evals): publish cross-language benchmark results"
 
 - [ ] **Step 7: 封裝原始 Evidence 並停在發布授權前**
 
-以 Archive 只收錄可公開 JSONL、Prompt、Diff、命令、Exit Code、Oracle 與匿名 Review；排除 Private Mapping、暫時 Workspace、認證資料與個人絕對路徑。產生 SHA-256，回報 Archive Path、Size 與 Hash。
+以 Archive 只收錄可公開的 Prompt、Report 摘要、Diff、命令、Exit Code、Oracle 與匿名 Review；排除 Private Mapping、私有 Controller Dispatch、完整 Subject Report、暫時 Workspace、認證資料與個人絕對路徑。產生 SHA-256，回報 Archive Path、Size 與 Hash。
 
-未再次取得 User 指示前，不 Push Skill Repository、不建立新的 Tag／Release，也不上傳 Evidence Asset。Fixture Repository 的 `cross-language-v1` 已在 Task 6 固定，不因結果好壞重打 Tag。
+未再次取得 User 指示前，不 Push Skill Repository、不建立新的 Skill Tag／Release，也不上傳 Evidence Asset。Fixture Repository 的修正版契約固定為 `cross-language-v2`；`cross-language-v1` 保留為首輪作廢契約，不覆寫也不刪除。
 
 ---
 
@@ -1483,11 +1511,11 @@ git commit -m "docs(evals): publish cross-language benchmark results"
 - [ ] Fixture Public Repository、Tag、Commit 與 CI 都可公開讀取且一致。
 - [ ] 四個 Baseline 都是 Public／Preservation Green、Acceptance Expected Red、Mutation Detected。
 - [ ] Manifest 產生 36 個唯一 Slot，Pilot 12 與 Full 24 不重疊。
-- [ ] 每個 Slot 都有固定版本、Prompt、JSONL、Diff、Command、Exit Code、Oracle、Terminal State 與 Blind Spot。
+- [ ] 每個 Slot 都有固定版本、Prompt、私有 Controller Dispatch、Report、Diff、Command、Exit Code、Oracle、Terminal State 與 Blind Spot；Desktop 無法取得的 JSONL 與 Telemetry 明確標示 `not_available`。
 - [ ] 只有明確 Infrastructure Failure 最多 Retry 一次，原始 Attempt 沒被覆寫。
 - [ ] Reviewer Materials 不揭露 Arm，36 份 Review 都有三個分維度理由。
 - [ ] Result 沒有 Aggregate Score、選擇性省略、Token 推估或跨情境「勝率」。
 - [ ] 既有 .NET Result 與新跨語言 Result 分開報告，不偽造可直接比較的總結。
-- [ ] Repository 38 項既有測試、新 Harness Tests、Agent Skill Validator、Fixture CI 與 `git diff --check` 全部通過。
+- [ ] Repository 全部既有測試、新 Harness Tests、Agent Skill Validator、Fixture CI 與 `git diff --check` 全部通過。
 - [ ] 公開檔案沒有 Secret、個資、雇主內部資料、Private Mapping 或個人絕對路徑。
 - [ ] Run Workspaces 與 Raw Evidence 保留；沒有執行未授權的批次刪除。

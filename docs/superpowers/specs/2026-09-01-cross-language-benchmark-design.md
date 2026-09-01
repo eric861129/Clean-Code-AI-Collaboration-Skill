@@ -3,10 +3,10 @@
 ## 文件狀態
 
 - 日期：2026-09-01
-- 狀態：Desktop Subject Protocol 已實作並通過本機單元／契約測試；尚未執行 Capability Probe、Pilot 或 Full Run
+- 狀態：Capability Probe 已通過；首輪 Pilot 因 Oracle 與 Subject 交付契約稽核問題整批作廢並保留，Desktop Subject Protocol v3 與 Fixture v2 已完成本機修正，待推送 Fixture v2 不可變 Tag 後重新執行 Pilot
 - Skill 版本：`v0.3.0`
-- Benchmark 版本：`0.3.0-cross-language-desktop-subject`
-- Fixture 版本：`cross-language-v1`
+- Benchmark 版本：`0.3.0-cross-language-desktop-subject-v3`
+- Fixture 版本：`cross-language-v2`
 - 主要 Repository：`Clean-Code-AI-Collaboration-Skill`
 - Fixture Repository：`Clean-Code-AI-Collaboration-Benchmark-Fixtures`
 
@@ -22,13 +22,16 @@ CLI 寫入工作區會被強制降為唯讀；繼續宣稱能以 CLI Sandbox 完
 不可覆寫協定：
 
 1. `stage --phase <pilot|full> --run-id <logical-run-id>` 建立唯一的 Fixture
-   Workspace、Baseline Commit、Prompt、`desktop-dispatch.json`、已預填不可變欄位的
-   `subject-report.template.json` 與私有 Dispatch Index。Dispatch 綁定
+   Workspace、Baseline Commit、Prompt、已預填不可變欄位的
+   `subject-report.template.json`、Controller-only Dispatch 與 Controller-only Dispatch Index。
+   Subject-visible instruction 與 staged artifacts 只揭露 Prompt、Report Template 與 Workspace，
+   不提供含 Arm metadata 的 Dispatch 路徑。Dispatch 綁定
    Benchmark／Scenario／Prompt Hash、Baseline、Generation、Attempt 與實體 Run ID。
 2. 外層編排者以 fresh context 的 Codex Desktop collaboration SubAgent 執行該份
-   Dispatch；SubAgent 可在該 Workspace 讀寫任務所需檔案。Workspace 外唯一允許讀取
-   的例外是本次 staged 的 Prompt、Dispatch 與 Report Template 三個明確路徑；它不得
-   讀取其他 Run、Harness、Evaluator 或 Review 資料。完成後它以 Template 為起點寫入
+   任務；SubAgent 可在該 Workspace 讀寫任務所需檔案。Workspace 外唯一允許讀取
+   的例外是本次 staged 的 Prompt 與 Report Template 兩個明確路徑；含有 Arm metadata
+   的 Controller Dispatch 只供 Harness 使用，不列入 Subject instruction。Subject 被明確要求不得讀取其他
+   Run、Harness、Evaluator 或 Review 資料。完成後它以 Template 為起點寫入
    ignored 的 `.benchmark-subject-report.json`，不可改寫其中預填的不可變欄位。
 3. `collect --dispatch-id <id> --outcome <...>` 重讀不可變 Dispatch，驗證 Report
    的 Dispatch／Prompt／Benchmark／Scenario Hash、Baseline、Generation 與 Attempt，
@@ -43,6 +46,11 @@ Desktop 無法由此 Harness 強制或可靠證明網路限制、Sandbox 細節�
 與檔案查閱 telemetry。這些欄位固定為 `not_available`，不從 Subject 自述、字數或
 Diff 推估。Dispatch、Thread ID、絕對 Workspace 路徑與完整 Report 都留在 Git
 忽略的 `.benchmark-runs/`；匿名 Review Packet 必須遮罩它們。
+
+這項隔離是「交付最小化與明確指令」，不是 OS ACL 或獨立帳號 Sandbox。Harness 能證明
+Prompt、Instruction 與 staged artifact 沒有主動揭露額外 treatment metadata，不能證明
+Subject 在產品層級無法掃描同一主機的其他路徑。結果文件必須保留這項限制，不得將其描述為
+已完成強制盲測；人工 Reviewer 的匿名 Packet 則是另一條獨立的匿名化流程。
 
 Report 遺漏或結構不完整標為 `candidate_incomplete`；Report Hash、Baseline、Generation、
 Attempt 不符，或 Subject 自行 Commit 使 HEAD 漂移，標為 `invalid_claim`。兩者都產生
@@ -142,7 +150,7 @@ Token、Tool Call、檔案查閱或 Sandbox telemetry，因此這些資料固定
 
 ## Fixture Repository 設計
 
-四個 Fixture 存放於獨立的公開 Repository `Clean-Code-AI-Collaboration-Benchmark-Fixtures`，並以 `cross-language-v1` Annotated Tag 固定版本。這個 Repository 與 Skill Repository 分離，避免 Subject 看見 Harness、答案、匿名對照表或其他情境的 Hidden Oracle。
+四個 Fixture 存放於獨立的公開 Repository `Clean-Code-AI-Collaboration-Benchmark-Fixtures`。首輪 Pilot 使用的 `cross-language-v1` 因 React Effect Preservation Oracle 契約衝突而完整作廢；修正版以 `cross-language-v2` Annotated Tag 固定。這個 Repository 與 Skill Repository 分離，避免 Subject 看見 Harness、答案、匿名對照表或其他情境的 Hidden Oracle。
 
 執行時只匯出當次選定的 Fixture 到暫時 Repository。Subject 不得看見：
 
@@ -422,11 +430,11 @@ Fixture 必須分別有公開 Gate、Preservation Oracle、修改前呈現預期
 ## 安全、隱私與可重現性
 
 - Fixture 只使用虛構資料，不含雇主、校務系統、學生、使用者或內部 Repository 資訊。
-- Prompt、JSONL、Diff 與錯誤輸出在公開前執行 Secret Scan。
+- Prompt、Report 摘要、Diff、錯誤輸出與任何實際存在的 JSONL 在公開前執行 Secret Scan。
 - Subject 不持有 GitHub Token、雲端憑證、正式 API Key 或個人設定。
 - 暫時 Repository 路徑不寫入公開結果；只保留可重現的相對路徑。
 - Fixture 與 Skill 都以不可變 Commit／Tag 固定，套件版本由 Lockfile 固定。
-- 公開 Result 必須包含 Runtime、CLI 與作業系統資訊，讓第三方辨識環境差異。
+- 公開 Result 必須包含 Runtime、Client 與作業系統資訊；無法取得的 CLI／Desktop 版本標示 `not_available`，讓第三方辨識環境差異。
 
 ## 風險與控制
 
@@ -435,6 +443,7 @@ Fixture 必須分別有公開 Gate、Preservation Oracle、修改前呈現預期
 | Fixture 太複雜，Benchmark 變成耐力測試 | 每個情境限制在小型 Repository 與快速 Gate；Agent Session 固定 8 分鐘 |
 | Fixture 太玩具化，無法觀察 Repository Context | 保留真實 Contract、邊界值、副作用或依賴取捨，不只測語法修改 |
 | Skill 組看見額外答案 | Skill 只提供通用方法；Fixture、任務與 Oracle 對三組一致，Hidden Oracle 不進 Subject Context |
+| Subject 在同一主機掃描 Controller-only 資料 | 不在 Prompt、Instruction 或 staged artifacts 揭露路徑；明確禁止跨 Run 讀取；由於沒有 OS ACL，公開結果仍列為無法強制證明的限制 |
 | Pilot 後調整規則美化結果 | 任何 Fixture 契約變動都使該 Fixture 三組 Pilot 一起作廢 |
 | 執行順序或快取影響結果 | 固定 Seed 打散順序；每次使用 Fresh Context 與暫時 Git Repository；依 Lockfile 預先快取 |
 | Agent 自我回報被誤當驗證 | Subject 結束後由獨立 Oracle Runner 重跑 Gate |
@@ -447,7 +456,7 @@ Fixture 必須分別有公開 Gate、Preservation Oracle、修改前呈現預期
 
 本次 Benchmark 完成必須同時符合：
 
-1. 獨立公開 Fixture Repository 已建立，四個 Fixture 固定於 `cross-language-v1` Tag。
+1. 獨立公開 Fixture Repository 已建立，四個修正版 Fixture 固定於 `cross-language-v2` Tag；`cross-language-v1` 只保留為首輪作廢契約的歷史證據。
 2. 每個 Fixture 在乾淨環境通過公開 Gate 與 Preservation Oracle，Acceptance Oracle 因預期需求缺口呈現 RED，且故意破壞既有契約的 Mutation 會被 Evaluator 抓到。
 3. Versioned Manifest 能產生正好 36 個唯一 Run Slot。
 4. Harness 契約測試、格式檢查與既有 Repository CI 全部通過。
