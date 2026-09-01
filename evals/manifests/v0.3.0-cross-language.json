@@ -84,7 +84,7 @@
         "is not overdue one minute before the two-hour boundary",
         "is overdue exactly at the two-hour boundary"
       ],
-      "expected_baseline_failure_count": 2
+      "expected_baseline_failure_count": 1
     },
     {
       "id": "react-effect-lifecycle",
@@ -170,7 +170,7 @@
         "test_high_priority_is_not_overdue_before_two_hour_boundary",
         "test_high_priority_is_overdue_at_two_hour_boundary"
       ],
-      "expected_baseline_failure_count": 2
+      "expected_baseline_failure_count": 1
     },
     {
       "id": "fastapi-provider-boundary",

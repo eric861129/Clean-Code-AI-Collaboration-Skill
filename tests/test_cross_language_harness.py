@@ -8,6 +8,7 @@ from pathlib import Path
 from evals.harness.anonymizer import build_review_packet
 from evals.harness.cli import (
     _build_parser,
+    _console_json,
     _run_document_path,
     _sanitize_persisted_text,
     _validate_terminal_document,
@@ -319,6 +320,12 @@ class CrossLanguageHarnessTests(unittest.TestCase):
         sanitized = _sanitize_persisted_text(value, workspace)
 
         self.assertEqual("{workspace}/.venv/python.exe", sanitized)
+
+    def test_console_json_is_safe_for_windows_cp950(self) -> None:
+        serialized = _console_json({"output": "✓ 完成"})
+
+        serialized.encode("cp950")
+        self.assertIn(r"\u2713", serialized)
 
     def test_terminal_document_must_match_current_contract(self) -> None:
         slot = RunSlot(

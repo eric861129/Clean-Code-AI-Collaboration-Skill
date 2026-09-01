@@ -83,7 +83,7 @@ RESULT_REQUIRED_FIELDS = {
     "generated_lines",
 }
 MARKDOWN_LINK_PATTERN = re.compile(r"!?\[[^\]]*\]\(([^)\n]+)\)")
-IGNORED_MARKDOWN_PARTS = {".git", ".superpowers"}
+IGNORED_MARKDOWN_PARTS = {".benchmark-runs", ".git", ".superpowers"}
 FORBIDDEN_DIFF_PATH_PARTS = {
     ".benchmark-subject-report.json",
     ".vs",

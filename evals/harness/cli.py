@@ -132,7 +132,7 @@ def _prepare(manifest: BenchmarkManifest, paths: HarnessPaths) -> None:
             raise RuntimeError("existing preflight is not passed")
         if preflight.get("contract_sha256") != contract_sha256:
             raise RuntimeError("existing preflight belongs to another contract")
-        print(json.dumps(preflight, ensure_ascii=False, indent=2))
+        print(_console_json(preflight))
         return
 
     results: list[dict[str, object]] = []
@@ -194,7 +194,7 @@ def _prepare(manifest: BenchmarkManifest, paths: HarnessPaths) -> None:
         "scenarios": results,
     }
     _write_json(preflight_path, document)
-    print(json.dumps(document, ensure_ascii=False, indent=2))
+    print(_console_json(document))
     if status != "passed":
         raise RuntimeError("preflight failed")
 
@@ -1179,6 +1179,10 @@ def _canonical_sha256(value: dict[str, object]) -> str:
         separators=(",", ":"),
     )
     return _sha256_text(payload)
+
+
+def _console_json(value: dict[str, object]) -> str:
+    return json.dumps(value, ensure_ascii=True, indent=2)
 
 
 def _read_json(path: Path) -> dict[str, object]:
