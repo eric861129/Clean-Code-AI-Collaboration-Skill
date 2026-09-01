@@ -23,6 +23,8 @@ def can_retry(reason: str, attempt: int) -> bool:
 def build_public_result(
     slots: tuple[RunSlot, ...],
     run_documents: list[dict[str, object]],
+    *,
+    benchmark_version: str,
 ) -> dict[str, object]:
     if len(slots) != 36 or len(run_documents) != 36:
         raise ValueError("result requires 36 terminal states")
@@ -60,7 +62,7 @@ def build_public_result(
         )
     return {
         "schema_version": "1.0",
-        "benchmark_version": "0.3.0-cross-language-desktop-subject",
+        "benchmark_version": benchmark_version,
         "status": "complete",
         "execution_limitations": [
             "Desktop collaboration telemetry is not available and is not inferred.",

@@ -96,7 +96,7 @@ def validate_manifest(raw: dict[str, object]) -> BenchmarkManifest:
         raise ValueError("cross-language benchmark requires Desktop collaboration")
     if subject_executor.get("kind") != DESKTOP_EXECUTOR_KIND:
         raise ValueError("subject executor must be Desktop collaboration")
-    if subject_executor.get("protocol_version") != "desktop-subject-v2":
+    if subject_executor.get("protocol_version") != "desktop-subject-v3":
         raise ValueError("subject executor protocol version is invalid")
     if subject_executor.get("dispatch_mode") != DESKTOP_DISPATCH_MODE:
         raise ValueError("subject executor dispatch mode is invalid")

@@ -50,8 +50,10 @@ CAMPAIGN_STATE_PATH = RUNS_ROOT / "campaign-state.json"
 INVALIDATIONS_ROOT = RUNS_ROOT / "invalidations"
 TIMEOUT_ADJUDICATIONS_ROOT = RUNS_ROOT / "timeout-adjudications"
 DISPATCH_ROOT = RUNS_ROOT / "desktop-dispatches"
+CONTROLLER_DISPATCH_ROOT = RUNS_ROOT / "desktop-controller-dispatches"
 ATTEMPT_RECEIPTS_ROOT = RUNS_ROOT / "desktop-attempt-receipts"
 LEGACY_NEWLINE_RECOVERY_REASON = "prompt_hash_newline_defect"
+DISPATCH_INDEX_SCHEMA_VERSION = "desktop-dispatch-index/v2"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -339,6 +341,7 @@ def _stage_desktop_slots(
             physical_run_id=physical_slot.run_id,
             contract_sha256=contract_sha256,
             scenario_contract_sha256=scenario_contract_sha256,
+            controller_dispatch_root=CONTROLLER_DISPATCH_ROOT,
         )
         _write_dispatch_index(dispatch)
         staged.append(
@@ -828,17 +831,28 @@ def _dispatch_index_path(dispatch_id: str) -> Path:
     return DISPATCH_ROOT / f"{dispatch_id}.json"
 
 
+def _controller_dispatch_path(dispatch_id: str) -> Path:
+    if re.fullmatch(r"desktop-dispatch-[A-Za-z0-9_.-]+", dispatch_id) is None:
+        raise ValueError("invalid desktop dispatch ID")
+    return CONTROLLER_DISPATCH_ROOT / f"{dispatch_id}.json"
+
+
 def _write_dispatch_index(dispatch: SubjectDispatch) -> Path:
     dispatch_id = dispatch.dispatch_id
+    controller_dispatch_path = _controller_dispatch_path(dispatch_id)
+    if dispatch.dispatch_path.resolve() != controller_dispatch_path.resolve():
+        raise ValueError("desktop dispatch is not in the private controller root")
+    if not controller_dispatch_path.is_file():
+        raise ValueError("desktop private controller dispatch is missing")
     path = _dispatch_index_path(dispatch_id)
     _write_json(
         path,
         {
-            "schema_version": "desktop-dispatch-index/v1",
+            "schema_version": DISPATCH_INDEX_SCHEMA_VERSION,
             "dispatch_id": dispatch_id,
             "dispatch_sha256": str(dispatch.dispatch_sha256),
             "dispatch_path": str(
-                dispatch.dispatch_path.relative_to(RUNS_ROOT)
+                controller_dispatch_path.relative_to(RUNS_ROOT)
             ).replace("\\", "/"),
         },
     )
@@ -847,22 +861,31 @@ def _write_dispatch_index(dispatch: SubjectDispatch) -> Path:
 
 def _load_dispatch_by_id(dispatch_id: str) -> SubjectDispatch:
     index = _read_json(_dispatch_index_path(dispatch_id))
+    if index.get("schema_version") != DISPATCH_INDEX_SCHEMA_VERSION:
+        raise ValueError("desktop dispatch index schema is unsupported; v2 is required")
     if index.get("dispatch_id") != dispatch_id:
         raise ValueError("desktop dispatch index ID mismatch")
     dispatch_path = index.get("dispatch_path")
     if not isinstance(dispatch_path, str):
         raise ValueError("desktop dispatch index path is invalid")
+    expected_dispatch = _controller_dispatch_path(dispatch_id)
+    expected_relative_path = str(expected_dispatch.relative_to(RUNS_ROOT)).replace(
+        "\\", "/"
+    )
+    if dispatch_path != expected_relative_path:
+        raise ValueError(
+            "desktop dispatch index path does not match the private controller dispatch"
+        )
     relative_path = PurePosixPath(dispatch_path.replace("\\", "/"))
     if relative_path.is_absolute() or ".." in relative_path.parts:
         raise ValueError("desktop dispatch index path must be relative")
-    dispatch = load_desktop_dispatch(RUNS_ROOT.joinpath(*relative_path.parts))
+    dispatch = load_desktop_dispatch(expected_dispatch)
     if dispatch.dispatch_id != dispatch_id:
         raise ValueError("desktop dispatch ID mismatch")
     if index.get("dispatch_sha256") != dispatch.dispatch_sha256:
         raise ValueError("desktop dispatch index hash mismatch")
     expected_workspace = RUNS_ROOT / "workspaces" / dispatch.physical_run_id
     expected_artifact = RUNS_ROOT / "artifacts" / dispatch.physical_run_id
-    expected_dispatch = expected_artifact / "desktop-dispatch.json"
     if (
         dispatch.workspace.root.resolve() != expected_workspace.resolve()
         or dispatch.workspace.artifact_dir.resolve() != expected_artifact.resolve()
@@ -1223,7 +1246,11 @@ def _write_result(
     reviews = _reviews_by_run(manifest)
     for document in documents:
         document["review"] = reviews[str(document["run_id"])]
-    result = build_public_result(slots, documents)
+    result = build_public_result(
+        slots,
+        documents,
+        benchmark_version=manifest.benchmark_version,
+    )
     _write_json(output, result)
     print(output)
 
@@ -1755,6 +1782,23 @@ def _ensure_fixture_clone(
             ROOT,
             manifest.fixture_timeout_seconds,
         )
+    fixture_tag_ref = f"refs/tags/{manifest.fixture_tag}"
+    _run_checked(
+        ["git", "check-ref-format", fixture_tag_ref],
+        paths.fixture_clone,
+        manifest.fixture_timeout_seconds,
+    )
+    _run_checked(
+        [
+            "git",
+            "fetch",
+            "--no-tags",
+            "origin",
+            f"{fixture_tag_ref}:{fixture_tag_ref}",
+        ],
+        paths.fixture_clone,
+        manifest.fixture_timeout_seconds,
+    )
     resolved = _run_checked(
         ["git", "rev-parse", f"{manifest.fixture_tag}^{{}}"],
         paths.fixture_clone,

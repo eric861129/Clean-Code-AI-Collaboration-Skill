@@ -16,7 +16,7 @@ from evals.harness.models import (
 from evals.harness.process import run_process
 from evals.harness.subject_runner import build_prompt
 
-DISPATCH_SCHEMA_VERSION = "desktop-subject-dispatch/v2"
+DISPATCH_SCHEMA_VERSION = "desktop-subject-dispatch/v3"
 LEGACY_DISPATCH_SCHEMA_VERSION = "desktop-subject-dispatch/v1"
 PROMPT_ENCODING = "utf-8"
 PROMPT_LINE_ENDINGS = "lf"
@@ -69,8 +69,9 @@ def stage_desktop_subject(
     physical_run_id: str,
     contract_sha256: str,
     scenario_contract_sha256: str,
+    controller_dispatch_root: Path,
 ) -> SubjectDispatch:
-    """寫入不可覆寫的 Desktop Subject prompt 與 dispatch 契約。"""
+    """寫入 Subject staged artifacts 與私有 controller dispatch。"""
 
     if manifest.client != DESKTOP_EXECUTOR:
         raise ValueError("Desktop staging requires the Desktop collaboration client")
@@ -98,16 +99,19 @@ def stage_desktop_subject(
     prompt_bytes = _utf8_lf_bytes(prompt)
     prompt_sha256 = _sha256_bytes(prompt_bytes)
     prompt_path = workspace.artifact_dir / "prompt.md"
-    dispatch_path = workspace.artifact_dir / "desktop-dispatch.json"
     report_template_path = workspace.artifact_dir / REPORT_TEMPLATE_FILENAME
+    staged_legacy_dispatch_path = workspace.artifact_dir / "desktop-dispatch.json"
+    dispatch_id = f"desktop-dispatch-{slot.run_id}--g{generation:02d}--a{attempt:02d}"
+    _require_private_controller_dispatch_root(controller_dispatch_root, workspace)
+    dispatch_path = controller_dispatch_root / f"{dispatch_id}.json"
     if (
         prompt_path.exists()
-        or dispatch_path.exists()
         or report_template_path.exists()
+        or staged_legacy_dispatch_path.exists()
+        or dispatch_path.exists()
     ):
         raise FileExistsError("desktop subject dispatch already exists")
 
-    dispatch_id = f"desktop-dispatch-{slot.run_id}--g{generation:02d}--a{attempt:02d}"
     payload: dict[str, object] = {
         "schema_version": DISPATCH_SCHEMA_VERSION,
         "dispatch_id": dispatch_id,
@@ -135,6 +139,7 @@ def stage_desktop_subject(
     dispatch_sha256 = _sha256_json(payload)
     payload["dispatch_sha256"] = dispatch_sha256
     prompt_path.write_bytes(prompt_bytes)
+    controller_dispatch_root.mkdir(parents=True, exist_ok=True)
     dispatch_path.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
     )
@@ -187,13 +192,11 @@ def desktop_subject_instruction(dispatch: SubjectDispatch) -> str:
             ),
             "Workspace 外唯一允許讀取的例外，僅限下列 staged 檔案：",
             f"- 任務 Prompt：{dispatch.prompt_path}",
-            f"- 不可變 Dispatch：{dispatch.dispatch_path}",
             f"- 已預填不可變欄位的 Report Template：{dispatch.report_template_path}",
             (
-                "若任務明確要求 $clean-code-ai-collaboration，請完整讀取此 "
-                "Workspace 已 staged 的 .agents/skills/"
-                "clean-code-ai-collaboration/SKILL.md，以及該檔直接引用、完成任務"
-                "所必要的 references；不得讀取其他 Skill。"
+                "若 Prompt 明確指定某個 Skill，才可讀取 Workspace 已 staged 的"
+                "該 Skill，以及其直接引用、完成任務所必要的 references；"
+                "不得讀取其他 Skill。"
             ),
             "不得修改 .git、Benchmark 控制檔或其他 Workspace。",
             f"完成後，寫入此 ignored JSON report：{dispatch.report_path}",
@@ -206,6 +209,14 @@ def desktop_subject_instruction(dispatch: SubjectDispatch) -> str:
                 "contract_sha256、scenario_contract_sha256、generation、attempt、"
                 "completion、summary、files_inspected、files_modified_claimed、"
                 "commands_claimed 與 telemetry=not_available。"
+            ),
+            (
+                "files_inspected 與 files_modified_claimed 僅接受 Workspace "
+                "repository-relative POSIX path；不得使用絕對路徑、.. 或反斜線。"
+            ),
+            (
+                "Workspace 外 staged Prompt 或 Report Template 不得列入"
+                " files_inspected 或 files_modified_claimed。"
             ),
             (
                 'commands_claimed=[{"command":"...","outcome":'
@@ -302,9 +313,13 @@ def validate_desktop_report(dispatch: SubjectDispatch) -> dict[str, object]:
             "candidate_incomplete", "desktop subject report summary must be text"
         )
     try:
-        _validate_relative_paths(report["files_inspected"], "files_inspected")
-        _validate_relative_paths(
-            report["files_modified_claimed"], "files_modified_claimed"
+        _validate_workspace_relative_paths(
+            report["files_inspected"], "files_inspected", dispatch.workspace.root
+        )
+        _validate_workspace_relative_paths(
+            report["files_modified_claimed"],
+            "files_modified_claimed",
+            dispatch.workspace.root,
         )
         _validate_commands(report["commands_claimed"])
     except ValueError as error:
@@ -429,7 +444,7 @@ def load_desktop_dispatch(path: Path) -> SubjectDispatch:
     if not isinstance(expected_hash, str) or expected_hash != _sha256_json(unsigned):
         raise ValueError("desktop dispatch hash mismatch")
     if payload.get("schema_version") != DISPATCH_SCHEMA_VERSION:
-        raise ValueError("desktop dispatch schema is unsupported; v2 is required")
+        raise ValueError("desktop dispatch schema is unsupported; v3 is required")
     required_strings = (
         "dispatch_id",
         "logical_run_id",
@@ -496,6 +511,10 @@ def load_desktop_dispatch(path: Path) -> SubjectDispatch:
     report_template_path = workspace.artifact_dir / report_template_relative_path
     if not report_template_path.is_file():
         raise ValueError("desktop dispatch report template is missing")
+    if _paths_overlap(path.resolve(), workspace.root.resolve()) or _paths_overlap(
+        path.resolve(), workspace.artifact_dir.resolve()
+    ):
+        raise ValueError("desktop dispatch must remain outside subject-readable paths")
     dispatch = SubjectDispatch(
         dispatch_id=str(payload["dispatch_id"]),
         logical_run_id=str(payload["logical_run_id"]),
@@ -706,19 +725,57 @@ def _scenario_for(
         raise ValueError(f"unknown scenario: {scenario_id}") from error
 
 
-def _validate_relative_paths(value: object, field: str) -> None:
+def _validate_workspace_relative_paths(
+    value: object,
+    field: str,
+    workspace_root: Path,
+) -> None:
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         raise ValueError(f"desktop subject report {field} must be a string list")
+    resolved_workspace_root = workspace_root.resolve()
     for item in value:
-        candidate = PurePosixPath(item.replace("\\", "/"))
+        candidate = PurePosixPath(item)
         if (
-            candidate.is_absolute()
+            not item
+            or "\\" in item
+            or candidate.is_absolute()
             or ".." in candidate.parts
             or re.match(r"^[A-Za-z]:", item) is not None
+            or not candidate.parts
+            or candidate == PurePosixPath(".")
+            or not _is_within(
+                (resolved_workspace_root / candidate).resolve(),
+                resolved_workspace_root,
+            )
         ):
             raise ValueError(
                 f"desktop subject report {field} contains a non-relative path"
             )
+
+
+def _require_private_controller_dispatch_root(
+    controller_dispatch_root: Path,
+    workspace: Workspace,
+) -> None:
+    root = controller_dispatch_root.resolve()
+    if _paths_overlap(root, workspace.root.resolve()) or _paths_overlap(
+        root, workspace.artifact_dir.resolve()
+    ):
+        raise ValueError(
+            "desktop controller dispatch root overlaps subject-readable paths"
+        )
+
+
+def _paths_overlap(first: Path, second: Path) -> bool:
+    return _is_within(first, second) or _is_within(second, first)
+
+
+def _is_within(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return False
+    return True
 
 
 def _validate_commands(value: object) -> None:

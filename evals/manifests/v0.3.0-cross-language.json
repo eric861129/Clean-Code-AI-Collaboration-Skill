@@ -1,10 +1,10 @@
 {
   "schema_version": "1.0",
-  "benchmark_version": "0.3.0-cross-language-desktop-subject",
+  "benchmark_version": "0.3.0-cross-language-desktop-subject-v3",
   "fixture_repository": {
     "url": "https://github.com/eric861129/Clean-Code-AI-Collaboration-Benchmark-Fixtures.git",
-    "tag": "cross-language-v1",
-    "commit": "47059c4da2e2273ae748aa176e0b1ea18f2d175c"
+    "tag": "cross-language-v2",
+    "commit": "da0663535612cc4a4bb66fc8bd7e83260aa978f7"
   },
   "skill": {
     "name": "clean-code-ai-collaboration",
@@ -18,7 +18,7 @@
     "client": "codex-desktop-collaboration",
     "subject_executor": {
       "kind": "codex-desktop-collaboration",
-      "protocol_version": "desktop-subject-v2",
+      "protocol_version": "desktop-subject-v3",
       "dispatch_mode": "external-collaboration-subagent",
       "report_relative_path": ".benchmark-subject-report.json",
       "network_enforcement": "not_available",
