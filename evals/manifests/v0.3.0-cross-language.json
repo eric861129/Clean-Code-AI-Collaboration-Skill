@@ -1,0 +1,240 @@
+{
+  "schema_version": "1.0",
+  "benchmark_version": "0.3.0-cross-language-initial",
+  "fixture_repository": {
+    "url": "https://github.com/eric861129/Clean-Code-AI-Collaboration-Benchmark-Fixtures.git",
+    "tag": "cross-language-v1",
+    "commit": "47059c4da2e2273ae748aa176e0b1ea18f2d175c"
+  },
+  "skill": {
+    "name": "clean-code-ai-collaboration",
+    "version": "0.3.0",
+    "tag": "v0.3.0",
+    "commit": "451a329665727c29d7441723fb5b70f08cfb003c"
+  },
+  "execution": {
+    "model": "gpt-5.6-sol",
+    "reasoning_effort": "high",
+    "client": "codex-cli",
+    "subject_timeout_seconds": 480,
+    "fixture_timeout_seconds": 120,
+    "oracle_timeout_seconds": 120,
+    "repetitions": 3,
+    "random_seed": 560301,
+    "sandbox": "workspace-write",
+    "subject_network": false,
+    "infrastructure_retry_limit": 1
+  },
+  "arms": [
+    {
+      "id": "control",
+      "instruction": ""
+    },
+    {
+      "id": "generic-clean-code",
+      "instruction": "請遵守 Clean Code 完成任務。"
+    },
+    {
+      "id": "skill-v0.3.0",
+      "skill": "clean-code-ai-collaboration",
+      "version": "0.3.0",
+      "instruction": "請使用 $clean-code-ai-collaboration 完成任務。"
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "react-overdue-rule",
+      "language": "typescript-react",
+      "fixture_path": "fixtures/react-overdue-rule",
+      "evaluator_path": "evaluators/react-overdue-rule",
+      "task": "調整 High Priority 工作項目的逾期規則：到期後保留兩小時寬限，剛好到達兩小時邊界時才視為逾期。請保留其他既有行為與公開 UI Contract，完成後執行 Repository Gate。",
+      "must_preserve": [
+        "Normal Priority 到期時仍視為逾期",
+        "Completed Work Item 永遠不進入逾期清單",
+        "WorkItemList Props 與顯示 Contract",
+        "與逾期規則無關的 Render 行為"
+      ],
+      "allowed_diff": [
+        "src/overdue.ts",
+        "src/overdue.public.test.tsx",
+        "src/overdue.test.ts",
+        "src/overdue.test.tsx"
+      ],
+      "allowed_diff_patterns": [
+        "^src/overdue(?:[.][A-Za-z0-9_-]+)?[.]tsx?$"
+      ],
+      "prohibited_changes": [
+        "不得修改 package.json、package-lock.json 或工具鏈設定",
+        "不得改變 WorkItemList Props 或建立第二套 WorkItem Model"
+      ],
+      "commands": {
+        "public": [
+          ["npm", "test", "--", "src/overdue.public.test.tsx"],
+          ["npm", "run", "typecheck"],
+          ["npm", "run", "lint"]
+        ],
+        "preservation": [
+          ["npm", "test", "--", ".benchmark-oracle/preservation.test.tsx"]
+        ],
+        "acceptance": [
+          ["npm", "test", "--", "--reporter=verbose", ".benchmark-oracle/acceptance.test.ts"]
+        ]
+      },
+      "expected_baseline_red_markers": [
+        "is not overdue one minute before the two-hour boundary",
+        "is overdue exactly at the two-hour boundary"
+      ]
+    },
+    {
+      "id": "react-effect-lifecycle",
+      "language": "typescript-react",
+      "fixture_path": "fixtures/react-effect-lifecycle",
+      "evaluator_path": "evaluators/react-effect-lifecycle",
+      "task": "調整 WorkItemPreview：相同識別碼的普通重新 Render 不得重複送出預覽請求；識別碼改變時要取消舊請求並正常載入新資料。請保留 Loading、Error、Props 與 API Response Contract。",
+      "must_preserve": [
+        "識別碼改變時取消舊請求並載入新資料",
+        "Unmount 後舊請求結果不得覆蓋狀態",
+        "Loading 與 Error UI 語意",
+        "Component Props 與 API Response Contract"
+      ],
+      "allowed_diff": [
+        "src/WorkItemPreview.tsx",
+        "src/WorkItemPreview.public.test.tsx",
+        "src/WorkItemPreview.test.tsx",
+        "src/useWorkItemPreview.ts"
+      ],
+      "allowed_diff_patterns": [
+        "^src/(?:WorkItemPreview(?:[.][A-Za-z0-9_-]+)?[.]tsx|useWorkItemPreview[.]ts)$"
+      ],
+      "prohibited_changes": [
+        "不得修改 package.json、package-lock.json 或工具鏈設定",
+        "不得移除 AbortSignal、Loading 或 Error 行為來讓測試通過"
+      ],
+      "commands": {
+        "public": [
+          ["npm", "test", "--", "src/WorkItemPreview.public.test.tsx"],
+          ["npm", "run", "typecheck"],
+          ["npm", "run", "lint"]
+        ],
+        "preservation": [
+          ["npm", "test", "--", ".benchmark-oracle/preservation.test.tsx"]
+        ],
+        "acceptance": [
+          ["npm", "test", "--", "--reporter=verbose", ".benchmark-oracle/acceptance.test.tsx"]
+        ]
+      },
+      "expected_baseline_red_markers": [
+        "does not request the same preview again on an ordinary rerender"
+      ]
+    },
+    {
+      "id": "fastapi-overdue-rule",
+      "language": "python-fastapi",
+      "fixture_path": "fixtures/fastapi-overdue-rule",
+      "evaluator_path": "evaluators/fastapi-overdue-rule",
+      "task": "調整 High Priority 工作項目的逾期規則：到期後保留兩小時寬限，剛好到達兩小時邊界時才視為逾期。請保留既有 HTTP Status、Response Schema 與其他優先級行為，完成後執行 Repository Gate。",
+      "must_preserve": [
+        "POST /overdue 的 HTTP 200 與 Response Schema",
+        "Normal Priority 到期時仍視為逾期",
+        "Completed Work Item 永遠不進入逾期清單",
+        "與逾期規則無關的 Route 與 Model"
+      ],
+      "allowed_diff": [
+        "app/overdue.py",
+        "tests/test_public_api.py",
+        "tests/test_overdue.py"
+      ],
+      "allowed_diff_patterns": [
+        "^(?:app/overdue[.]py|tests/test_(?:public_api|overdue)[.]py)$"
+      ],
+      "prohibited_changes": [
+        "不得修改 requirements.lock、pyproject.toml 或工具鏈設定",
+        "不得改變 HTTP Contract 或建立第二套 WorkItem Model"
+      ],
+      "commands": {
+        "public": [
+          ["{python}", "-m", "pytest", "-q", "tests"],
+          ["{python}", "-m", "ruff", "check", "."],
+          ["{python}", "-m", "ruff", "format", "--check", "."]
+        ],
+        "preservation": [
+          ["{python}", "-m", "pytest", "-q", ".benchmark-oracle/test_preservation.py"]
+        ],
+        "acceptance": [
+          ["{python}", "-m", "pytest", "-vv", ".benchmark-oracle/test_acceptance.py"]
+        ]
+      },
+      "expected_baseline_red_markers": [
+        "test_high_priority_is_not_overdue_before_two_hour_boundary",
+        "test_high_priority_is_overdue_at_two_hour_boundary"
+      ]
+    },
+    {
+      "id": "fastapi-provider-boundary",
+      "language": "python-fastapi",
+      "fixture_path": "fixtures/fastapi-provider-boundary",
+      "evaluator_path": "evaluators/fastapi-provider-boundary",
+      "task": "讓通知 Route 透過 FastAPI 原生 Dependency Injection 使用既有 NotificationSender Protocol，使測試能替換 Provider。請保留 202、404、502、503 與既有錯誤語意，不得新增同義 Protocol、第二套 Domain Model 或無需求支持的 Repository Layer。",
+      "must_preserve": [
+        "通知成功回傳 202",
+        "找不到 Work Item 回傳 404 與 work_item_not_found",
+        "Provider 回傳 false 時回傳 502 與 notification_failed",
+        "Provider 拋出例外時回傳 503 與 provider_unavailable",
+        "既有 Use Case 與 NotificationSender Protocol"
+      ],
+      "allowed_diff": [
+        "app/main.py",
+        "tests/test_public_api.py",
+        "tests/test_dependency_override.py"
+      ],
+      "allowed_diff_patterns": [
+        "^(?:app/main[.]py|tests/test_(?:public_api|dependency_override)[.]py)$"
+      ],
+      "prohibited_changes": [
+        "不得修改 requirements.lock、pyproject.toml 或工具鏈設定",
+        "不得新增同義 Protocol、第二套 Domain Model 或 Repository Layer",
+        "不得改變既有 HTTP Status、Response Schema 或失敗語意"
+      ],
+      "commands": {
+        "public": [
+          ["{python}", "-m", "pytest", "-q", "tests"],
+          ["{python}", "-m", "ruff", "check", "."],
+          ["{python}", "-m", "ruff", "format", "--check", "."]
+        ],
+        "preservation": [
+          ["{python}", "-m", "pytest", "-q", ".benchmark-oracle/test_preservation.py"]
+        ],
+        "acceptance": [
+          ["{python}", "-m", "pytest", "-vv", ".benchmark-oracle/test_acceptance.py"]
+        ]
+      },
+      "expected_baseline_red_markers": [
+        "test_route_uses_fastapi_dependency_override"
+      ]
+    }
+  ],
+  "pilot": {
+    "repetitions": [1],
+    "invalidate_all_arms_when_contract_changes": true
+  },
+  "retry_policy": {
+    "allowed_reasons": [
+      "harness_failure",
+      "package_cache_failure",
+      "cli_runner_failure",
+      "base_environment_failure"
+    ],
+    "maximum_retries": 1,
+    "preserve_original_attempt": true
+  },
+  "rubrics": [
+    "evals/rubrics/context-and-locality.md",
+    "evals/rubrics/behavior-and-validation.md",
+    "evals/rubrics/decision-and-escalation.md"
+  ],
+  "anonymization": {
+    "candidate_ids": "cryptographically-random",
+    "private_mapping": true,
+    "reviewer_can_see_arm": false
+  }
+}
