@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import re
+from pathlib import Path
 
 from evals.harness.models import BenchmarkManifest
-
 
 EXPECTED_ARM_IDS = {"control", "generic-clean-code", "skill-v0.3.0"}
 EXPECTED_SCENARIO_IDS = {

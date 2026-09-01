@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -30,3 +31,39 @@ class BenchmarkManifest:
     random_seed: int
     scenarios: tuple[dict[str, object], ...]
     arms: tuple[dict[str, object], ...]
+
+
+@dataclass(frozen=True)
+class CommandResult:
+    args: tuple[str, ...]
+    exit_code: int | None
+    stdout: str
+    stderr: str
+    elapsed_seconds: float
+    timed_out: bool
+    classification: str
+    attempt: int
+
+
+@dataclass(frozen=True)
+class Workspace:
+    root: Path
+    artifact_dir: Path
+    baseline_commit: str
+
+
+@dataclass(frozen=True)
+class HarnessPaths:
+    repository_root: Path
+    runs_root: Path
+    fixture_clone: Path
+    skill_repository: Path
+
+
+@dataclass(frozen=True)
+class SubjectObservation:
+    run_id: str
+    command: CommandResult
+    prompt_sha256: str
+    raw_jsonl_path: Path
+    last_message_path: Path
