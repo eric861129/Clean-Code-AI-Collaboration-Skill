@@ -9,6 +9,7 @@ from evals.harness.anonymizer import build_review_packet
 from evals.harness.cli import (
     _build_parser,
     _console_json,
+    _physical_run_id,
     _run_document_path,
     _sanitize_persisted_text,
     _validate_terminal_document,
@@ -217,6 +218,13 @@ class CrossLanguageHarnessTests(unittest.TestCase):
             _run_document_path(slot, 1),
             _run_document_path(slot, 2),
         )
+
+    def test_physical_run_id_is_short_and_attempt_specific(self) -> None:
+        first = _physical_run_id("logical-run", 1, "a" * 64, 1)
+        second = _physical_run_id("logical-run", 1, "a" * 64, 2)
+
+        self.assertLessEqual(len(first), 20)
+        self.assertNotEqual(first, second)
 
     def test_review_packet_does_not_reveal_arm_or_run_order(self) -> None:
         sample_run = {

@@ -259,9 +259,11 @@ def _execute_slot(
     last_reason = ""
     for attempt in (1, 2):
         physical_slot = RunSlot(
-            run_id=(
-                f"{logical_slot.run_id}--g{generation:02d}--"
-                f"{scenario_contract_sha256[:8]}--attempt-{attempt:02d}"
+            run_id=_physical_run_id(
+                logical_slot.run_id,
+                generation,
+                scenario_contract_sha256,
+                attempt,
             ),
             scenario_id=logical_slot.scenario_id,
             language=logical_slot.language,
@@ -630,6 +632,8 @@ def _invalidate_pilot(
     evidence: list[dict[str, object]] = []
     for slot in slots:
         path = _run_document_path(slot, generation)
+        if not path.is_file():
+            continue
         document = _read_run_document(slot)
         _validate_terminal_document(slot, document, scenario_contract_sha256)
         evidence.append(
@@ -640,10 +644,15 @@ def _invalidate_pilot(
                 "sha256": _file_sha256(path),
             }
         )
+    if not evidence:
+        raise FileNotFoundError(
+            f"scenario has no completed pilot evidence: {scenario_id}"
+        )
     invalidation = {
         "schema_version": "1.0",
         "scenario_id": scenario_id,
         "generation": generation,
+        "partial_generation": len(evidence) != len(slots),
         "contract_sha256": contract_sha256,
         "scenario_contract_sha256": scenario_contract_sha256,
         "reason": reason.strip(),
@@ -1035,6 +1044,18 @@ def _run_document_path(slot: RunSlot, generation: int) -> Path:
         / slot.scenario_id
         / f"{slot.run_id}--g{generation:02d}.json"
     )
+
+
+def _physical_run_id(
+    logical_run_id: str,
+    generation: int,
+    scenario_contract_sha256: str,
+    attempt: int,
+) -> str:
+    identity = (
+        f"{logical_run_id}|{generation}|{scenario_contract_sha256}|{attempt}"
+    )
+    return f"run-{_sha256_text(identity)[:16]}"
 
 
 def _active_generation(scenario_id: str) -> int:
