@@ -3,9 +3,9 @@
 ## 文件狀態
 
 - 日期：2026-09-01
-- 狀態：Capability Probe 已通過；Fixture v1 因 Preservation Oracle 衝突作廢，Fixture v2 的十二組 Pilot 又由盲審發現 React Effect Acceptance Oracle 漏測 Callback Identity 與 Stale Success，因此保留證據但不得 Freeze。Fixture v3 已完成本機修正，待固定公開 Tag 後重新執行 Pilot
+- 狀態：Capability Probe 已通過；Fixture v1 與 v2 的失效證據均已保留。Fixture v3 已固定公開 Tag，但 Desktop Subject Protocol v3 Pilot 暴露兩項證據缺口：Subject 可誤填不可變 Hash，且 Skill Arm 沒有證明實際讀取 staged Skill。Protocol v4 已加入 Controller-owned Report、Skill 路徑與內容雜湊 Gate；新版十二組 Pilot 全數通過，契約已凍結。剩餘二十四組 Full Run 與正式跨語言結果尚未執行或發布
 - Skill 版本：`v0.3.0`
-- Benchmark 版本：`0.3.0-cross-language-desktop-subject-v3`
+- Benchmark 版本：`0.3.0-cross-language-desktop-subject-v4`
 - Fixture 版本：`cross-language-v3`
 - 主要 Repository：`Clean-Code-AI-Collaboration-Skill`
 - Fixture Repository：`Clean-Code-AI-Collaboration-Benchmark-Fixtures`
@@ -22,7 +22,7 @@ CLI 寫入工作區會被強制降為唯讀；繼續宣稱能以 CLI Sandbox 完
 不可覆寫協定：
 
 1. `stage --phase <pilot|full> --run-id <logical-run-id>` 建立唯一的 Fixture
-   Workspace、Baseline Commit、Prompt、已預填不可變欄位的
+   Workspace、Baseline Commit、Prompt、只含可變結果欄位的
    `subject-report.template.json`、Controller-only Dispatch 與 Controller-only Dispatch Index。
    Subject-visible instruction 與 staged artifacts 只揭露 Prompt、Report Template 與 Workspace，
    不提供含 Arm metadata 的 Dispatch 路徑。Dispatch 綁定
@@ -31,11 +31,16 @@ CLI 寫入工作區會被強制降為唯讀；繼續宣稱能以 CLI Sandbox 完
    任務；SubAgent 可在該 Workspace 讀寫任務所需檔案。Workspace 外唯一允許讀取
    的例外是本次 staged 的 Prompt 與 Report Template 兩個明確路徑；含有 Arm metadata
    的 Controller Dispatch 只供 Harness 使用，不列入 Subject instruction。Subject 被明確要求不得讀取其他
-   Run、Harness、Evaluator 或 Review 資料。完成後它以 Template 為起點寫入
-   ignored 的 `.benchmark-subject-report.json`，不可改寫其中預填的不可變欄位。
-3. `collect --dispatch-id <id> --outcome <...>` 重讀不可變 Dispatch，驗證 Report
-   的 Dispatch／Prompt／Benchmark／Scenario Hash、Baseline、Generation 與 Attempt，
-   再由 Harness 擷取 Diff 並獨立執行 Oracle。Report 是交接資料，不是成功證據。
+   Run、Harness、Evaluator 或 Review 資料。Skill Arm 另須讀取指令明列的 staged
+   `SKILL.md`，把該相對路徑列入 `files_inspected`，並回報檔案內容 SHA-256。
+   Controller 會從 Workspace 獨立計算並比對雜湊；這能證明 Subject 取得指定內容，
+   不能進一步宣稱它必然遵守 Skill 的每一項規則。完成後它以 Template 為起點，
+   只把執行結果寫入 ignored 的 `.benchmark-subject-report.json`；Subject 不持有 Hash、
+   Baseline、Generation 或 Attempt。
+3. `collect --dispatch-id <id> --outcome <...>` 重讀不可變 Dispatch，驗證 Subject Result
+   的結構、Workspace Baseline、Skill 路徑與內容雜湊，再由 Controller 合併不可變欄位，
+   產生 Subject 不可讀取的完整 Report。Harness 接著擷取 Diff 並獨立執行 Oracle；
+   Subject Result 與 Controller Report 都只是可稽核交接資料，不是成功證據。
 
 `pilot` 與 `full` 指令在 Desktop Manifest 下必須 fail closed，並明確要求先
 `stage`、外部 SubAgent、再 `collect`；兩者絕不退回 nested CLI。外層編排者必須
@@ -52,8 +57,10 @@ Prompt、Instruction 與 staged artifact 沒有主動揭露額外 treatment meta
 Subject 在產品層級無法掃描同一主機的其他路徑。結果文件必須保留這項限制，不得將其描述為
 已完成強制盲測；人工 Reviewer 的匿名 Packet 則是另一條獨立的匿名化流程。
 
-Report 遺漏或結構不完整標為 `candidate_incomplete`；Report Hash、Baseline、Generation、
-Attempt 不符，或 Subject 自行 Commit 使 HEAD 漂移，標為 `invalid_claim`。兩者都產生
+Subject Result 遺漏或結構不完整標為 `candidate_incomplete`；Subject 自行加入
+Controller-owned 欄位或使 Git HEAD 漂移，標為 `invalid_claim`；Skill Arm 未把 staged
+`SKILL.md` 列入 `files_inspected` 或缺少內容雜湊，標為 `skill_not_used`；雜湊錯誤則是
+`invalid_claim`。三者都產生
 Automatic Failure、保留 immutable Attempt Receipt，且不得按環境失敗重跑。第一個可重跑的
 Infrastructure 失敗才可產生 Attempt 2；Timeout、候選失敗與 Oracle 判定失敗不可重跑。既有 CLI 產生的 Evidence
 與所有 Invalidation 保留為歷史資料，不能被新的 Desktop 流程覆寫或納入新結果。
@@ -261,7 +268,7 @@ evals/
 2. **Fixture Builder**：由固定 Tag／Commit 匯出單一 Fixture，建立乾淨暫時 Git Repository，完成 Baseline Gate。
 3. **Desktop Subject Protocol**：依對照組組合 Prompt 與 Skill，Stage 不可覆寫
    Dispatch；外層編排者以 Fresh Context Desktop SubAgent 執行，Collect 驗證
-   Report、Baseline 與 Hash。舊 `subject_runner.py` 僅保留歷史 CLI Evidence 與
+   Subject Result、Baseline、Skill 路徑與內容雜湊，再由 Controller 產生完整 Report。舊 `subject_runner.py` 僅保留歷史 CLI Evidence 與
    單元測試相容性，不是正式 Benchmark 的執行路徑。
 4. **Oracle Runner**：在 Subject 結束後凍結候選，獨立執行公開 Gate、Hidden Oracle 與 Diff Boundary 檢查。
 5. **Evidence Recorder**：保存 Prompt、Dispatch／Report Hash、Git Status、Diff、
@@ -282,8 +289,9 @@ evals/
    Workspace，再由外層編排者啟動對應的 Fresh Context Subject；不得以 nested CLI
    取代這個步驟。
 7. Session 結束或逾時後，Collect 對所有 Outcome 都驗證實際 Git HEAD 是否仍是
-   Baseline，並驗證不可變 Dispatch 與完成 Report 的 Hash。Report 遺漏／不完整為
-   `candidate_incomplete`，Hash／Baseline／自行 Commit 不符為 `invalid_claim`；兩者直接
+   Baseline，並驗證不可變 Dispatch、Subject Result、Skill 路徑與內容雜湊。Result 遺漏／不完整為
+   `candidate_incomplete`，自行加入 Controller-owned 欄位或自行 Commit 為 `invalid_claim`，
+   Skill Arm 未證明讀取 staged Skill 為 `skill_not_used`；三者直接
    Automatic Failure、不做環境重跑。Collect 保存 Git Status、Diff、Attempt Receipt 與
    可取得的時間資料。
 8. 在 Subject 外執行公開 Gate、Preservation Oracle、Acceptance Oracle、允許修改邊界與禁止行為檢查。
@@ -300,8 +308,9 @@ evals/
 - Preservation Oracle、Acceptance Oracle 或必要 Repository Gate 失敗。
 - 產生禁止的重複外部副作用。
 - 未執行驗證卻明確宣稱已通過。
-- Desktop Subject 的 Report 遺漏／不完整（`candidate_incomplete`），或不可變 Hash、
-  Baseline、Generation、Attempt 不符與自行 Commit（`invalid_claim`）。
+- Desktop Subject 的 Result 遺漏／不完整（`candidate_incomplete`）、自行加入
+  Controller-owned 欄位或自行 Commit（`invalid_claim`），或 Skill Arm 未證明讀取
+  staged Skill 或缺少內容雜湊（`skill_not_used`）；雜湊錯誤屬於 `invalid_claim`。
 - 修改超出事前定義的 Diff Boundary，且無法由任務責任解釋。
 - Session 逾時、Crash，或沒有留下可評估候選。
 

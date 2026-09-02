@@ -664,7 +664,11 @@ def _finalize_desktop_candidate_failure(
 ) -> None:
     """不可變 Subject 契約被違反時，直接留下不可重跑的失敗證據。"""
 
-    if reason not in {"candidate_incomplete", "invalid_claim"}:
+    if reason not in {
+        "candidate_incomplete",
+        "invalid_claim",
+        "skill_not_used",
+    }:
         raise ValueError(f"invalid desktop candidate failure reason: {reason}")
     write_attempt_receipt(
         dispatch,
@@ -1331,11 +1335,8 @@ def _invalidate_pilot(
             legacy_pending_dispatch,
         )
         return
-    contract = _freeze_document(manifest, paths)
-    contract_sha256 = _canonical_sha256(contract)
-    if _freeze_path(contract_sha256).exists():
-        raise RuntimeError("cannot invalidate a frozen contract")
-    scenario_contract_sha256 = _scenario_contract_sha256(
+    replacement_contract_sha256 = _canonical_sha256(_freeze_document(manifest, paths))
+    replacement_scenario_contract_sha256 = _scenario_contract_sha256(
         manifest,
         paths,
         scenario_id,
@@ -1347,13 +1348,33 @@ def _invalidate_pilot(
         if slot.scenario_id == scenario_id
     )
     evidence: list[dict[str, object]] = []
+    prior_contract_sha256: str | None = None
+    prior_scenario_contract_sha256: str | None = None
     for slot in slots:
         _require_no_inflight_desktop_attempts(slot, generation)
         path = _run_document_path(slot, generation)
         if not path.is_file():
             continue
         document = _read_run_document(slot)
-        _validate_terminal_document(slot, document, scenario_contract_sha256)
+        document_contract_sha256 = document.get("contract_sha256")
+        document_scenario_contract_sha256 = document.get("scenario_contract_sha256")
+        if not isinstance(document_contract_sha256, str) or not isinstance(
+            document_scenario_contract_sha256, str
+        ):
+            raise ValueError("pilot run document is missing contract provenance")
+        _require_sha256_text(document_contract_sha256, "pilot benchmark contract")
+        _require_sha256_text(
+            document_scenario_contract_sha256, "pilot scenario contract"
+        )
+        _validate_terminal_document(slot, document, document_scenario_contract_sha256)
+        if prior_contract_sha256 is None:
+            prior_contract_sha256 = document_contract_sha256
+            prior_scenario_contract_sha256 = document_scenario_contract_sha256
+        elif (
+            document_contract_sha256 != prior_contract_sha256
+            or document_scenario_contract_sha256 != prior_scenario_contract_sha256
+        ):
+            raise ValueError("pilot generation contains mixed contracts")
         evidence.append(
             {
                 "run_id": slot.run_id,
@@ -1366,13 +1387,19 @@ def _invalidate_pilot(
         raise FileNotFoundError(
             f"scenario has no completed pilot evidence: {scenario_id}"
         )
+    if prior_contract_sha256 is None or prior_scenario_contract_sha256 is None:
+        raise RuntimeError("pilot invalidation lost prior contract provenance")
+    if _freeze_path(prior_contract_sha256).exists():
+        raise RuntimeError("cannot invalidate a frozen contract")
     invalidation = {
         "schema_version": "1.0",
         "scenario_id": scenario_id,
         "generation": generation,
         "partial_generation": len(evidence) != len(slots),
-        "contract_sha256": contract_sha256,
-        "scenario_contract_sha256": scenario_contract_sha256,
+        "contract_sha256": prior_contract_sha256,
+        "scenario_contract_sha256": prior_scenario_contract_sha256,
+        "replacement_contract_sha256": replacement_contract_sha256,
+        "replacement_scenario_contract_sha256": replacement_scenario_contract_sha256,
         "reason": reason.strip(),
         "runs": evidence,
     }
@@ -1388,7 +1415,7 @@ def _invalidate_pilot(
         raise ValueError("invalid campaign state")
     scenarios[scenario_id] = {
         "generation": generation + 1,
-        "must_change_from": scenario_contract_sha256,
+        "must_change_from": prior_scenario_contract_sha256,
         "invalidation": str(invalidation_path.relative_to(RUNS_ROOT)).replace(
             "\\", "/"
         ),
@@ -2091,6 +2118,11 @@ def _tree_sha256(root: Path) -> str:
         digest.update(path.read_bytes())
         digest.update(b"\0")
     return digest.hexdigest()
+
+
+def _require_sha256_text(value: str, label: str) -> None:
+    if re.fullmatch(r"[0-9a-f]{64}", value) is None:
+        raise ValueError(f"{label} SHA-256 is invalid")
 
 
 def _source_tree_sha256(root: Path) -> str:

@@ -220,7 +220,7 @@ class CrossLanguageHarnessTests(unittest.TestCase):
                 dispatch.dispatch_path.read_text(encoding="utf-8")
             )
             self.assertEqual(
-                "desktop-subject-dispatch/v3",
+                "desktop-subject-dispatch/v4",
                 dispatch_payload["schema_version"],
             )
             self.assertEqual(controller_dispatch_root, dispatch.dispatch_path.parent)
@@ -244,17 +244,16 @@ class CrossLanguageHarnessTests(unittest.TestCase):
             template = json.loads(
                 dispatch.report_template_path.read_text(encoding="utf-8")
             )
-            self.assertEqual("desktop-subject-report/v1", template["schema_version"])
-            self.assertEqual(dispatch.dispatch_sha256, template["dispatch_sha256"])
-            self.assertEqual(workspace.baseline_commit, template["baseline_commit"])
-            self.assertEqual(dispatch.prompt_sha256, template["prompt_sha256"])
-            self.assertEqual(dispatch.contract_sha256, template["contract_sha256"])
             self.assertEqual(
-                dispatch.scenario_contract_sha256,
-                template["scenario_contract_sha256"],
+                "desktop-subject-result/v1", template["schema_version"]
             )
-            self.assertEqual(dispatch.generation, template["generation"])
-            self.assertEqual(dispatch.attempt, template["attempt"])
+            self.assertNotIn("dispatch_sha256", template)
+            self.assertNotIn("baseline_commit", template)
+            self.assertNotIn("prompt_sha256", template)
+            self.assertNotIn("contract_sha256", template)
+            self.assertNotIn("scenario_contract_sha256", template)
+            self.assertNotIn("generation", template)
+            self.assertNotIn("attempt", template)
             reloaded = load_desktop_dispatch(dispatch.dispatch_path)
             self.assertEqual(dispatch.prompt_sha256, reloaded.prompt_sha256)
             instruction = desktop_subject_instruction(dispatch)
@@ -391,7 +390,7 @@ class CrossLanguageHarnessTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with self.assertRaisesRegex(ValueError, "v3"):
+            with self.assertRaisesRegex(ValueError, "v4"):
                 load_desktop_dispatch(legacy_path)
 
     def test_private_dispatch_index_loads_only_controller_dispatch(self) -> None:
@@ -876,7 +875,122 @@ class CrossLanguageHarnessTests(unittest.TestCase):
             self.assertNotIn(".benchmark-subject-report.json", diff.changed_paths)
             self.assertNotIn(".benchmark-subject-report.json", diff.diff)
 
-    def test_desktop_report_requires_dispatch_baseline_and_prompt_hash(
+    def test_invalidate_pilot_preserves_prior_contract_after_protocol_bump(
+        self,
+    ) -> None:
+        manifest = load_manifest(MANIFEST_PATH)
+        scenario_id = "react-overdue-rule"
+        generation = 5
+        prior_contract_sha256 = "1" * 64
+        prior_scenario_contract_sha256 = "2" * 64
+        replacement_scenario_contract_sha256 = "3" * 64
+        slots = tuple(
+            slot
+            for slot in pilot_slots(build_run_slots(manifest))
+            if slot.scenario_id == scenario_id
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            runs_root = root / ".benchmark-runs"
+            run_documents = runs_root / "run-documents"
+            invalidations = runs_root / "invalidations"
+            campaign_state = runs_root / "campaign-state.json"
+            campaign_state.parent.mkdir(parents=True)
+            campaign_state.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "1.0",
+                        "scenarios": {
+                            scenario_id: {"generation": generation}
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            for slot in slots:
+                path = (
+                    run_documents
+                    / scenario_id
+                    / f"{slot.run_id}--g{generation:02d}.json"
+                )
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(
+                    json.dumps(
+                        {
+                            "run_id": slot.run_id,
+                            "terminal_state": "passed",
+                            "contract_sha256": prior_contract_sha256,
+                            "scenario_contract_sha256": (
+                                prior_scenario_contract_sha256
+                            ),
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+            paths = HarnessPaths(
+                repository_root=root,
+                runs_root=runs_root,
+                fixture_clone=root / "fixture",
+                skill_repository=root,
+            )
+            with (
+                patch.object(harness_cli, "RUNS_ROOT", runs_root),
+                patch.object(harness_cli, "RUN_DOCUMENTS", run_documents),
+                patch.object(harness_cli, "INVALIDATIONS_ROOT", invalidations),
+                patch.object(harness_cli, "CAMPAIGN_STATE_PATH", campaign_state),
+                patch.object(
+                    harness_cli,
+                    "FREEZE_ROOT",
+                    runs_root / "contract-freezes",
+                ),
+                patch.object(
+                    harness_cli,
+                    "_freeze_document",
+                    return_value={"schema_version": "replacement-contract"},
+                ),
+                patch.object(
+                    harness_cli,
+                    "_scenario_contract_sha256",
+                    return_value=replacement_scenario_contract_sha256,
+                ),
+                patch.object(
+                    harness_cli,
+                    "_require_no_inflight_desktop_attempts",
+                ),
+            ):
+                _invalidate_pilot(
+                    manifest,
+                    paths,
+                    scenario_id,
+                    "desktop_subject_v4_evidence_contract",
+                )
+
+            state = json.loads(campaign_state.read_text(encoding="utf-8"))
+            scenario_state = state["scenarios"][scenario_id]
+            self.assertEqual(generation + 1, scenario_state["generation"])
+            self.assertEqual(
+                prior_scenario_contract_sha256,
+                scenario_state["must_change_from"],
+            )
+            invalidation = json.loads(
+                (runs_root / scenario_state["invalidation"]).read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertEqual(
+                prior_contract_sha256,
+                invalidation["contract_sha256"],
+            )
+            self.assertEqual(
+                replacement_scenario_contract_sha256,
+                invalidation["replacement_scenario_contract_sha256"],
+            )
+            self.assertEqual(
+                prior_scenario_contract_sha256,
+                invalidation["scenario_contract_sha256"],
+            )
+
+    def test_desktop_result_rejects_controller_owned_fields_and_external_paths(
         self,
     ) -> None:
         manifest = load_manifest(MANIFEST_PATH)
@@ -930,47 +1044,46 @@ class CrossLanguageHarnessTests(unittest.TestCase):
                 "candidate_incomplete", missing_report.exception.reason
             )
             self.assertFalse(can_retry(missing_report.exception.reason, 1))
-            report = {
-                "schema_version": "desktop-subject-report/v1",
-                "dispatch_sha256": "wrong",
-                "baseline_commit": workspace.baseline_commit,
-                "prompt_sha256": dispatch.prompt_sha256,
-                "contract_sha256": dispatch.contract_sha256,
-                "scenario_contract_sha256": dispatch.scenario_contract_sha256,
-                "generation": dispatch.generation,
-                "attempt": dispatch.attempt,
-                "completion": "completed",
-                "summary": "完成最小修改。",
-                "files_inspected": ["subject.txt"],
-                "files_modified_claimed": [],
-                "commands_claimed": [],
-                "telemetry": "not_available",
-            }
+            result = json.loads(
+                dispatch.report_template_path.read_text(encoding="utf-8")
+            )
+            result.update(
+                {
+                    "summary": "完成最小修改。",
+                    "files_inspected": ["subject.txt"],
+                }
+            )
+            result["dispatch_sha256"] = "wrong"
             dispatch.report_path.write_text(
-                json.dumps(report, ensure_ascii=False), encoding="utf-8"
+                json.dumps(result, ensure_ascii=False), encoding="utf-8"
             )
             with self.assertRaises(DesktopSubjectValidationError) as invalid_report:
                 validate_desktop_report(dispatch)
             self.assertEqual("invalid_claim", invalid_report.exception.reason)
             self.assertFalse(can_retry(invalid_report.exception.reason, 1))
 
-            report["dispatch_sha256"] = dispatch.dispatch_sha256
-            report["files_inspected"] = [str(dispatch.prompt_path)]
-            report["files_modified_claimed"] = [
-                str(dispatch.report_template_path)
-            ]
+            result = {
+                "schema_version": "desktop-subject-result/v1",
+                "completion": "completed",
+                "summary": "完成最小修改。",
+                "files_inspected": [str(dispatch.prompt_path)],
+                "files_modified_claimed": [str(dispatch.report_template_path)],
+                "commands_claimed": [],
+                "skill_inspection_claims": [],
+                "telemetry": "not_available",
+            }
             dispatch.report_path.write_text(
-                json.dumps(report, ensure_ascii=False), encoding="utf-8"
+                json.dumps(result, ensure_ascii=False), encoding="utf-8"
             )
             with self.assertRaisesRegex(
                 DesktopSubjectValidationError, "non-relative path"
             ):
                 validate_desktop_report(dispatch)
 
-            report["files_inspected"] = ["subject.txt"]
-            report["files_modified_claimed"] = []
+            result["files_inspected"] = ["subject.txt"]
+            result["files_modified_claimed"] = []
             dispatch.report_path.write_text(
-                json.dumps(report, ensure_ascii=False), encoding="utf-8"
+                json.dumps(result, ensure_ascii=False), encoding="utf-8"
             )
             observation = build_desktop_observation(
                 dispatch,
@@ -991,6 +1104,193 @@ class CrossLanguageHarnessTests(unittest.TestCase):
                     )
                 self.assertEqual("invalid_claim", drift.exception.reason)
                 self.assertFalse(can_retry(drift.exception.reason, 1))
+
+    def test_controller_merges_immutable_dispatch_fields_into_private_report(
+        self,
+    ) -> None:
+        manifest = load_manifest(MANIFEST_PATH)
+        slot = RunSlot(
+            run_id="react-overdue-rule--control--r01",
+            scenario_id="react-overdue-rule",
+            language="typescript-react",
+            arm_id="control",
+            repetition=1,
+            order_index=0,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workspace_root = root / "workspace"
+            artifact_dir = root / "artifacts"
+            controller_dispatch_root = root / "controller-dispatches"
+            workspace_root.mkdir()
+            artifact_dir.mkdir()
+            (workspace_root / ".gitignore").write_text(
+                ".benchmark-subject-report.json\n", encoding="utf-8"
+            )
+            (workspace_root / "subject.txt").write_text("baseline", encoding="utf-8")
+            self._git(workspace_root, "init", "--initial-branch=main")
+            self._git(workspace_root, "config", "user.name", "Benchmark Runner")
+            self._git(
+                workspace_root,
+                "config",
+                "user.email",
+                "benchmark@example.invalid",
+            )
+            self._git(workspace_root, "add", "-A")
+            self._git(workspace_root, "commit", "-m", "baseline")
+            workspace = Workspace(
+                workspace_root,
+                artifact_dir,
+                self._git(workspace_root, "rev-parse", "HEAD").strip(),
+            )
+            dispatch = stage_desktop_subject(
+                slot,
+                manifest,
+                workspace,
+                generation=7,
+                attempt=1,
+                physical_run_id="run-controllermerge",
+                contract_sha256="b" * 64,
+                scenario_contract_sha256="a" * 64,
+                controller_dispatch_root=controller_dispatch_root,
+            )
+
+            result = json.loads(
+                dispatch.report_template_path.read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                {
+                    "schema_version",
+                    "completion",
+                    "summary",
+                    "files_inspected",
+                    "files_modified_claimed",
+                    "commands_claimed",
+                    "skill_inspection_claims",
+                    "telemetry",
+                },
+                set(result),
+            )
+            self.assertEqual("desktop-subject-result/v1", result["schema_version"])
+            result.update(
+                {
+                    "summary": "完成最小修改。",
+                    "files_inspected": ["subject.txt"],
+                }
+            )
+            dispatch.report_path.write_text(
+                json.dumps(result, ensure_ascii=False), encoding="utf-8"
+            )
+
+            observation = build_desktop_observation(
+                dispatch,
+                outcome="completed",
+                elapsed_seconds=1.0,
+                subject_thread_id="thread-private",
+            )
+
+            self.assertNotEqual(dispatch.report_path, observation.report_path)
+            self.assertIsNotNone(observation.report_path)
+            merged = json.loads(observation.report_path.read_text(encoding="utf-8"))
+            self.assertEqual("desktop-subject-report/v2", merged["schema_version"])
+            self.assertEqual(dispatch.dispatch_sha256, merged["dispatch_sha256"])
+            self.assertEqual(dispatch.contract_sha256, merged["contract_sha256"])
+            self.assertEqual(
+                dispatch.scenario_contract_sha256,
+                merged["scenario_contract_sha256"],
+            )
+            self.assertEqual(dispatch.generation, merged["generation"])
+            self.assertEqual(dispatch.attempt, merged["attempt"])
+
+    def test_skill_arm_requires_subject_to_inspect_staged_skill(self) -> None:
+        manifest = load_manifest(MANIFEST_PATH)
+        slot = RunSlot(
+            run_id="react-overdue-rule--skill-v0.3.0--r01",
+            scenario_id="react-overdue-rule",
+            language="typescript-react",
+            arm_id="skill-v0.3.0",
+            repetition=1,
+            order_index=0,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workspace_root = root / "workspace"
+            artifact_dir = root / "artifacts"
+            controller_dispatch_root = root / "controller-dispatches"
+            skill_relative_path = ".agents/skills/clean-code-ai-collaboration/SKILL.md"
+            skill_path = workspace_root / Path(skill_relative_path)
+            skill_path.parent.mkdir(parents=True)
+            skill_path.write_text("# Test Skill", encoding="utf-8")
+            artifact_dir.mkdir()
+            (workspace_root / ".gitignore").write_text(
+                ".benchmark-subject-report.json\n", encoding="utf-8"
+            )
+            (workspace_root / "subject.txt").write_text("baseline", encoding="utf-8")
+            self._git(workspace_root, "init", "--initial-branch=main")
+            self._git(workspace_root, "config", "user.name", "Benchmark Runner")
+            self._git(
+                workspace_root,
+                "config",
+                "user.email",
+                "benchmark@example.invalid",
+            )
+            self._git(workspace_root, "add", "-A")
+            self._git(workspace_root, "commit", "-m", "baseline")
+            workspace = Workspace(
+                workspace_root,
+                artifact_dir,
+                self._git(workspace_root, "rev-parse", "HEAD").strip(),
+            )
+            dispatch = stage_desktop_subject(
+                slot,
+                manifest,
+                workspace,
+                generation=7,
+                attempt=1,
+                physical_run_id="run-skillusagegate",
+                contract_sha256="b" * 64,
+                scenario_contract_sha256="a" * 64,
+                controller_dispatch_root=controller_dispatch_root,
+            )
+            instruction = desktop_subject_instruction(dispatch)
+            self.assertIn(skill_relative_path, instruction.replace("\\", "/"))
+
+            result = json.loads(
+                dispatch.report_template_path.read_text(encoding="utf-8")
+            )
+            result.update(
+                {
+                    "summary": "完成最小修改。",
+                    "files_inspected": ["subject.txt"],
+                }
+            )
+            dispatch.report_path.write_text(
+                json.dumps(result, ensure_ascii=False), encoding="utf-8"
+            )
+            with self.assertRaises(DesktopSubjectValidationError) as missing_skill:
+                validate_desktop_report(dispatch)
+            self.assertEqual("skill_not_used", missing_skill.exception.reason)
+            self.assertFalse(can_retry(missing_skill.exception.reason, 1))
+
+            result["files_inspected"].append(skill_relative_path)
+            dispatch.report_path.write_text(
+                json.dumps(result, ensure_ascii=False), encoding="utf-8"
+            )
+            with self.assertRaises(DesktopSubjectValidationError) as missing_hash:
+                validate_desktop_report(dispatch)
+            self.assertEqual("skill_not_used", missing_hash.exception.reason)
+
+            result["skill_inspection_claims"] = [
+                {
+                    "path": skill_relative_path,
+                    "sha256": hashlib.sha256(skill_path.read_bytes()).hexdigest(),
+                }
+            ]
+            dispatch.report_path.write_text(
+                json.dumps(result, ensure_ascii=False), encoding="utf-8"
+            )
+            merged = validate_desktop_report(dispatch)
+            self.assertTrue(merged["skill_inspection_verified"])
 
     def test_desktop_attempt_receipt_is_immutable_and_retry_ready(self) -> None:
         manifest = load_manifest(MANIFEST_PATH)
@@ -1468,7 +1768,7 @@ class CrossLanguageHarnessTests(unittest.TestCase):
         self.assertEqual("not_available", client["client_version"])
         self.assertEqual(manifest.subject_executor, client["subject_executor"])
         self.assertEqual(
-            "desktop-subject-v3",
+            "desktop-subject-v4",
             manifest.subject_executor["protocol_version"],
         )
         self.assertNotIn("codex_version", client)

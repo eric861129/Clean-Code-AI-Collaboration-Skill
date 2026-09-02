@@ -61,6 +61,7 @@ class SubjectDispatch:
     logical_run_id: str
     physical_run_id: str
     scenario_id: str
+    arm_id: str
     generation: int
     attempt: int
     workspace: Workspace
@@ -72,6 +73,7 @@ class SubjectDispatch:
     prompt_sha256: str
     contract_sha256: str
     scenario_contract_sha256: str
+    required_skill_inspection_paths: tuple[str, ...]
     dispatch_sha256: str
 
 

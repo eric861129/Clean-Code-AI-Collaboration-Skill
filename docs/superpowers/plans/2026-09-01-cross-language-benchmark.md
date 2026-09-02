@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Benchmark 版本固定為 `0.3.0-cross-language-desktop-subject-v3`；Fixture Tag 固定為 `cross-language-v3`；Skill 固定使用已發布的 `v0.3.0`，不得改用工作目錄中的新版本。
+- Benchmark 版本固定為 `0.3.0-cross-language-desktop-subject-v4`；Fixture Tag 固定為 `cross-language-v3`；Skill 固定使用已發布的 `v0.3.0`，不得改用工作目錄中的新版本。
 - 主要比較只有 TypeScript／React 與 Python／FastAPI；既有 .NET 結果只作歷史參考；Java／Spring 不進入本次執行。
 - 固定 4 個 Scenario、3 個 Arm、3 次 Repetition，共 36 個 Fresh Context Session；Pilot 先跑 12 次，契約不變才計入正式結果。
 - Model 固定為 `gpt-5.6-sol`，Reasoning Effort 固定為 `high`，Subject 由 Codex Desktop collaboration 的 Fresh Context SubAgent 執行；Harness 只負責 Stage／Collect，不啟動 nested CLI。
@@ -28,7 +28,7 @@
 - 每個程式 Task 都先完成 RED，再做最小 GREEN、完整回歸與 Conventional Commit。
 - 建立公開 Repository、Push、Tag、Release Asset 與執行 36 次 Session 都是明列的外部操作；只在對應 Task 到達且前置 Gate 通過後執行。
 
-## 2026-09-01 Desktop Subject Protocol v3（首輪 Pilot 已稽核作廢）
+## 2026-09-01 Desktop Subject Protocol v4（v3 Pilot 已稽核作廢）
 
 Desktop 內 nested Codex CLI 的 Workspace 寫入已實機確認會被強制唯讀，因此原先
 CLI Subject Runner 不可作為正式跨語言評測執行器。以下流程取代本計畫後續所有
@@ -41,7 +41,7 @@ CLI Subject Runner 不可作為正式跨語言評測執行器。以下流程取�
    py -3 -m evals.harness.cli stage --phase pilot --run-id <logical-run-id>
    ```
 
-   Stage 建立唯一 Workspace、Prompt、已預填不可變欄位的
+   Stage 建立唯一 Workspace、Prompt、只含可變結果欄位的
    `subject-report.template.json`、Controller-only Dispatch 和 Controller-only Dispatch Index。它們都不可覆寫，並綁定
    Benchmark／Scenario／Prompt Hash、Baseline Commit、Generation、Attempt 與實體 Run ID。
 
@@ -49,10 +49,13 @@ CLI Subject Runner 不可作為正式跨語言評測執行器。以下流程取�
    collaboration SubAgent。SubAgent 可在外層指令指定的 Workspace 讀寫任務所需檔案；
    Workspace 外只有 staged Prompt 與 Report Template 兩個明確路徑會交付給 Subject。
    Controller Dispatch 路徑不寫入 Subject instruction，避免主動洩漏 Arm 與 treatment metadata。
-   若 Prompt 要求 Skill，只能讀取 Workspace 中 staged 的固定版本。完成後在 Workspace
+   若 Prompt 要求 Skill，必須讀取 Workspace 中 staged 的固定版本，並把明列的
+   `SKILL.md` 相對路徑寫入 `files_inspected`，並回報檔案內容 SHA-256。Controller
+   會獨立計算並比對雜湊；這證明 Subject 取得指定內容，不代表它必然遵守每條規則。完成後在 Workspace
    根目錄寫入 ignored 的
-   `.benchmark-subject-report.json`。Report 的檔案欄位只接受 Workspace-relative POSIX
-   path；外部 staged 檔案不得列入。Report 是交接資料，不是驗收證據。
+   `.benchmark-subject-report.json`。Subject Result 只包含可變執行結果，檔案欄位只接受
+   Workspace-relative POSIX path；Hash、Baseline、Generation 與 Attempt 由 Controller
+   持有。Collect 驗證後才在私有路徑產生完整 Report；兩者都不是驗收證據。
 
 3. 編排者帶回完成、Timeout 或 Infrastructure Failure 狀態，再執行：
 
@@ -60,10 +63,12 @@ CLI Subject Runner 不可作為正式跨語言評測執行器。以下流程取�
    py -3 -m evals.harness.cli collect --dispatch-id <dispatch-id> --outcome <completed|timeout|infrastructure_failure>
    ```
 
-   Collect 重新驗證 Dispatch／Prompt／Benchmark／Scenario Hash、實際 Git Baseline、
-   Generation、Attempt 與 Report；接著由 Harness 擷取 Diff 並重跑獨立 Oracle。Report
-   遺漏／不完整標為 `candidate_incomplete`，Hash、Baseline 或自行 Commit 不符標為
-   `invalid_claim`，兩者都直接 Automatic Failure 且不可重跑。超過 480 秒的回報一律列為
+   Collect 重新驗證 Dispatch、實際 Git Baseline、Subject Result、Skill 路徑與內容雜湊；
+   Controller 合併不可變欄位後，Harness 擷取 Diff 並重跑獨立 Oracle。Result
+   遺漏／不完整標為 `candidate_incomplete`，自行加入 Controller-owned 欄位或自行 Commit
+   標為 `invalid_claim`，Skill Arm 未列入 staged Skill 或缺少內容雜湊標為
+   `skill_not_used`，雜湊不符則是 `invalid_claim`；三者都直接
+   Automatic Failure 且不可重跑。超過 480 秒的回報一律列為
    Timeout。第一個明確 Infrastructure Failure 可以產生第二次 Attempt；Timeout 與候選失敗不可重跑。
 
 4. `pilot` 與 `full` 現在刻意 fail closed，訊息會要求使用上述 stage／外部
@@ -76,19 +81,27 @@ CLI Subject Runner 不可作為正式跨語言評測執行器。以下流程取�
 
 6. 首輪 Pilot 使用的 `cross-language-v1` 與 Desktop Subject Protocol v2 已完整作廢；
    第二輪 `cross-language-v2` 又因盲審找到 React Effect Acceptance Oracle 漏測而不得 Freeze。
-   修正版 Fixture v3 與 Protocol v3 先在本機完成驗證；只有 `cross-language-v3` 的
+   修正版 Fixture v3 已以 `cross-language-v3` 固定公開；Protocol v3 Pilot 因 Subject
+   誤填不可變 Hash 與 Skill 使用未被證明而保留為失效證據。Protocol v4 完成測試後，只有 Fixture 的
    Annotated Tag 推送到公開 Fixture Repository，且 Manifest 能由遠端解析到相同 Commit
    後，才可重新執行 12 組 Pilot。`prepare` 必須對既有 Fixture Cache 明確 fetch 指定 Tag，
    再驗證 dereferenced Tag 與 Manifest Commit 完全相同；不能因 Cache 已存在就跳過更新。
 
 > **隔離限制：** Desktop collaboration 沒有提供可由 Harness 證明的 OS ACL 或獨立帳號
-> Sandbox。Protocol v3 能驗證的是 Subject-visible Prompt、Instruction 與 staged artifacts
+> Sandbox。Protocol v4 能驗證的是 Subject-visible Prompt、Instruction 與 staged artifacts
 > 沒有主動揭露額外 treatment metadata；不能宣稱 Subject 在檔案系統層級絕對無法掃描其他
 > 路徑。公開結果必須保留這項限制，並與人工 Reviewer 的匿名 Packet 分開描述。
 
 > **Follow-up（未納入本次修正）：** Result Builder 目前維持既有公開結果欄位；待完成
 > Capability Probe／Pilot 後，再決定是否以不洩漏 Dispatch 的方式揭露 Desktop Protocol
 > 執行中繼資料。此項不影響本次 stage／collect 的 fail-closed 契約。
+
+> **Pilot v4 驗收（2026-09-02）：** 十二組固定 Pilot 全數取得有效的 Passed Terminal State，
+> 共六十個 Public／Preservation／Acceptance Oracle 命令成功。四組 Skill Arm 都由 Controller
+> 驗證 staged `SKILL.md` 的路徑與 SHA-256；匿名 Packet 經獨立盲審，未發現身分洩漏或
+> Freeze 阻擋項。契約已凍結為
+> `8f932545c0cc1c642688c02b6bd319230ae1d3bd1bf0351efac8169fd599ad29`。
+> 這只代表 Pilot 與執行契約通過，不是完整 Benchmark 結果；剩餘二十四組 Full Run 尚未執行。
 
 ## File Map
 
@@ -961,7 +974,7 @@ if ($fixtureCommit -notmatch '^[0-9a-f]{40}$') {
 ```json
 {
   "schema_version": "1.0",
-  "benchmark_version": "0.3.0-cross-language-desktop-subject-v3",
+  "benchmark_version": "0.3.0-cross-language-desktop-subject-v4",
   "fixture_repository": {
     "url": "https://github.com/eric861129/Clean-Code-AI-Collaboration-Benchmark-Fixtures.git",
     "tag": "cross-language-v3"
@@ -1288,7 +1301,7 @@ CI 只跑 Harness Unit／Contract Test，不啟動 Codex Session、不 Clone Fix
 - Consumes: 固定 Fixture Tag、Manifest、Harness 與 Skill `v0.3.0`。
 - Produces: 12 個 Pilot Terminal State、12 份匿名 Review Packet，以及是否能直接計入正式結果的凍結決策。
 
-- [ ] **Step 1: 執行 Preflight，不啟動 Subject**
+- [x] **Step 1: 執行 Preflight，不啟動 Subject**
 
 ```powershell
 py -3 -m evals.harness.cli prepare
@@ -1300,7 +1313,7 @@ git status --short --branch
 
 Expected: 四個 Baseline Public／Preservation Green、Acceptance Expected Red；Fixture Commit、Skill Tag、Prompt Hash、Lockfile Hash、CLI、模型與 12 個 Pilot Slot 全部列出。
 
-- [ ] **Step 2: 執行 Pilot**
+- [x] **Step 2: 執行 Pilot**
 
 依固定 Planner 順序，逐一處理每個 Pilot Slot；一個 Slot 完整結束後，才開始下一個：
 
@@ -1312,10 +1325,11 @@ py -3 -m evals.harness.cli collect --dispatch-id <dispatch-id> --outcome <comple
 
 每次 `stage` 都必須對應一個 fresh Subject；不可批次派發後共用 Context，也不可直接執行
 `pilot`。Expected: 12 個 Slot 各自取得 Passed、Automatic Failure、Timeout 或 Infrastructure
-Failure；Report 遺漏／不完整或不可變欄位不符會直接成為不可重跑的 Automatic Failure。單一
+Failure；Subject Result 遺漏／不完整、自行填入 Controller-owned 欄位，或 Skill Arm
+未證明讀取 staged Skill，會直接成為不可重跑的 Automatic Failure。單一
 Session 最多 480 秒，Harness 每完成一個 Slot 即落盤 Dispatch、Attempt Receipt、Diff 與 Evidence。
 
-- [ ] **Step 3: 驗證 Pilot 完整性與匿名材料**
+- [x] **Step 3: 驗證 Pilot 完整性與匿名材料**
 
 ```powershell
 py -3 -m evals.harness.cli review-packets --phase pilot
@@ -1324,15 +1338,22 @@ py -3 -m evals.harness.cli verify --phase pilot
 
 Expected: 12 個 Terminal State、12 個匿名 Candidate ID、Arm 不出現在 Packet；所有 Prompt、Controller-only Dispatch、Report 與 Diff 都有可驗證 Hash，Desktop 不要求 JSONL。Controller Dispatch 不主動交付，也不列入 Subject instruction。
 
-- [ ] **Step 4: 做契約凍結判斷**
+- [x] **Step 4: 做契約凍結判斷**
 
 逐一回答：Baseline RED 是否只來自需求缺口？Oracle 是否抓到真正風險？允許修改範圍是否誤判合理責任？Prompt 三組是否只有預定差異？若全部為是，在 `.benchmark-runs/contract-freezes/` 建立以 Contract SHA 命名的凍結紀錄，內容含 Manifest、Harness、Codex CLI、Fixture、Skill、Prompt、Oracle 與 Rubric Hash。若 Oracle Timeout 尚未判明是 Candidate 還是 Infrastructure，必須先執行 `adjudicate-timeout`，不得直接凍結。
 
 若四項都成立，明確執行 `freeze --decision-note "..."`；`pilot` 本身不得自動凍結。若任一項需修正，不能只重跑單一 Arm。先執行 `invalidate-pilot --scenario <id> --reason "..."`，保存該 Scenario 三個 Pilot Run 的 Hash 與作廢原因，再以 TDD 修正並建立獨立 Commit。Harness 會提升該情境的 Generation，且只有 Scenario Contract Hash 確實改變後，才允許重新執行三個 Arm。舊 Generation 永遠保留，不得進入最終 Result。
 
-- [ ] **Step 5: 停在 Full Run 前回報 Pilot**
+- [x] **Step 5: 停在 Full Run 前回報 Pilot**
 
 回報 12 個狀態、契約是否凍結、Invalidation／Retry 是否發生、已使用時間與無法取得的 Telemetry。此時不建立公開 Result，也不先跑剩餘 24 次。
+
+完成結果：Protocol v4 的十二組 Pilot 全數通過，沒有候選失敗或 Infrastructure Retry；
+四組 Skill Arm 的 staged Skill 讀取證據均通過 Controller 驗證，六十個 Oracle 命令成功。
+匿名 Packet 的獨立盲審沒有發現身分洩漏或 Freeze 阻擋項，契約已凍結為
+`8f932545c0cc1c642688c02b6bd319230ae1d3bd1bf0351efac8169fd599ad29`。
+Desktop 無法可靠取得的 Token、Tool Call、網路強制與檔案查閱 Telemetry 仍標示為
+`not_available`。依停止條件，尚未啟動剩餘二十四組 Full Run，也沒有建立公開 Result。
 
 ---
 
@@ -1424,7 +1445,7 @@ def test_cross_language_result_is_complete_and_non_aggregate(self) -> None:
     path = EVAL_ROOT / "results" / "v0.3.0-cross-language.json"
     result = json.loads(path.read_text(encoding="utf-8"))
     self.assertEqual(
-        "0.3.0-cross-language-desktop-subject-v3",
+        "0.3.0-cross-language-desktop-subject-v4",
         result["benchmark_version"],
     )
     for field in (

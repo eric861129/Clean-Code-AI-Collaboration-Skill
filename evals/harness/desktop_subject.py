@@ -16,11 +16,13 @@ from evals.harness.models import (
 from evals.harness.process import run_process
 from evals.harness.subject_runner import build_prompt
 
-DISPATCH_SCHEMA_VERSION = "desktop-subject-dispatch/v3"
+DISPATCH_SCHEMA_VERSION = "desktop-subject-dispatch/v4"
 LEGACY_DISPATCH_SCHEMA_VERSION = "desktop-subject-dispatch/v1"
 PROMPT_ENCODING = "utf-8"
 PROMPT_LINE_ENDINGS = "lf"
-REPORT_SCHEMA_VERSION = "desktop-subject-report/v1"
+SUBJECT_RESULT_SCHEMA_VERSION = "desktop-subject-result/v1"
+REPORT_SCHEMA_VERSION = "desktop-subject-report/v2"
+LEGACY_REPORT_SCHEMA_VERSION = "desktop-subject-report/v1"
 REPORT_FILENAME = ".benchmark-subject-report.json"
 REPORT_TEMPLATE_FILENAME = "subject-report.template.json"
 MAX_REPORT_BYTES = 64 * 1024
@@ -33,7 +35,11 @@ class DesktopSubjectValidationError(ValueError):
 
     def __init__(self, reason: str, message: str) -> None:
         super().__init__(message)
-        if reason not in {"candidate_incomplete", "invalid_claim"}:
+        if reason not in {
+            "candidate_incomplete",
+            "invalid_claim",
+            "skill_not_used",
+        }:
             raise ValueError(f"invalid desktop candidate failure reason: {reason}")
         self.reason = reason
 
@@ -112,12 +118,22 @@ def stage_desktop_subject(
     ):
         raise FileExistsError("desktop subject dispatch already exists")
 
+    required_skill_inspection_paths = _required_skill_inspection_paths(
+        manifest, slot.arm_id
+    )
+    for required_path in required_skill_inspection_paths:
+        if not (workspace.root / PurePosixPath(required_path)).is_file():
+            raise ValueError(
+                f"required staged Skill entrypoint is missing: {required_path}"
+            )
+
     payload: dict[str, object] = {
         "schema_version": DISPATCH_SCHEMA_VERSION,
         "dispatch_id": dispatch_id,
         "logical_run_id": slot.run_id,
         "physical_run_id": physical_run_id,
         "scenario_id": slot.scenario_id,
+        "arm_id": slot.arm_id,
         "generation": generation,
         "attempt": attempt,
         "workspace_root": str(workspace.root),
@@ -135,6 +151,7 @@ def stage_desktop_subject(
         "executor": dict(executor),
         "report_relative_path": report_relative_path,
         "report_template_relative_path": REPORT_TEMPLATE_FILENAME,
+        "required_skill_inspection_paths": list(required_skill_inspection_paths),
     }
     dispatch_sha256 = _sha256_json(payload)
     payload["dispatch_sha256"] = dispatch_sha256
@@ -145,15 +162,7 @@ def stage_desktop_subject(
     )
     report_template_path.write_text(
         json.dumps(
-            _report_template(
-                baseline_commit=workspace.baseline_commit,
-                prompt_sha256=prompt_sha256,
-                contract_sha256=contract_sha256,
-                scenario_contract_sha256=scenario_contract_sha256,
-                dispatch_sha256=dispatch_sha256,
-                generation=generation,
-                attempt=attempt,
-            ),
+            _report_template(),
             ensure_ascii=False,
             indent=2,
         ),
@@ -164,6 +173,7 @@ def stage_desktop_subject(
         logical_run_id=slot.run_id,
         physical_run_id=str(payload["physical_run_id"]),
         scenario_id=slot.scenario_id,
+        arm_id=slot.arm_id,
         generation=generation,
         attempt=attempt,
         workspace=workspace,
@@ -175,6 +185,7 @@ def stage_desktop_subject(
         prompt_sha256=prompt_sha256,
         contract_sha256=contract_sha256,
         scenario_contract_sha256=scenario_contract_sha256,
+        required_skill_inspection_paths=required_skill_inspection_paths,
         dispatch_sha256=dispatch_sha256,
     )
 
@@ -182,33 +193,47 @@ def stage_desktop_subject(
 def desktop_subject_instruction(dispatch: SubjectDispatch) -> str:
     """提供給外層 Sol 派發新鮮 Desktop Subject 的最小指令。"""
 
-    return "\n".join(
+    lines = [
+        "你是獨立 Benchmark Subject。",
+        f"只能在此 Workspace 工作：{dispatch.workspace.root}",
         (
-            "你是獨立 Benchmark Subject。",
-            f"只能在此 Workspace 工作：{dispatch.workspace.root}",
-            (
-                "可讀取 Workspace 內完成任務所需的檔案；不可讀取其他 Run、"
-                "Harness、Fixture 原始庫、Evaluator 或 Review 資料。"
-            ),
-            "Workspace 外唯一允許讀取的例外，僅限下列 staged 檔案：",
-            f"- 任務 Prompt：{dispatch.prompt_path}",
-            f"- 已預填不可變欄位的 Report Template：{dispatch.report_template_path}",
-            (
-                "若 Prompt 明確指定某個 Skill，才可讀取 Workspace 已 staged 的"
-                "該 Skill，以及其直接引用、完成任務所必要的 references；"
-                "不得讀取其他 Skill。"
-            ),
+            "可讀取 Workspace 內完成任務所需的檔案；不可讀取其他 Run、"
+            "Harness、Fixture 原始庫、Evaluator 或 Review 資料。"
+        ),
+        "Workspace 外唯一允許讀取的例外，僅限下列 staged 檔案：",
+        f"- 任務 Prompt：{dispatch.prompt_path}",
+        f"- 可變結果欄位的 Report Template：{dispatch.report_template_path}",
+        (
+            "若 Prompt 明確指定某個 Skill，才可讀取 Workspace 已 staged 的"
+            "該 Skill，以及其直接引用、完成任務所必要的 references；"
+            "不得讀取其他 Skill。"
+        ),
+    ]
+    if dispatch.required_skill_inspection_paths:
+        lines.extend(
+            [
+                "本次任務必須先讀取下列 Workspace 內 staged Skill 入口檔：",
+                *(f"- {path}" for path in dispatch.required_skill_inspection_paths),
+                (
+                    "並將每一個相對路徑原樣列入 files_inspected；"
+                    "同時讀取檔案內容、計算 SHA-256，填入 "
+                    "skill_inspection_claims；未列入或雜湊不符，"
+                    "將視為未使用指定 Skill。"
+                ),
+            ]
+        )
+    lines.extend(
+        [
             "不得修改 .git、Benchmark 控制檔或其他 Workspace。",
             f"完成後，寫入此 ignored JSON report：{dispatch.report_path}",
             (
-                "請以 Report Template 為起點，只補齊可變的執行結果欄位；不得更動"
-                "其中已預填的 hash、baseline、generation 或 attempt。"
+                "請以 Report Template 為起點，只填寫可變的執行結果欄位；"
+                "不可自行加入 hash、baseline、generation 或 attempt。"
             ),
             (
-                "report 必須含 dispatch_sha256、baseline_commit、prompt_sha256、"
-                "contract_sha256、scenario_contract_sha256、generation、attempt、"
-                "completion、summary、files_inspected、files_modified_claimed、"
-                "commands_claimed 與 telemetry=not_available。"
+                "result 必須且只能包含 schema_version、completion、summary、"
+                "files_inspected、files_modified_claimed、commands_claimed、"
+                "skill_inspection_claims 與 telemetry=not_available。"
             ),
             (
                 "files_inspected 與 files_modified_claimed 僅接受 Workspace "
@@ -222,12 +247,18 @@ def desktop_subject_instruction(dispatch: SubjectDispatch) -> str:
                 'commands_claimed=[{"command":"...","outcome":'
                 '"passed|failed|not_run"}]；沒有執行命令時使用空陣列。'
             ),
-        )
+            (
+                'skill_inspection_claims=[{"path":"Workspace-relative '
+                'SKILL.md","sha256":"64 位小寫十六進位"}]；'
+                "非 Skill 組使用空陣列。"
+            ),
+        ]
     )
+    return "\n".join(lines)
 
 
 def validate_desktop_report(dispatch: SubjectDispatch) -> dict[str, object]:
-    """驗證 Subject 報告只引用當次不可變 dispatch。"""
+    """驗證 Subject 可變結果，並由 Controller 合併不可變欄位。"""
 
     path = dispatch.report_path
     if not path.is_file():
@@ -251,18 +282,12 @@ def validate_desktop_report(dispatch: SubjectDispatch) -> dict[str, object]:
 
     required = {
         "schema_version",
-        "dispatch_sha256",
-        "baseline_commit",
-        "prompt_sha256",
-        "contract_sha256",
-        "scenario_contract_sha256",
-        "generation",
-        "attempt",
         "completion",
         "summary",
         "files_inspected",
         "files_modified_claimed",
         "commands_claimed",
+        "skill_inspection_claims",
         "telemetry",
     }
     missing = required - set(report)
@@ -271,38 +296,15 @@ def validate_desktop_report(dispatch: SubjectDispatch) -> dict[str, object]:
             "candidate_incomplete",
             f"desktop subject report missing fields: {sorted(missing)}",
         )
-    if report["schema_version"] != REPORT_SCHEMA_VERSION:
-        raise DesktopSubjectValidationError(
-            "invalid_claim", "desktop subject report schema is invalid"
-        )
-    if report["dispatch_sha256"] != dispatch.dispatch_sha256:
-        raise DesktopSubjectValidationError(
-            "invalid_claim", "desktop subject report dispatch hash mismatch"
-        )
-    if report["baseline_commit"] != dispatch.workspace.baseline_commit:
-        raise DesktopSubjectValidationError(
-            "invalid_claim", "desktop subject report baseline mismatch"
-        )
-    if report["prompt_sha256"] != dispatch.prompt_sha256:
-        raise DesktopSubjectValidationError(
-            "invalid_claim", "desktop subject report prompt hash mismatch"
-        )
-    if report["contract_sha256"] != dispatch.contract_sha256:
-        raise DesktopSubjectValidationError(
-            "invalid_claim", "desktop subject report contract hash mismatch"
-        )
-    if report["scenario_contract_sha256"] != dispatch.scenario_contract_sha256:
+    extra = set(report) - required
+    if extra:
         raise DesktopSubjectValidationError(
             "invalid_claim",
-            "desktop subject report scenario contract hash mismatch",
+            f"desktop subject result contains controller-owned fields: {sorted(extra)}",
         )
-    if report["generation"] != dispatch.generation:
+    if report["schema_version"] != SUBJECT_RESULT_SCHEMA_VERSION:
         raise DesktopSubjectValidationError(
-            "invalid_claim", "desktop subject report generation mismatch"
-        )
-    if report["attempt"] != dispatch.attempt:
-        raise DesktopSubjectValidationError(
-            "invalid_claim", "desktop subject report attempt mismatch"
+            "invalid_claim", "desktop subject result schema is invalid"
         )
     if report["completion"] != "completed":
         raise DesktopSubjectValidationError(
@@ -330,7 +332,38 @@ def validate_desktop_report(dispatch: SubjectDispatch) -> dict[str, object]:
         raise DesktopSubjectValidationError(
             "invalid_claim", "Desktop telemetry must be not_available"
         )
-    return report
+    inspected = set(report["files_inspected"])
+    missing_skill_paths = set(dispatch.required_skill_inspection_paths) - inspected
+    if missing_skill_paths:
+        raise DesktopSubjectValidationError(
+            "skill_not_used",
+            (
+                "desktop subject result did not prove staged Skill inspection: "
+                f"{sorted(missing_skill_paths)}"
+            ),
+        )
+    skill_inspection_verified = _validate_skill_inspection_claims(
+        report["skill_inspection_claims"], dispatch
+    )
+    return {
+        "schema_version": REPORT_SCHEMA_VERSION,
+        "dispatch_sha256": dispatch.dispatch_sha256,
+        "baseline_commit": dispatch.workspace.baseline_commit,
+        "prompt_sha256": dispatch.prompt_sha256,
+        "contract_sha256": dispatch.contract_sha256,
+        "scenario_contract_sha256": dispatch.scenario_contract_sha256,
+        "generation": dispatch.generation,
+        "attempt": dispatch.attempt,
+        "arm_id": dispatch.arm_id,
+        "completion": report["completion"],
+        "summary": report["summary"],
+        "files_inspected": report["files_inspected"],
+        "files_modified_claimed": report["files_modified_claimed"],
+        "commands_claimed": report["commands_claimed"],
+        "skill_inspection_claims": report["skill_inspection_claims"],
+        "telemetry": report["telemetry"],
+        "skill_inspection_verified": skill_inspection_verified,
+    }
 
 
 def build_desktop_observation(
@@ -350,12 +383,15 @@ def build_desktop_observation(
     }:
         raise ValueError(f"invalid Desktop subject outcome: {outcome}")
     report_sha256 = "not_available"
+    evidence_report_path: Path | None = None
     if validate:
         _validate_workspace_baseline(dispatch.workspace)
     if outcome == "completed" and validate:
-        validate_desktop_report(dispatch)
-        report_sha256 = _sha256_file(dispatch.report_path)
+        merged_report = validate_desktop_report(dispatch)
+        evidence_report_path = _write_private_report(dispatch, merged_report)
+        report_sha256 = _sha256_file(evidence_report_path)
     elif dispatch.report_path.is_file():
+        evidence_report_path = dispatch.report_path
         report_sha256 = _sha256_file(dispatch.report_path)
     return SubjectObservation(
         run_id=dispatch.physical_run_id,
@@ -368,7 +404,7 @@ def build_desktop_observation(
         elapsed_seconds=elapsed_seconds,
         dispatch_path=dispatch.dispatch_path,
         dispatch_sha256=dispatch.dispatch_sha256,
-        report_path=dispatch.report_path if dispatch.report_path.is_file() else None,
+        report_path=evidence_report_path,
         report_sha256=report_sha256,
         subject_thread_id=subject_thread_id,
         telemetry="not_available",
@@ -444,12 +480,13 @@ def load_desktop_dispatch(path: Path) -> SubjectDispatch:
     if not isinstance(expected_hash, str) or expected_hash != _sha256_json(unsigned):
         raise ValueError("desktop dispatch hash mismatch")
     if payload.get("schema_version") != DISPATCH_SCHEMA_VERSION:
-        raise ValueError("desktop dispatch schema is unsupported; v3 is required")
+        raise ValueError("desktop dispatch schema is unsupported; v4 is required")
     required_strings = (
         "dispatch_id",
         "logical_run_id",
         "physical_run_id",
         "scenario_id",
+        "arm_id",
         "workspace_root",
         "artifact_directory",
         "baseline_commit",
@@ -469,6 +506,16 @@ def load_desktop_dispatch(path: Path) -> SubjectDispatch:
         raise ValueError("desktop dispatch has invalid generation or attempt")
     if payload["generation"] <= 0 or payload["attempt"] <= 0:
         raise ValueError("desktop dispatch generation and attempt must be positive")
+    required_skill_inspection_paths = payload.get("required_skill_inspection_paths")
+    if not isinstance(required_skill_inspection_paths, list) or not all(
+        isinstance(item, str) for item in required_skill_inspection_paths
+    ):
+        raise ValueError("desktop dispatch Skill inspection paths are invalid")
+    _validate_workspace_relative_paths(
+        required_skill_inspection_paths,
+        "required_skill_inspection_paths",
+        Path(str(payload["workspace_root"])),
+    )
     if payload["prompt_encoding"] != PROMPT_ENCODING:
         raise ValueError("desktop dispatch prompt encoding is invalid")
     if payload["prompt_line_endings"] != PROMPT_LINE_ENDINGS:
@@ -511,6 +558,11 @@ def load_desktop_dispatch(path: Path) -> SubjectDispatch:
     report_template_path = workspace.artifact_dir / report_template_relative_path
     if not report_template_path.is_file():
         raise ValueError("desktop dispatch report template is missing")
+    for required_path in required_skill_inspection_paths:
+        if not (workspace.root / PurePosixPath(required_path)).is_file():
+            raise ValueError(
+                f"required staged Skill entrypoint is missing: {required_path}"
+            )
     if _paths_overlap(path.resolve(), workspace.root.resolve()) or _paths_overlap(
         path.resolve(), workspace.artifact_dir.resolve()
     ):
@@ -520,6 +572,7 @@ def load_desktop_dispatch(path: Path) -> SubjectDispatch:
         logical_run_id=str(payload["logical_run_id"]),
         physical_run_id=str(payload["physical_run_id"]),
         scenario_id=str(payload["scenario_id"]),
+        arm_id=str(payload["arm_id"]),
         generation=int(payload["generation"]),
         attempt=int(payload["attempt"]),
         workspace=workspace,
@@ -531,6 +584,7 @@ def load_desktop_dispatch(path: Path) -> SubjectDispatch:
         prompt_sha256=str(payload["prompt_sha256"]),
         contract_sha256=str(payload["contract_sha256"]),
         scenario_contract_sha256=str(payload["scenario_contract_sha256"]),
+        required_skill_inspection_paths=tuple(required_skill_inspection_paths),
         dispatch_sha256=str(expected_hash),
     )
     _validate_report_template(dispatch)
@@ -676,7 +730,7 @@ def _validate_legacy_report(
     if not isinstance(report, dict):
         raise ValueError("legacy desktop dispatch report must be an object")
     expected = {
-        "schema_version": REPORT_SCHEMA_VERSION,
+        "schema_version": LEGACY_REPORT_SCHEMA_VERSION,
         "dispatch_sha256": dispatch_sha256,
         "baseline_commit": baseline_commit,
         "prompt_sha256": prompt_sha256,
@@ -800,30 +854,15 @@ def _validate_workspace_baseline(workspace: Workspace) -> None:
         )
 
 
-def _report_template(
-    *,
-    baseline_commit: str,
-    prompt_sha256: str,
-    contract_sha256: str,
-    scenario_contract_sha256: str,
-    dispatch_sha256: str,
-    generation: int,
-    attempt: int,
-) -> dict[str, object]:
+def _report_template() -> dict[str, object]:
     return {
-        "schema_version": REPORT_SCHEMA_VERSION,
-        "dispatch_sha256": dispatch_sha256,
-        "baseline_commit": baseline_commit,
-        "prompt_sha256": prompt_sha256,
-        "contract_sha256": contract_sha256,
-        "scenario_contract_sha256": scenario_contract_sha256,
-        "generation": generation,
-        "attempt": attempt,
+        "schema_version": SUBJECT_RESULT_SCHEMA_VERSION,
         "completion": "completed",
         "summary": "",
         "files_inspected": [],
         "files_modified_claimed": [],
         "commands_claimed": [],
+        "skill_inspection_claims": [],
         "telemetry": "not_available",
     }
 
@@ -835,18 +874,101 @@ def _validate_report_template(dispatch: SubjectDispatch) -> None:
         raise ValueError("desktop dispatch report template is invalid JSON") from error
     if not isinstance(template, dict):
         raise ValueError("desktop dispatch report template must be an object")
-    expected = _report_template(
-        baseline_commit=dispatch.workspace.baseline_commit,
-        prompt_sha256=dispatch.prompt_sha256,
-        contract_sha256=dispatch.contract_sha256,
-        scenario_contract_sha256=dispatch.scenario_contract_sha256,
-        dispatch_sha256=dispatch.dispatch_sha256,
-        generation=dispatch.generation,
-        attempt=dispatch.attempt,
-    )
-    for field, value in expected.items():
-        if template.get(field) != value:
-            raise ValueError(f"desktop dispatch report template {field} mismatch")
+    expected = _report_template()
+    if template != expected:
+        raise ValueError("desktop dispatch report template does not match contract")
+
+
+def _required_skill_inspection_paths(
+    manifest: BenchmarkManifest, arm_id: str
+) -> tuple[str, ...]:
+    try:
+        arm = next(arm for arm in manifest.arms if arm.get("id") == arm_id)
+    except StopIteration as error:
+        raise ValueError(f"unknown arm: {arm_id}") from error
+    skill_name = arm.get("skill")
+    if skill_name is None:
+        return ()
+    if not isinstance(skill_name, str) or not skill_name.strip():
+        raise ValueError(f"arm {arm_id} has an invalid Skill name")
+    return (f".agents/skills/{skill_name}/SKILL.md",)
+
+
+def _validate_skill_inspection_claims(
+    value: object, dispatch: SubjectDispatch
+) -> bool | str:
+    if not isinstance(value, list):
+        raise DesktopSubjectValidationError(
+            "candidate_incomplete",
+            "desktop subject result skill_inspection_claims must be a list",
+        )
+    required = set(dispatch.required_skill_inspection_paths)
+    if not required:
+        if value:
+            raise DesktopSubjectValidationError(
+                "invalid_claim",
+                "non-Skill arm must not claim staged Skill inspection",
+            )
+        return "not_applicable"
+
+    claims: dict[str, str] = {}
+    for claim in value:
+        if not isinstance(claim, dict) or set(claim) != {"path", "sha256"}:
+            raise DesktopSubjectValidationError(
+                "candidate_incomplete",
+                "desktop subject Skill inspection claim is invalid",
+            )
+        path = claim.get("path")
+        sha256 = claim.get("sha256")
+        if not isinstance(path, str) or not isinstance(sha256, str):
+            raise DesktopSubjectValidationError(
+                "candidate_incomplete",
+                "desktop subject Skill inspection claim fields are invalid",
+            )
+        if path in claims:
+            raise DesktopSubjectValidationError(
+                "invalid_claim", "duplicate staged Skill inspection claim"
+            )
+        claims[path] = sha256
+
+    missing = required - set(claims)
+    if missing:
+        raise DesktopSubjectValidationError(
+            "skill_not_used",
+            f"desktop subject result lacks staged Skill hashes: {sorted(missing)}",
+        )
+    extra = set(claims) - required
+    if extra:
+        raise DesktopSubjectValidationError(
+            "invalid_claim",
+            f"desktop subject result claims undeclared Skill files: {sorted(extra)}",
+        )
+    for relative_path, claimed_sha256 in claims.items():
+        if re.fullmatch(r"[0-9a-f]{64}", claimed_sha256) is None:
+            raise DesktopSubjectValidationError(
+                "invalid_claim", "staged Skill inspection hash is invalid"
+            )
+        expected_sha256 = _sha256_file(
+            dispatch.workspace.root / PurePosixPath(relative_path)
+        )
+        if claimed_sha256 != expected_sha256:
+            raise DesktopSubjectValidationError(
+                "invalid_claim", "staged Skill inspection hash mismatch"
+            )
+    return True
+
+
+def _write_private_report(dispatch: SubjectDispatch, report: dict[str, object]) -> Path:
+    path = dispatch.dispatch_path.with_name(f"{dispatch.dispatch_id}.report.json")
+    content = json.dumps(report, ensure_ascii=False, indent=2)
+    try:
+        with path.open("x", encoding="utf-8") as output:
+            output.write(content)
+    except FileExistsError:
+        if path.read_text(encoding="utf-8") != content:
+            raise ValueError("private desktop subject report already differs")
+        return path
+    return path
 
 
 def _require_sha256(value: str, label: str) -> None:
