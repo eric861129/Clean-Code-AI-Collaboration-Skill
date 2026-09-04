@@ -529,6 +529,7 @@ class SkillContractTests(unittest.TestCase):
             "fail-fast: false",
             "os: [ubuntu-latest, windows-latest]",
             "runs-on: ${{ matrix.os }}",
+            "fetch-depth: 0",
             "python -m unittest discover -s tests -v",
             "python -m compileall -q evals/harness evals/v040_strategy_full_run.py scripts",
         }:

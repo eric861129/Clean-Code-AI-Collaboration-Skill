@@ -8,7 +8,6 @@ import json
 from pathlib import Path
 import shutil
 import subprocess
-import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -127,12 +126,12 @@ class ProfilePackagingTests(unittest.TestCase):
 
     def test_generated_package_passes_open_standard_validation(self) -> None:
         self.build_worktree_package("csharp")
-        executable = Path(sys.executable).with_name(
-            "agentskills.exe" if sys.platform == "win32" else "agentskills"
-        )
+        executable = shutil.which("agentskills")
+
+        self.assertIsNotNone(executable, "agentskills must be available on PATH")
 
         result = subprocess.run(
-            [str(executable), "validate", str(self.output)],
+            [executable, "validate", str(self.output)],
             capture_output=True,
             check=False,
             text=True,
