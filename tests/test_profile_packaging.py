@@ -24,6 +24,17 @@ FIXTURE_ROOT = ROOT / "tests" / "fixtures" / "profile-packaging" / "csharp"
 FIXED_COMMIT = "0123456789abcdef0123456789abcdef01234567"
 
 
+def read_committed_bytes(path: Path) -> bytes:
+    relative_path = path.relative_to(ROOT).as_posix()
+    result = subprocess.run(
+        ["git", "show", f"HEAD:{relative_path}"],
+        cwd=ROOT,
+        capture_output=True,
+        check=True,
+    )
+    return result.stdout
+
+
 class ProfilePackagingTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary_directory = tempfile.TemporaryDirectory()
@@ -426,8 +437,14 @@ class ProfilePackagingTests(unittest.TestCase):
         self.assertNotIn("rm" + "tree", source)
 
     def test_canonical_fixture_has_one_cross_platform_digest(self) -> None:
+        attributes = (ROOT / ".gitattributes").read_text(encoding="utf-8")
+
+        self.assertIn("LICENSE text eol=lf", attributes.splitlines())
+
         inputs = {
-            path.relative_to(FIXTURE_ROOT / "input").as_posix(): path.read_bytes()
+            path.relative_to(FIXTURE_ROOT / "input").as_posix(): read_committed_bytes(
+                path
+            )
             for path in (FIXTURE_ROOT / "input").rglob("*")
             if path.is_file()
         }
