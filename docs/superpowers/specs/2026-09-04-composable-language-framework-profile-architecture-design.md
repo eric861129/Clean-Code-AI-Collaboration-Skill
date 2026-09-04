@@ -3,7 +3,7 @@
 ## 文件狀態
 
 - 日期：2026-09-04
-- 狀態：聊天室架構設計已核准；等待 Codex 依本規格制定實作計畫並分階段開發
+- 狀態：設計已核准；下一步制定 Implementation Plan，計畫再次核准後才開始開發
 - 目標版本：`v0.5.0`
 - 目前版本：`v0.4.0`
 - Repository：`Clean-Code-AI-Collaboration-Skill`
@@ -12,6 +12,8 @@
 ## 版本與實作範圍
 
 本文件同時描述長期完整架構與分階段 Roadmap，但 `v0.5.0` 的正式實作範圍只包含：
+
+正式實作前必須先修復 v0.4.0 歷史驗證器，使它依 Receipt 指定的歷史 Revision 與 Git Blob Bytes 驗證，不再依賴目前 Worktree 或 Checkout EOL；既有 Result、Manifest 與 Receipt 保持不變。
 
 1. Profile Metadata Schema、Catalog 與驗證工具。
 2. Changed Module 為中心的 Profile Selection Contract。
@@ -70,7 +72,7 @@ Core Skill
 4. C#、Go、Rust、Python、Java、TypeScript 屬於 Language Profile。
 5. React、Vue 屬於 Framework Profile；TypeScript 納入正式規劃，作為前端共用語言層。
 6. 使用者預設只需要呼叫 `$clean-code-ai-collaboration`，由 Agent 依 Repository Facts 選擇適用 Profile。
-7. Source of Truth 只保留一份。未來可由 CI 產生可獨立安裝的 Specialist Skill，但不得手動維護重複的 Core 內容。
+7. Source of Truth 只保留一份。未來可由 CI 產生可獨立安裝的 Specialist Package，但不得手動維護重複的 Core 內容。
 8. `v0.5.0` 不改 Repository 名稱、不改 Core Skill 名稱，也不改既有明確呼叫政策。
 9. 新增 Profile 不授權安裝工具、修改依賴、改動公開契約或執行破壞性操作。
 10. 已完成 Reference 與 Contract Test 的新 Profile 從 `experimental` 開始；只有 Roadmap Metadata 的 Profile 使用 `planned`，兩者都必須經過對應 Evidence Gate 才能升級。
@@ -85,7 +87,7 @@ Core Skill
 6. 讓 Profile 只補充生態系原生判斷，不重寫 CLEAN、風險路徑、授權與輸出契約。
 7. 先完成 C#、Python、TypeScript 與 React 四個 Profile，再依序擴充 Go、Rust、Java 與 Vue。
 8. 建立 Core Only 與 Core + Profile 的可比較 Benchmark 契約。
-9. 為未來 Specialist Skill 與 Plugin Suite 的自動打包保留清楚邊界。
+9. 為未來 Specialist Package 與 Plugin Suite 的自動打包保留清楚邊界。
 10. 讓外部貢獻者能依固定模板新增 Profile，而不必理解全部 Benchmark Harness 內部實作。
 
 ## 非目標
@@ -109,7 +111,7 @@ Core Skill
 
 ### Language Profile
 
-補充某一程式語言或其基礎執行生態系的語意風險，例如 C# Nullable、Go Context、Rust Ownership、Python Dynamic Typing 或 Java Exception Contract。
+補充某一程式語言、標準 Runtime、標準 Library 與 Project System 的語意風險，例如 C# Nullable、Go Context、Rust Ownership、Python Dynamic Typing 或 Java Exception Contract。選用的 DI、Container 或其他生態系機制只有在 Repository Facts 證明已使用時才能成為檢查對象；Language Profile 不得規定特定實作。
 
 ### Framework Profile
 
@@ -123,9 +125,9 @@ Consumer Repository 已確認的命名、架構、測試、授權、工具與團
 
 Repository 既有且可執行的 Formatter、Linter、Static Analysis、Build、Unit／Integration／Contract／E2E Test、Security Scan、Architecture Test 或其他驗證入口。
 
-### Specialist Skill
+### Specialist Package
 
-由 Core 與單一或少數 Profile 自動組裝的獨立安裝產物。它是 Distribution Artifact，不是另一份手動維護的 Source of Truth。
+由 Core 與單一或少數 Profile 自動組裝的 Distribution Artifact，內含一個可獨立安裝的 Skill；它不是另一份手動維護的 Source of Truth。
 
 ## 分層責任
 
@@ -248,7 +250,8 @@ Clean-Code-AI-Collaboration-Skill/
 ├── scripts/
 │   ├── validate_profiles.py
 │   ├── build_skill_package.py
-│   └── generate_profile_matrix.py
+│   ├── generate_profile_matrix.py
+│   └── package-manifest.schema.json
 │
 ├── tests/
 │   ├── test_skill_contract.py
@@ -261,8 +264,7 @@ Clean-Code-AI-Collaboration-Skill/
 │   └── existing benchmark assets...
 │
 └── dist/                         # Generated、Git ignored
-    ├── clean-code-ai-collaboration/
-    └── sample specialist package...
+    └── clean-code-ai-csharp/     # v0.5.0 唯一 Sample Package
 ```
 
 Go、Rust、Java 與 Vue 在 `v0.5.0` 只有 Planned Metadata。不得建立空白或只有標題的 `language-go.md`、`language-rust.md`、`language-java.md`、`framework-vue.md`，也不得把未完成 Reference 放入可安裝產物。
@@ -292,11 +294,23 @@ evals/profiles/
 ### 目錄規則
 
 1. `clean-code-ai-collaboration/` 是可直接安裝的正式 Core Skill。
-2. `profiles/*.yaml` 是本 Repository 的 Profile Registry，不是 Consumer Repository 的設定檔。
-3. Profile Markdown 放在既有 `references/` 內，讓 `SKILL.md` 能以相對連結漸進式載入。
-4. `dist/` 只能由 Script 產生，不得手動修改或作為 Source of Truth。
-5. Planned Profile 可以先存在於 `catalog.yaml` 與 Metadata；未有完整 Reference 時不得被打包或宣稱為可用。
-6. 本版本不搬動既有 Benchmark 歷史結果，也不改寫已發布 Result 的路徑。
+2. `profiles/*.yaml` 是本 Repository 在維護、CI 與 Packaging 階段使用的 Profile Registry，不是 Consumer Repository 的設定檔，也不是 Runtime 必須解析的輸入。
+3. `scripts/generate_profile_matrix.py` 必須從 Catalog 與 Metadata 產生 `references/profile-selection.md` 的 Runtime Profile Index 與 README 的 Supported Profile Matrix；兩個 Checked-in 區塊使用下列唯一固定 Marker，CI 以 `--check` 驗證沒有漂移。產生區塊不得手動修改或成為第二份 Source of Truth。
+
+```markdown
+<!-- profile-matrix:generated:start -->
+<!-- profile-matrix:generated:end -->
+
+<!-- runtime-profile-index:generated:start -->
+<!-- runtime-profile-index:generated:end -->
+```
+
+一般模式只能替換成對 Marker 之間的內容；`--check` 完全 Read-only。Marker 缺失、重複、交錯或 End 先於 Start 時必須 Fail Closed，不得重寫整份文件。
+4. Consumer Runtime 只讀取 `SKILL.md` 與相關 Markdown Reference，不需要 YAML Parser。
+5. Profile Markdown 放在既有 `references/` 內，讓 `SKILL.md` 能以相對連結漸進式載入。
+6. `dist/` 必須加入 `.gitignore`，只能由 Script 產生，不得手動修改、Commit 或作為 Source of Truth。
+7. Planned Profile 可以先存在於 `catalog.yaml` 與 Metadata；未有完整 Reference 時不得被打包或宣稱為可用。
+8. 本版本不搬動既有 Benchmark 歷史結果，也不改寫已發布 Result 的路徑。
 
 ## Core Skill 修改範圍
 
@@ -317,6 +331,8 @@ evals/profiles/
 
 每個 Profile 都有一份 YAML Metadata，並通過 `profiles/profile.schema.json`。Planned Profile 可省略尚未存在的 Reference；其他狀態必須連結實際檔案。
 
+Metadata 與 Catalog 驗證使用 Python 3.12，並在 `requirements-dev.txt` 直接 Pin `PyYAML` 與 `jsonschema`；不得依賴間接相依套件或自行實作 YAML Parser。JSON Schema 使用 Draft 2020-12。
+
 以下為 Language Profile 範例：
 
 ```yaml
@@ -329,12 +345,19 @@ suite_version: "0.5.0"
 reference: clean-code-ai-collaboration/references/language-csharp.md
 
 detection:
-  manifest_files:
+  owning_manifests:
+    - pattern: "*.csproj"
+      boundary: project
+  supporting_files:
     - "*.sln"
-    - "*.csproj"
+    - "*.slnx"
+    - "Directory.Build.props"
+    - "Directory.Build.targets"
+    - "global.json"
   file_extensions:
     - ".cs"
   dependency_markers: []
+  supporting_dependencies: []
 
 routing:
   scope: changed-module
@@ -344,6 +367,10 @@ composition:
   requires: []
   recommends: []
   conflicts: []
+
+ownership:
+  maintainers:
+    - eric861129
 
 evidence:
   benchmark_status: not_started
@@ -363,14 +390,18 @@ suite_version: "0.5.0"
 reference: clean-code-ai-collaboration/references/framework-react.md
 
 detection:
-  manifest_files:
-    - "package.json"
+  owning_manifests:
+    - pattern: "package.json"
+      boundary: package
+  supporting_files: []
   file_extensions:
     - ".jsx"
     - ".tsx"
   dependency_markers:
     - "react"
+  supporting_dependencies:
     - "react-dom"
+    - "react-native"
 
 routing:
   scope: changed-module
@@ -381,6 +412,10 @@ composition:
   recommends:
     - typescript
   conflicts: []
+
+ownership:
+  maintainers:
+    - eric861129
 
 evidence:
   benchmark_status: not_started
@@ -401,11 +436,15 @@ status: planned
 suite_version: "0.5.0"
 
 detection:
-  manifest_files:
-    - "go.mod"
+  owning_manifests:
+    - pattern: "go.mod"
+      boundary: project
+  supporting_files:
+    - "go.work"
   file_extensions:
     - ".go"
   dependency_markers: []
+  supporting_dependencies: []
 
 routing:
   scope: changed-module
@@ -416,6 +455,10 @@ composition:
   recommends: []
   conflicts: []
 
+ownership:
+  maintainers:
+    - eric861129
+
 evidence:
   benchmark_status: not_started
   manifests: []
@@ -423,6 +466,36 @@ evidence:
 ```
 
 Planned Metadata 用來鎖定 ID、分類與 Roadmap，不代表 Runtime 支援。Routing 與 Packaging 必須忽略 Planned Profile。
+
+### Detection Metadata Semantics
+
+1. `owning_manifests` 是有序物件清單；每筆包含檔名 `pattern` 與 `boundary`。`boundary` 只能是 `project`、`package` 或 `workspace`。
+2. `supporting_files` 只能補強語言、版本、Workspace 或 Project 設定事實，不能單獨建立 Changed Module 或啟用 Profile。
+3. `file_extensions` 是 Language Candidate 的主要訊號；Framework 的 Extension 只作與 Changed Module 相關性的輔助證據。
+4. `dependency_markers` 建立 Framework Candidate；`supporting_dependencies` 只能辨識 Renderer 或補強適用範圍。
+5. Package Dependency 只從 `dependencies`、`devDependencies`、`peerDependencies` 與 `optionalDependencies` 尋找；Lockfile 不參與 Marker 查找。
+6. Metadata 中的 Pattern 使用大小寫敏感的 POSIX-style 相對名稱比對；Validator 必須另外拒絕會在大小寫不敏感檔案系統衝突的宣告。
+
+同一候選檔案命中多個 Owning Manifest 時，先選目錄距離最近者，再依 `project`、`package`、`workspace` 的順序選較具體 Boundary，最後依 Metadata 宣告順序決定。不同候選檔案若得到不同 Owner，就拆成不同 Changed Module，不得為了只套用一次 Profile 而合併。
+
+### Catalog Contract
+
+`profiles/catalog.yaml` 只保存 Catalog Schema Version 與有序的 Profile Metadata 相對路徑，不重複 ID、Status、Reference 或 Evidence：
+
+```yaml
+schema_version: "1.0"
+profiles:
+  - csharp.yaml
+  - python.yaml
+  - typescript.yaml
+  - react.yaml
+  - go.yaml
+  - rust.yaml
+  - java.yaml
+  - vue.yaml
+```
+
+各 Profile YAML 是自身狀態的唯一真實來源，並使用結構化 `ownership`、`deprecation` 與 `evidence`。JSON Schema 驗證單檔形狀；Python Validator 驗證 Catalog 順序與唯一性、跨檔引用、相依 Cycle、檔案路徑及成熟度／Evidence 關係。
 
 ### 必要欄位
 
@@ -435,23 +508,42 @@ Planned Metadata 用來鎖定 ID、分類與 Roadmap，不代表 Runtime 支援�
 | `status` | `planned`、`experimental`、`beta`、`stable` 或 `deprecated` |
 | `suite_version` | 目前所屬 Skill Suite 版本 |
 | `reference` | 非 Planned Profile 的 Markdown 路徑；Planned 必須省略 |
-| `detection` | Manifest、Extension 與 Dependency 訊號 |
+| `detection` | Owning Manifest、Supporting Fact、Extension 與 Dependency 訊號 |
 | `routing` | Changed Module 選擇策略與載入順序 |
 | `composition` | Requires、Recommends 與 Conflicts |
+| `ownership` | 至少一位負責維護 Metadata、Reference 與 Evidence 的 Maintainer |
 | `evidence` | Benchmark 狀態與可稽核路徑 |
+| `deprecation` | 僅 `deprecated` Profile 必須提供的結構化淘汰資訊 |
+
+### Ownership、Deprecation 與 Evidence Contract
+
+1. 所有 Profile（包含 `planned`）都必須有非空白的 `ownership.maintainers`；值使用可穩定辨識的 Repository Maintainer ID。
+2. 只有 `deprecated` Profile 可以有 `deprecation`。`deprecation.reason` 必填；`replacement` 與 `removal_version` 選填，但若存在就必須可解析且符合對應格式。
+3. `evidence.benchmark_status` 只能是 `not_started`、`pilot_recorded` 或 `full_run_recorded`。
+4. 每筆 `evidence.results` 必須包含 `stage`、`outcome`、Repository 內相對 `path`、該檔案的 SHA-256 `sha256` 與布林值 `public`。
+5. `outcome` 只能是 `passed`、`failed`、`no_difference` 或 `inconclusive`。失敗、無差異與無法判定的結果都必須保留，不能只登錄通過結果。
+6. `beta` 必須至少有一筆有效、公開且通過的 Pilot Result；`stable` 必須至少有一筆有效、公開且通過的 Full Run Result。Metadata Validator 必須重新計算 Evidence 檔案雜湊，不能只相信欄位文字。
 
 ### Schema 規則
 
-1. `id` 必須符合 `^[a-z][a-z0-9-]*$`。
-2. 非 `planned` Profile 必須存在 `reference`，且該檔案可讀。
-3. `planned` Profile 必須省略 `reference`，避免指向空白或不存在的文件。
-4. `stable` 必須至少連結一份公開 Full Run Result。
-5. `beta` 必須至少連結通過的 Pilot 或等價證據。
-6. `experimental` 可以只有文件與 Contract Test，但 README 必須明確標示未完成效果驗證。
-7. `deprecated` 必須提供 Replacement 或移除原因。
-8. `requires`、`recommends`、`conflicts` 只能引用 Catalog 中存在的 ID。
-9. Profile ID、Reference Path 與產物名稱必須在大小寫不敏感檔案系統上仍保持唯一。
-10. Planned Profile 不得進入正式打包清單，也不得由 Routing 自動選取。
+1. Schema 根節點與結構化子物件預設使用 `additionalProperties: false`，未定義欄位必須明確拒絕。
+2. `id` 必須符合 `^[a-z][a-z0-9-]*$`。
+3. 非 `planned` Profile 必須存在 `reference`，且該檔案可讀。
+4. `planned` Profile 必須省略 `reference`，避免指向空白或不存在的文件。
+5. `stable` 必須至少連結一份公開 Full Run Result。
+6. `beta` 必須至少連結通過的 Pilot 或等價證據。
+7. `experimental` 可以只有文件與 Contract Test，但 README 必須明確標示未完成效果驗證。
+8. `deprecated` 必須提供 Replacement 或移除原因。
+9. `requires`、`recommends`、`conflicts` 只能引用 Catalog 中存在的 ID。
+10. Profile ID、Reference Path 與產物名稱必須在大小寫不敏感檔案系統上仍保持唯一。
+11. Planned Profile 不得進入正式打包清單，也不得由 Routing 自動選取。
+12. `ownership.maintainers` 必須存在且至少包含一個非空白 Maintainer ID。
+13. 非 `deprecated` Profile 不得提供 `deprecation`；`deprecated` Profile 必須提供非空白 `deprecation.reason`。
+14. `evidence.benchmark_status` 必須與登錄的 Result Stage 一致，不得在沒有對應 Result 時宣稱已完成 Pilot 或 Full Run。
+15. Evidence Result 的 `path` 必須存在於 Repository 內，`sha256` 必須與檔案內容相符，`public` 必須明確為布林值。
+16. Profile 成熟度升級必須符合 Evidence Contract；`failed`、`no_difference` 與 `inconclusive` 不得當成升級依據。
+17. `owning_manifests` 每筆都必須有合法 `pattern` 與 `boundary`；`supporting_files` 不得被 Validator 或 Routing 提升為 Owner。
+18. `dependency_markers` 與 `supporting_dependencies` 不得在同一 Profile 重複相同 Package Name。
 
 ## Profile Reference Contract
 
@@ -462,6 +554,7 @@ Planned Metadata 用來鎖定 ID、分類與 Roadmap，不代表 Runtime 支援�
 
 ## Use This Profile When
 ## Repository Facts to Inspect
+## Version-Sensitive Facts
 ## Language or Framework Semantic Risks
 ## Clean Code Misapplications
 ## Behavior and Boundary Contracts
@@ -477,6 +570,7 @@ Planned Metadata 用來鎖定 ID、分類與 Roadmap，不代表 Runtime 支援�
 
 - **Use This Profile When**：正面訊號與不適用範圍。
 - **Repository Facts to Inspect**：Agent 在下判斷前應查閱的 Manifest、設定、鄰近測試與既有模式。
+- **Version-Sensitive Facts**：列出可驗證的版本來源、版本未知時的保守行為，以及只適用於特定版本的判斷。
 - **Semantic Risks**：該生態系真正可能改變行為的語意，不是單純排版。
 - **Clean Code Misapplications**：常見的機械式重構，例如過度抽象、錯誤套用繼承、為消除警告破壞生命週期。
 - **Behavior and Boundary Contracts**：API、資料、錯誤、副作用、資源與生命週期邊界。
@@ -495,17 +589,19 @@ Planned Metadata 用來鎖定 ID、分類與 Roadmap，不代表 Runtime 支援�
 4. 每項建議必須說明何時適用、何時不適用，以及可能改變的行為。
 5. 範例必須原創、最小化，而且用來說明語意差異，不建立大型教學專案。
 6. Formatter 能完全決定的排版規則不應占據主要篇幅。
+7. Profile Reference 延續既有 Core Reference，使用英文；SPEC、根目錄 `CONTEXT.md` 與 README 主體使用台灣繁體中文，並保留正式英文術語。
+8. `Version-Sensitive Facts` 不得把目前最新版當成隱含基準；版本無法確認時必須記錄 Unknown，而不是把不確定規則寫成強制要求。
 
 ## Profile Selection Contract
 
 ### 選擇原則
 
-Profile Selection 必須以本次任務的 Changed Module 與 Expected Diff 為中心，而不是只掃描 Repository Root。
+Profile Selection 必須以本次任務的 Changed Module 為中心，不得只掃描 Repository Root。
 
 ```text
 1. 讀取 User Prompt 與 Repository Instruction
-2. 確認 Expected Diff 或最可能修改的模組
-3. 尋找該模組最近的 Manifest 與設定檔
+2. 依目前工作階段確認 Expected Diff、Actual Diff 或兩者
+3. 為每個候選檔案尋找最近的 Owning Manifest，並依 Manifest 所在目錄分組
 4. 以檔案副檔名確認主要語言候選
 5. 以 Dependency Marker 確認 Framework 候選
 6. 移除 Planned、Deprecated 或不相容候選
@@ -517,16 +613,68 @@ Profile Selection 必須以本次任務的 Changed Module 與 Expected Diff 為�
 
 Metadata Validator／Routing Fixture 負責驗證預期選擇；實際 Agent 執行仍必須讀取 Repository Facts。Script 的靜態推導不能取代 Agent 對 Expected Diff、Ownership 與行為邊界的判斷。
 
+### Changed Module Boundary
+
+1. 每個候選 Changed File 從自身目錄向 Repository Root 尋找最近的 Owning Manifest。
+2. 共享同一個最近 Owning Manifest 的檔案屬於同一 Changed Module；不同 Manifest 目錄分開處理。
+3. 找不到 Owning Manifest 時，先查 Repository Policy，再把 Root Manifest 當作補充訊號。
+4. Generated、Vendor 與 Build Output 預設不參與偵測，除非它們本身是明確 Expected Diff。
+5. Manifest、設定檔或新檔案本身是 Expected Diff 時，以該 Manifest 的目錄作為 Changed Module，並用鄰近原始碼與 Repository Policy補足語言事實。
+
+### Detection Semantics
+
+1. Language Profile 以 Changed File Extension 為主要訊號；Owning Manifest 用於設定檔型 Diff 與候選確認。
+2. Framework Profile 必須由 Owning Manifest 的 Dependency Marker 或 Repository Policy 證明；`.jsx`、`.tsx` 或其他語法外觀只能作輔助訊號。
+3. `package.json` 的 `dependencies`、`devDependencies`、`peerDependencies` 與 `optionalDependencies` 都可提供 Dependency Marker。
+4. Lockfile 只能補強已存在的 Manifest／Policy 事實，不能單獨決定 Framework。
+5. Repository Root 訊號不得覆蓋 Changed File Extension、最近 Owning Manifest 或更具體的 Repository Policy。
+
+Metadata 必須透過 `owning_manifests`、`supporting_files`、`dependency_markers` 與 `supporting_dependencies` 保存 Owning／Supporting 差異；Runtime Profile Index 必須呈現這些角色，不能把所有命中檔案或套件當成同等 Module Owner／Candidate Marker。
+
+### Technology-Specific Detection Contract
+
+| Profile | 主要語言／Framework 訊號 | Owning Manifest | Supporting Facts | v0.5.0 行為 |
+| --- | --- | --- | --- | --- |
+| C# | `.cs` | 最近的 `.csproj` | `.sln`、`.slnx`、`Directory.Build.props`、`Directory.Build.targets`、`global.json` | 可選取 `csharp` |
+| Python | `.py`、`.pyi` | 依距離選擇 `pyproject.toml`、`setup.py` 或 `setup.cfg` | `requirements*.txt`、`Pipfile`、`poetry.lock`、`uv.lock`；`.ipynb` 不自動分析 | 可選取 `python` |
+| TypeScript | `.ts`、`.tsx`、`.mts`、`.cts` | 最近的 `package.json`；最近的 `tsconfig.json` 或 `tsconfig.*.json` 界定 TypeScript Project／Config-only Diff | `.js`、`.jsx` 不構成 TypeScript 訊號 | 可選取 `typescript` |
+| React | `react` Dependency Marker 加上 Changed File、Import、Repository Policy 或 Manifest Diff 的相關性 | 提供 Dependency Marker 的最近 `package.json` | `react-dom`、`react-native` 只辨識 Renderer；`.jsx`、`.tsx` 只作輔助 | 可選取 `react` |
+| Go | `.go` | 最近的 `go.mod` | `go.work` 只作 Workspace 補充 | 只回報 Planned／Unavailable |
+| Rust | `.rs` | 最近的 `Cargo.toml` | `Cargo.lock` 只作補充 | 只回報 Planned／Unavailable |
+| Java | `.java` | 最近的 `pom.xml`、`build.gradle` 或 `build.gradle.kts` | `settings.gradle`、`settings.gradle.kts` 只作 Root 補充 | 只回報 Planned／Unavailable |
+| Vue | `vue` Dependency Marker 與 `.vue` | 提供 Dependency Marker 的最近 `package.json` | JavaScript／TypeScript 訊號另由對應 Language Profile 判斷 | 只回報 Planned／Unavailable |
+
+補充規則：
+
+1. C# 找不到 `.csproj` 時，`.sln`／`.slnx` 只能協助定位 Solution 範圍，不得覆蓋更接近的其他技術棧 Owning Manifest。
+2. Python Lockfile 與 Requirements File 不單獨界定 Changed Module。
+3. TypeScript 的 `package.json` 界定 Package；`tsconfig*` 界定該 Package 內的 TypeScript Project。兩者同時存在時，以候選檔案最近且最具體的 Project Boundary 分組，但 Dependency Marker 仍從對應 Package 取得。
+4. `react` 是 React Framework Candidate 的必要且足夠 Dependency Marker；`react-dom` 或 `react-native` 單獨存在都不能啟用 React Profile。
+5. React Candidate 還必須與本次 Changed Module 的行為相關。只修改同 Package 內非 React 工具程式時，只套用適用的 Language Profile。
+6. React Profile 涵蓋 Renderer-neutral 的 Component、Hook、State、Effect 與 Lifecycle；DOM 規則只在 `react-dom` 證據存在時套用。React Native 平台 API 不屬於 `v0.5.0` Reference 範圍。
+7. Planned Profile 命中上述訊號時只記錄 Planned／Unavailable，不讀取 Reference、不參與 Composition，也不成為 Packaging Target。
+
+### Version-Sensitive Facts
+
+Profile 不設定一組脫離 Repository 的通用最低版本。每次套用時，必須盡可能從 TFM、Language Version、Runtime Version、Compiler Config 與 Dependency Version 判斷適用語意；Reference 對版本差異使用條件式表述。版本無法確認時記錄為 Unknown，不假設最新版本，也不把不確定規則當成強制要求。
+
+### Stage-Specific Diff Evidence
+
+- Planning 使用 Expected Diff。
+- Implementation 同時追蹤 Expected Diff 與 Actual Diff，並回報偏離。
+- Review 以 Actual Diff 為主要選擇依據，再與 Expected Diff 比對範圍。
+- Expected Diff 尚未完全確定時，可以提出最可能模組並標示 Assumption；若不同答案會改變公開行為、資料、資源或副作用，必須列為 Critical Unknown。
+
 ### 選擇優先順序
 
-1. User 對本次任務的明確 Profile 指示。
+1. User 對本次任務的明確 Profile 或 Core Only 指示。
 2. Repository Policy 對特定目錄或模組的明確規定。
 3. Expected Diff 中的檔案類型與最近 Manifest。
 4. 該模組 Manifest 中的 Framework Dependency。
 5. Repository Root 訊號，只能作為補充，不能覆蓋更接近 Changed Module 的事實。
 6. 無充分訊號時使用 Core Only。
 
-`v0.5.0` 不新增必要的 Consumer Profile 設定檔。使用者可用自然語言或 Repository Instruction 明確指定 Profile，但不要求額外 Parser，也不新增另一組穩定 YAML 指令契約。
+`v0.5.0` 不新增必要的 Consumer Profile 設定檔。使用者可用自然語言或 Repository Instruction 明確指定可用 Profile 或 Core Only，但不要求額外 Parser，也不新增另一組穩定 YAML 指令契約。明確指定可以優先於自動偵測，仍不得啟用 Planned、Deprecated、缺少 Reference、相依未滿足、衝突或與 Changed Module 明顯不適用的 Profile；此時應回報無法套用的理由並依風險決定 Core Only 或停止。
 
 ### 單一技術棧
 
@@ -603,13 +751,22 @@ automation/* → Core + Python
 6. 找不到支援 Profile 不是錯誤；Core Skill 必須保持可用。
 7. Planned Profile 命中偵測訊號時，只能回報「規劃中」，不得讀取不存在的 Reference 或假裝套用。
 
+### Composition Semantics
+
+1. `requires` 依傳遞關係展開；任何必要 Profile 缺少、不可用或不適用時，該 Profile 組合無效。
+2. `recommends` 只提供組合提示，不會單憑 Metadata 自動套用；被建議的 Profile 仍須有獨立 Repository Facts。
+3. `conflicts` 必須由雙方 Metadata 對稱宣告；命中時不得自行選擇其中一方。
+4. Self-reference、`requires` Cycle 與不對稱 Conflict 都是 Metadata 驗證錯誤。
+5. `load_order` 相同時，依 `kind` 再依 `id` 排序，確保結果穩定。
+6. Conflict 只阻止有衝突的 Profile 組合；非關鍵情境可回到 Core Only 並回報原因。若不同 Profile 會改變公開行為、資料、資源或副作用，必須停止並取得人類決策。
+
 ## Profile 套用後的輸出
 
 Profile 不新增另一套完整輸出格式。
 
 - **Lightweight**：只有 Profile 確實改變選擇或驗證時，才在簡短回報中說明。
-- **Standard**：在 `Decision Basis` 或 `Selected Approach` 內列出 `Profiles Applied`。
-- **Full Audit**：把 Profile 選擇的 Repository Facts、Unknowns 與 Evidence 納入既有追蹤契約。
+- **Standard**：固定在 `Decision Basis` 內依 Changed Module 列出 `Profiles Applied` 與 `Profile Basis`；Core Only 明確記錄 `Profiles Applied: none`。
+- **Full Audit**：Profile Reference 放入 `Applicable References`，選擇證據放入 `Repository Facts Used`，無法確定的訊號放入 `Unknowns`；Core Only 明確記錄 `Profiles Applied: none`。
 
 建議格式：
 
@@ -745,9 +902,10 @@ Spring Boot、JPA Transaction 等應由 Framework Profile 處理。
 2. Profile Metadata 的 `suite_version` 必須與 Release 版本一致。
 3. Profile 成熟度不等於 SemVer；例如 `v0.5.0` 可以同時包含 Experimental 與 Planned Profile。
 4. 新增向後相容 Profile 屬於 Minor Release。
-5. 修正文句、偵測訊號或不改變契約的 Profile Bug 屬於 Patch Release。
-6. 改變 Profile ID、選擇優先權、公開輸出契約或移除既有 Profile，需要依相容性決定 Major Release。
-7. Benchmark Version、Fixture Version 與 Profile Schema Version 分開管理，不能以 Skill Version 取代。
+5. 純文字修正，或讓實作重新符合既有 Detection／Routing 契約且不改變選取結果的 Bug Fix，屬於 Patch Release。
+6. 新增向後相容 Detection 訊號，或使既有 Repository Facts 產生新的相容 Profile Selection 結果，屬於 Minor Release。
+7. 破壞既有 Profile ID、Schema、Composition、選擇優先權、公開輸出契約，或移除既有 Profile，屬於 Major Release。
+8. Benchmark Version、Fixture Version 與 Profile Schema Version 分開管理，不能以 Skill Version 取代。
 
 ## Source 與 Distribution
 
@@ -767,7 +925,20 @@ Spring Boot、JPA Transaction 等應由 Framework Profile 處理。
 
 ### Specialist Package
 
-未來可以產生：
+`scripts/build_skill_package.py` 接受可重複的 `--profile <id>`。每個明確選取的 Profile 都必須遞迴納入其 `requires`，但不會因 `recommends` 自動增加 Profile。只指定 `react` 是有效請求；要產生 TypeScript React Package，呼叫端必須同時指定 `--profile typescript --profile react`。
+
+每個 Specialist Package 只包含：
+
+1. 由 Packager 產生、名稱與選擇結果一致的 `SKILL.md` 與必要 OpenAI Adapter。
+2. 所有必要 Core References。
+3. 只描述此 Package 所含 Profile 的 Runtime Profile Index。
+4. 明確選取的 Profile、它們傳遞式 `requires`，以及對應 Profile References。
+5. Repository 的 `LICENSE`。
+6. 可機器驗證的 `PACKAGE-MANIFEST.json`。
+
+已被 Bundled 不代表每個任務都會套用該 Profile。Specialist Package 仍必須依 Changed Module 判斷適用性；若 Bundled Profile 對目前任務不適用，就以 Core Only 執行並回報理由，不得為了符合 Package 名稱而強制套用。
+
+長期可以產生：
 
 ```text
 clean-code-ai-csharp
@@ -780,9 +951,25 @@ clean-code-ai-react
 clean-code-ai-vue
 ```
 
-每個 Specialist Package 可以複製必要 Core 文件以確保獨立安裝，但只能由 `build_skill_package.py` 產生。生成檔案應包含來源 Commit、Suite Version、Profile ID 與內容雜湊，避免產物無法追蹤。
+### Reproducible Package Manifest
 
-`v0.5.0` 的 Definition of Done 不要求公開發行全部 Specialist Package。至少要完成一個可重現的範例打包與 Contract Test，證明架構可行；正式發布應等待對應 Profile 至少達到 `beta`。
+Release Mode 只能在乾淨 Worktree 執行，所有輸入都從目前 `HEAD` 的 Git Blob Bytes 讀取；不得混入未 Commit 檔案、Checkout EOL 或平台特有內容。Development／Test Mode 必須明確接收 Source Root，使用目前 Worktree Bytes，並在 Manifest 記錄 `source_mode: worktree`，不得冒充 Release Artifact。
+
+`PACKAGE-MANIFEST.json` 同時記錄來源與實際產物，至少包含：
+
+- Manifest Schema Version。
+- `source_commit` 與 `source_mode`。
+- Suite Version 與 Packager Version。
+- 依穩定規則排序的 Profile ID。
+- 排序後的 `inputs`，每筆包含 Repository 相對路徑與 SHA-256。
+- 排序後的 `files`，每筆包含 Package 相對路徑與 SHA-256。
+- Package Overall Digest；計算時排除 Manifest 自身的 Overall Digest 欄位。
+
+Manifest 與產物不得包含 Timestamp、Absolute Path、OS 名稱或其他會讓相同輸入產生不同 Bytes 的環境資訊。Canonical JSON 使用 UTF-8、LF、遞迴排序 Object Key、固定 Array 順序與無多餘空白的 Serialization。Overall Digest 是移除 `overall_digest` 欄位後之 Canonical Manifest JSON 的 SHA-256；`files` 不列入 `PACKAGE-MANIFEST.json` 自身，避免自我雜湊循環。Ubuntu 與 Windows 必須對同一個 Canonical Fixture 產生相同 Digest。
+
+`scripts/package-manifest.schema.json` 使用 JSON Schema Draft 2020-12 與 `additionalProperties: false` 驗證這份產物。它的 Schema Version 與 `profiles/profile.schema.json`、Suite SemVer 分開管理，避免 Packaging Contract 與 Profile Metadata 綁死。
+
+`v0.5.0` 只在 Git ignored 的 `dist/clean-code-ai-csharp/` 產生一個 C# Sample Package 並執行 Contract Test；不建立 ZIP、不 Commit `dist/`，也不公開發布。正式發布任何 Specialist Package 必須等待其中所有 Profile 至少達到 `beta`，並另行取得 Release 授權。
 
 ### Plugin Suite
 
@@ -803,6 +990,42 @@ Plugin Manifest、Marketplace 發布與完整 Suite 安裝屬於後續版本。`
 9. Profile 不得把原本未授權的外部操作變成已授權。
 10. Planned Profile 不得改變既有 Core 行為。
 
+## 非功能需求與工具安全
+
+### Context Budget
+
+1. 不設定會掩蓋任務差異的任意全域 Token 上限；Routing 以 Changed Module 為單位，只載入實際相關的 Profile Reference。
+2. 每份 Profile Reference 目標上限約為 1,500 個英文單字；超過時必須先消除重複 Core 說明，或提出具體理由接受 Review。
+3. Core `SKILL.md` 必須持續符合既有 525-word Contract，不得用提高上限掩蓋 Routing 膨脹。
+
+### Portability 與 CI Matrix
+
+Profile Contract、Routing、Generated Region 與 Packaging Tests 必須同時在 Ubuntu 與 Windows 執行，並對相同 Canonical Fixture 驗證相同 Package Digest。Core Skill 的 `agentskills validate` 至少在 Ubuntu 執行；若 Windows Runner 可取得相同 CLI，也一併驗證，但不得因工具不可取得而改寫 Contract。
+
+### Tool Mutation Boundary
+
+1. `validate_profiles.py` 是 Read-only，不得修改任何檔案。
+2. `generate_profile_matrix.py` 只能改寫 README 與 `profile-selection.md` 中各自唯一、明確標記的 Generated Region；Marker 缺失、重複或順序錯誤時必須停止，不能重寫整份文件。
+3. `build_skill_package.py` 只能寫入呼叫端明確指定、執行開始時尚不存在的 Output Directory；已存在時必須 Fail Closed，不能覆寫或清空。
+4. Packaging 失敗時，只能逐一刪除本次執行實際建立且有明確路徑的檔案，再由最深層開始非遞迴移除已空目錄；不得使用 Recursive Delete、Glob Delete 或清理執行前已存在的內容。
+5. 這些工具不得存取網路、安裝依賴、Commit、Tag、Push、建立 Release，或修改 Consumer Repository。
+
+### Script API 與 CLI Contract
+
+三個 Script 的核心邏輯必須是可 Import、可用暫存 Fixture 測試且不直接結束 Process 的 Python Function；CLI 只負責參數解析、呼叫核心邏輯與呈現已排序的 Diagnostic。固定 CLI 為：
+
+```text
+python scripts/validate_profiles.py --source-root <path>
+python scripts/generate_profile_matrix.py --source-root <path> [--check]
+python scripts/build_skill_package.py --source-root <path> --output <new-path> --source-mode <release|worktree> --profile <id> [--profile <id> ...]
+```
+
+所有 Diagnostic 依 Repository 相對檔案路徑、欄位路徑與錯誤代碼穩定排序，不輸出 Traceback 作為一般 Contract Failure 介面。Exit Code 固定為：
+
+- `0`：成功，或 `--check` 確認無漂移。
+- `1`：Schema、Contract、Validation、Generated Drift 或 Packaging 前置條件失敗。
+- `2`：缺少參數、非法選項或其他 CLI Usage Error。
+
 ## 驗證與 CI
 
 ### Profile Contract Tests
@@ -822,7 +1045,11 @@ Plugin Manifest、Marketplace 發布與完整 Suite 安裝屬於後續版本。`
 
 ### Routing Tests
 
-使用小型 Fixture 驗證：
+每個案例放在 `tests/fixtures/profile-routing/<case>/`，只保存最小 Manifest、代表性 Source Stub 與 `expected.json`。Fixture 不安裝套件、不連網、不 Build，也不複製完整範例應用程式。
+
+`expected.json` 至少包含 `changed_files`、選填的 `explicit_profiles`、整體 `outcome`、各 Changed Module 的 `root`／`profiles`／`unavailable_profiles`、穩定的 `reason_codes` 與預期 `unknowns`。`outcome` 只能是 `selected`、`core_only` 或 `blocked`。測試不得比對完整人類敘述，避免純文案修正破壞 Routing Contract。
+
+使用這些小型 Fixture 驗證：
 
 1. 純 C# 模組只選 `csharp`。
 2. Python 模組只選 `python`。
@@ -839,29 +1066,42 @@ Plugin Manifest、Marketplace 發布與完整 Suite 安裝屬於後續版本。`
 
 ### Packaging Tests
 
-- 同一 Source Commit 產生相同檔案與內容雜湊。
-- Specialist Package 只包含 Core 與選定 Profile 所需檔案。
+跨平台 Canonical Fixture 獨立放在 `tests/fixtures/profile-packaging/csharp/`，不得與 Routing Fixture 共用預期結果或讓兩種測試責任互相依賴。
+
+- Release Mode 從同一 Source Commit 產生逐 Byte 相同的檔案、輸入雜湊與 Overall Digest。
+- Windows 與 Ubuntu 對同一 Canonical Fixture 產生相同 Overall Digest。
+- Development／Test Mode 明確標記 `source_mode: worktree`，不得宣稱為 Release Artifact。
+- Specialist Package 只包含 Core、明確選定 Profile 與其傳遞式 `requires` 所需檔案，不自動納入 `recommends`。
+- `react` 單獨打包有效；TypeScript React 必須明確同時選取 `typescript` 與 `react`。
+- Bundled Profile 對 Changed Module 不適用時回到 Core Only，不會強制套用。
 - Generated `SKILL.md` Frontmatter 名稱與 Metadata 一致。
 - Generated Package 可通過 `agentskills validate`。
-- `dist/` 不是手動 Source，乾淨 Checkout 可重新產生。
+- `PACKAGE-MANIFEST.json` 通過獨立 Schema，不含 Timestamp、Absolute Path 或 OS，並可重新計算每個 Input Hash、Package File Hash 與 Overall Digest。
+- 已存在的 Output Directory 必須 Fail Closed；失敗清理不得刪除執行前內容或使用 Recursive Delete。
+- `dist/` 是 Git ignored 的 Generated Output，乾淨 Checkout 可重新產生。
 - Planned Profile 無法作為 Packaging Target。
 
 ### Existing Regression Tests
 
 既有 `test_skill_contract.py`、Benchmark Harness Test、Strategy Full Run Verification 與 Open Standard Validation 必須繼續通過。若需要重構固定的 `REFERENCE_NAMES`，測試應改成「Core Reference + Catalog 中可用的 Profile Reference」契約，不得單純刪除完整性檢查。
 
+在新增 Profile 前，必須先修復 v0.4.0 Strategy Full Run Verification：歷史 Result 應依其 Receipt 所指向的固定 Revision 讀取 Git Blob Bytes，不得以目前 `SKILL_SOURCE`、目前 Worktree Bytes 或平台 EOL 作比較基準。這項修復不得改寫既有公開 Result、Manifest 或 Receipt。
+
 ### CI 建議流程
+
+Profile Contract、Routing、Generated Region 與 Packaging 步驟在 Ubuntu 與 Windows Matrix 執行；兩個平台使用同一份 Canonical Fixture Digest Assertion。`agentskills validate` 至少在 Ubuntu 執行，Windows 有相同 CLI 時再加入同一 Gate。
 
 ```text
 1. Install validation dependencies
 2. Run repository unit tests
 3. Validate profile schema and catalog
-4. Validate profile reference contract
-5. Run routing fixtures
-6. Build deterministic sample package
-7. Validate Core Skill open standard
-8. Validate generated sample Specialist Skill
-9. Compile benchmark harness
+4. Check generated Runtime Profile Index and README Profile Matrix
+5. Validate profile reference contract
+6. Run routing fixtures
+7. Build deterministic sample package
+8. Validate Core Skill open standard
+9. Validate the Skill inside the generated sample Specialist Package
+10. Compile benchmark harness
 ```
 
 ## Profile Benchmark 設計
@@ -930,6 +1170,13 @@ core-plus-react
 
 ## Documentation 設計
 
+本主題只維護以下權威文件：
+
+1. 本 SPEC 是完整架構與驗收規則的唯一來源，所有設計確認直接更新本檔。
+2. 根目錄 `CONTEXT.md` 只保存穩定術語，不保存實作細節。
+3. 架構確認後只建立 `docs/adr/0001-core-plus-composable-profiles.md`，記錄 Monorepo、單一 Core 與 Composable Profiles 的決策與取捨，並連回本 SPEC。
+4. SPEC 經使用者核准後只建立 `docs/superpowers/plans/2026-09-04-composable-language-framework-profile-architecture.md`；不另建 Summary、Decision Log、Roadmap 或 Handoff 文件。
+
 實作完成後，README 應新增：
 
 1. Core + Profile 架構簡介。
@@ -954,22 +1201,22 @@ core-plus-react
 | Java | Language | Planned | Not available | Not started |
 | Vue | Framework | Planned | Not available | Not started |
 
-矩陣必須由 `catalog.yaml` 產生或至少由 CI 驗證一致，避免 README 與真實狀態漂移。
+矩陣與 `profile-selection.md` 的 Runtime Profile Index 必須由 `scripts/generate_profile_matrix.py` 從 Catalog／Metadata 產生為分別使用 `profile-matrix:generated` 與 `runtime-profile-index:generated` Marker 的 Checked-in 區塊；CI 使用 Read-only `--check` 模式拒絕漂移，人工不得直接修改產生區塊。
 
 ## 貢獻者契約
 
-新增 Experimental Profile 的 Pull Request 必須同時提供：
+只有 `planned` Metadata 可以先獨立提交。從 `planned` 升為 `experimental` 的同一筆變更必須原子地提供：
 
 1. Profile Metadata。
 2. 符合固定章節的 Profile Reference。
 3. Detection 與 Routing Fixture。
 4. Contract Test。
-5. README Matrix 更新或可重現的自動生成結果。
+5. Runtime Profile Index 與 README Matrix 的可重現 Generated Region 更新。
 6. Evidence Status 與未完成項目，不得空白省略。
 7. 原創內容或清楚授權與 Attribution。
 8. 不重複 Core 規則的自我檢查。
 
-只新增 Planned Profile 時，可以只有 Metadata 與 Catalog 更新，但必須省略 `reference`，且不得啟用 Routing／Packaging。
+只新增 Planned Profile 時，可以只有 Metadata 與 Catalog 更新，但必須省略 `reference`，且不得啟用 Routing／Packaging。不得提交空白 Reference、TODO／TBD 占位、缺少測試的可用狀態，或先宣稱 `experimental` 再於後續變更補齊契約。
 
 Profile Reviewer 至少檢查：
 
@@ -991,18 +1238,32 @@ Profile Reviewer 至少檢查：
 
 ## 實作里程碑
 
+### Preflight：v0.4.0 Historical Verification Integrity
+
+範圍：
+
+- 讓 v0.4.0 Strategy Full Run Verification 從 Receipt 指定的歷史 Revision 取得 Git Blob Bytes。
+- 排除目前 Worktree、CRLF／LF 與後續 Profile Reference 對歷史驗證結果的影響。
+- 保留既有 Result、Manifest 與 Receipt。
+
+完成條件：
+
+- 相同歷史 Revision 在不同 Checkout EOL 下得到相同驗證結果。
+- v0.4.0 公開 Receipt 可重播，且不依賴目前 Skill Tree。
+- 全部既有 Regression Tests 回到綠燈後，才開始 M0-A。
+
 ### M0-A：Profile Structural Contract
 
 範圍：
 
 - 新增 `profile.schema.json` 與 `catalog.yaml`。
-- 加入八個 Profile Metadata；首批四個為 `experimental`，其餘為 `planned`。
+- 加入八個 `planned` Profile Metadata。
 - 新增 Profile Contract Tests。
 - 不修改 Core Routing 行為。
 
 完成條件：
 
-- Schema、Catalog、ID、Status、Reference 與 Composition 驗證全數通過。
+- Schema、Catalog、ID、Status 與 Composition 驗證全數通過。
 - Planned Profile 不可被 Routing 或 Packaging 使用。
 - Planned Profile 不建立空白 Reference。
 
@@ -1012,15 +1273,15 @@ Profile Reviewer 至少檢查：
 
 - 新增 `references/profile-selection.md`。
 - 在 `SKILL.md` 加入最小 Routing 入口。
-- 新增 Changed Module 與 Polyglot Fixtures。
+- 以 `tests/fixtures/profile-routing/<case>/` 的測試專用 Catalog、最小 Manifest、Source Stub 與 `expected.json` 新增 Changed Module 與 Polyglot Routing Contract Tests。
 - 更新 Output Contract 的 Profile 回報規則。
 
 完成條件：
 
 - 既有 Prompt 不需修改。
 - 無 Profile 時維持 Core 行為。
-- TypeScript React 能選出兩層 Profile。
-- Planned Vue 不會被誤載入。
+- 測試專用 Fixture 中的 TypeScript React 能選出兩層 Profile。
+- 真實 Catalog 中的八個 Planned Profile 都不會被載入或打包。
 - Entry Point 篇幅與所有既有測試通過。
 
 ### M1-A：C# Profile
@@ -1028,40 +1289,38 @@ Profile Reviewer 至少檢查：
 範圍：
 
 - 完成 `language-csharp.md`。
-- 增加 C# Routing 與 Semantic Contract Tests。
-- 標示為 `experimental`。
+- 增加 C# Routing 與 Semantic Contract Tests，並在同一步把 C# Metadata 標示為 `experimental`。
 
 完成條件：
 
 - 不包含 ASP.NET Core 專屬規則。
-- 能明確處理 Nullability、Cancellation、Resource、LINQ、Equality 與 DI Lifetime 風險。
+- Reference 明確涵蓋 Nullability、Cancellation、Resource、LINQ、Equality，以及 Repository 已使用 DI 時的 Lifetime 風險。
 
 ### M1-B：Python Profile
 
 範圍：
 
 - 完成 `language-python.md`。
-- 增加 Python Routing 與 Semantic Contract Tests。
-- 標示為 `experimental`。
+- 增加 Python Routing 與 Semantic Contract Tests，並在同一步把 Python Metadata 標示為 `experimental`。
 
 完成條件：
 
 - 不把 FastAPI 或 Django 當成 Python 通則。
-- 能涵蓋 Dynamic Typing、Mutable State、Async、Cleanup 與 Exception Boundary。
+- Reference 明確涵蓋 Dynamic Typing、Mutable State、Async、Cleanup 與 Exception Boundary。
 
 ### M1-C：TypeScript 與 React Profiles
 
 範圍：
 
 - 完成 `language-typescript.md` 與 `framework-react.md`。
-- 驗證 TypeScript React 與 JavaScript React 的不同組合。
-- 標示為 `experimental`。
+- 驗證 TypeScript React 與 JavaScript React 的不同組合，並在同一步把 TypeScript 與 React Metadata 標示為 `experimental`。
 
 完成條件：
 
 - TypeScript 規則與 React Lifecycle 規則分離。
-- JavaScript React 不會誤報 TypeScript Profile。
-- 既有 React Benchmark Fixture 可作後續 Profile Pilot 基礎。
+- 固定 Routing Fixture 證明 JavaScript React 不會選取 TypeScript Profile。
+- React Profile 只涵蓋 Renderer-neutral 語意與有 `react-dom` 證據的條件式 DOM 規則，不把 React Native 平台 API 納入 `v0.5.0`。
+- 識別既有 Pinned React Benchmark Fixture，僅作後續 M2 Profile Pilot 的候選基礎，不宣稱已驗證 Profile 效果。
 
 ### M1-D：README、Authoring Guide 與 Sample Packaging
 
@@ -1069,17 +1328,19 @@ Profile Reviewer 至少檢查：
 
 - 新增 Profile Matrix 與使用說明。
 - 新增 Profile Authoring Guide。
-- 完成至少一個可重現 Specialist Package 範例。
+- 在 Git ignored 的 `dist/clean-code-ai-csharp/` 完成唯一的可重現 C# Specialist Package 範例。
 
 完成條件：
 
 - README 狀態與 Catalog 一致。
 - Generated Package 通過 Open Standard Validation。
+- Ubuntu 與 Windows 對 `tests/fixtures/profile-packaging/csharp/` 產生相同 Package Digest。
+- Sample Package 不建立 ZIP、不 Commit，也不公開發布。
 - 不公開發布未達 Beta 的 Specialist Package。
 
 ### `v0.5.0` Release Boundary
 
-M0-A、M0-B、M1-A、M1-B、M1-C 與 M1-D 是 `v0.5.0` 的實作與驗收範圍。完成後先進行規格對照、測試與 Release Review；不要在同一個未重新核准的計畫中自動接續 M2 或 M3。
+Preflight、M0-A、M0-B、M1-A、M1-B、M1-C 與 M1-D 是 `v0.5.0` 的實作與驗收範圍。完成後先進行規格對照、測試與 Release Review；不要在同一個未重新核准的計畫中自動接續 M2 或 M3。
 
 ### M2：Profile Pilot
 
@@ -1112,10 +1373,19 @@ Codex 開始開發前應先：
 
 1. 讀取本規格、目前 `SKILL.md`、所有既有 Core Reference、Tests、CI 與 Benchmark Contract。
 2. 盤點本規格與目前 Repository 的實際差異，不假設目錄或工具已存在。
-3. 產生獨立 Implementation Plan，將 M0-A 至 M1-D 拆成可驗證的小步驟。
+3. 產生獨立 Implementation Plan，將 Preflight 至 M1-D 拆成可驗證的小步驟；每個 Task 明列檔案、先寫的失敗測試、最小實作、驗證命令、完成條件與 Commit Boundary。
 4. 保留現有 Tests 與公開 Result，不以重寫歷史證據來讓新 Contract 通過。
-5. 對依賴安裝、Release、Tag、外部 Repository、正式 Benchmark Run 或其他外部操作保留 Authorization Gate。
-6. 在未取得下一階段核准前停止於 `v0.5.0` Release Boundary。
+5. Implementation Plan 必須先交由使用者核准；核准前不得建立開發 Worktree 或修改實作檔案。
+6. 計畫核准後，從包含核准設計與計畫的本機 `main` 建立 `codex/v0.5.0-composable-profiles` Branch，以及位於 Repository 同層、目錄名稱為 `Clean-Code-AI-Collaboration-Skill-v0.5.0` 的隔離 Worktree；公共文件不得保存使用者的絕對路徑。
+7. 開發採 TDD，依 Preflight、M0-A、M0-B、M1-A、M1-B、M1-C、M1-D 順序小步實作；每個里程碑通過指定 Gate 後建立一個可獨立回復的本機 Commit。
+8. 計畫核准後，允許在隔離 Worktree 的本機虛擬環境安裝 `requirements-dev.txt` 精確 Pin 的開發相依；不得寫入 System Python、由 Repository Script 自動安裝或 Commit `.venv`。
+9. Preflight 必須先讓完整 Regression 回到綠燈；不得先開發 Profile、降低 Assertion 或改寫既有 Result／Manifest／Receipt。
+10. 對 Push、PR、Merge、Tag、GitHub Release、公開 Specialist Package、外部 Repository、正式 Benchmark Run、M2 或 M3 保留新的 Authorization Gate。
+11. 在未取得下一階段核准前停止於 `v0.5.0` Release Boundary。
+
+### Validation 與交付狀態
+
+`v0.5.0` 完成宣稱必須依序提供 Targeted Tests、Windows 完整 Repository Tests、Benchmark Harness Compile、Core 與 Sample Package Open Standard Validation、Generated Region `--check`、Canonical Package 跨平台 CI、SPEC Compliance Review 與 Code Review 證據。本機通過不等於 CI 通過；CI 通過也不等於已 Push、Merge、Tag 或發布。
 
 ## 驗收條件
 
@@ -1135,6 +1405,23 @@ Codex 開始開發前應先：
 12. 文件與 Metadata 沒有未完成占位內容、空白 Evidence 宣稱或不可解析的 Profile 引用。
 13. TypeScript + React Benchmark 設計具備可分離的 Profile 歸因邊界。
 14. M2、M3 未在沒有下一階段核准的情況下被提前實作。
+15. 所有 Profile 都有明確 Maintainer；Beta／Stable 宣稱可由公開且通過的 Evidence Result 驗證，其他 Outcome 仍完整保留。
+16. Ubuntu 與 Windows 對 Canonical Packaging Fixture 產生相同 Digest，產物不包含 Timestamp、Absolute Path 或 OS 差異。
+17. v0.5.0 只產生 Git ignored 的 `dist/clean-code-ai-csharp/`，不建立 ZIP、不 Commit，也不公開發布。
+18. Validator、Generator 與 Packager 符合各自 Mutation Boundary，錯誤路徑不使用 Recursive Delete 或覆寫既有 Output Directory。
+19. C#、Python、TypeScript、React 與四個 Planned Profile 都遵守 Technology-Specific Detection Contract；Supporting File 不會被誤當成同等 Owning Manifest。
+20. Profile 對版本敏感規則讀取 Repository Facts；版本未知時明確記錄 Unknown，不假設最新版。
+21. Routing 與 Packaging Fixture 分離，且都不需安裝依賴或 Build 完整範例應用程式。
+22. Detection Metadata 結構化區分 Owning／Supporting File 與 Candidate／Supporting Dependency，Routing 不依 Profile ID 寫死例外。
+23. 多重 Owning Manifest 依距離、Boundary Specificity 與 Metadata 順序產生穩定結果。
+24. 三個 Script 提供可 Import 的核心邏輯、固定 CLI、穩定 Diagnostic 排序與 `0`／`1`／`2` Exit Code。
+25. Generated Region 使用唯一固定 Marker；`--check` Read-only，異常 Marker Fail Closed。
+26. Routing `expected.json` 使用穩定 Outcome 與 Reason Code，不比對完整人類文案。
+27. `PACKAGE-MANIFEST.json` 同時驗證 Input 與 Package File，通過獨立 Schema，並依 Canonical JSON 計算 Overall Digest。
+28. Planned Metadata 可獨立提交；升級 Experimental 必須原子包含 Metadata、完整 Reference、Tests 與 Generated Docs。
+29. Implementation Plan 經使用者核准後才建立隔離 Worktree 並開始開發。
+30. 開發依 Preflight 至 M1-D 採 TDD 與里程碑本機 Commit；不自動 Push、PR、Merge、Tag 或發布。
+31. 完成報告明確區分本機 Gates、跨平台 CI、Review 與 Release 狀態。
 
 ## 風險與緩解
 
@@ -1156,7 +1443,7 @@ Codex 開始開發前應先：
 
 ### 風險：Context 膨脹
 
-緩解：`SKILL.md` 只路由，不內嵌 Profile；每次只讀本次模組相關 Reference；Profile 設定篇幅上限。
+緩解：`SKILL.md` 只路由，不內嵌 Profile；每個 Changed Module 只讀相關 Reference；Profile Reference 目標不超過約 1,500 個英文單字，Core Entry Point 持續遵守 525-word Contract。
 
 ### 風險：Profile 存在但沒有證據
 
@@ -1166,9 +1453,13 @@ Codex 開始開發前應先：
 
 緩解：Language 與 Framework 使用階梯式 Treatment Arm；公開 Result 明確標示評估的是單一 Profile 或 Profile Pack。
 
-### 風險：Generated Specialist Skill 漂移
+### 風險：Generated Specialist Package 漂移
 
-緩解：禁止手動修改 `dist/`；生成內容保存 Commit、Version 與 Hash；CI 驗證可重現。
+緩解：`dist/` 必須 Git ignored；Release Mode 從 HEAD Git Blob Bytes 生成；Manifest 排除非決定性資訊；Ubuntu／Windows 對同一 Fixture 驗證相同 Digest。
+
+### 風險：生成工具覆寫或誤刪使用者檔案
+
+緩解：Validator Read-only；Generator 只改固定 Marker；Packager 只接受不存在的明確 Output Directory；失敗時逐檔清理本次建立內容，禁止 Recursive Delete。
 
 ### 風險：一次開發八個 Profile 導致品質下降
 
@@ -1192,6 +1483,6 @@ Codex 開始開發前應先：
 
 `Clean-Code-AI-Collaboration-Skill` 將以 Monorepo 繼續發展。`clean-code-ai-collaboration` 保持單一 Core Skill，Language Profile 與 Framework Profile 依 Changed Module 組合使用；TypeScript 作為 React／Vue 共同語言層，React 與 Vue 保持 Framework 分類。
 
-`v0.5.0` 完成 Profile Contract、Routing、C#、Python、TypeScript 與 React，並只為 Go、Rust、Java、Vue 建立 Planned Metadata。獨立 Specialist Skill 只作自動生成的 Distribution Artifact，不作新的手動維護來源。
+`v0.5.0` 完成 Profile Contract、Routing、C#、Python、TypeScript 與 React，並只為 Go、Rust、Java、Vue 建立 Planned Metadata。獨立 Specialist Package 只作自動生成的 Distribution Artifact，不作新的手動維護來源。
 
 Profile Pilot、正式結果與剩餘 Profile 屬於下一階段。這個設計的核心不是增加更多規則，而是讓共用判斷維持一致、讓語言差異只在需要時被載入，並讓每個「支援」主張都能對應到清楚的 Repository Facts、驗證與 Evidence Boundary。
