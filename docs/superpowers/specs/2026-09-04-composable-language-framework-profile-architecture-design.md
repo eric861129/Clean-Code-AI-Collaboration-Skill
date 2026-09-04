@@ -9,6 +9,19 @@
 - Repository：`Clean-Code-AI-Collaboration-Skill`
 - 主要決策：採用單一 Monorepo、保留一個 Core Skill，透過 Language Profile 與 Framework Profile 擴充
 
+## 版本與實作範圍
+
+本文件同時描述長期完整架構與分階段 Roadmap，但 `v0.5.0` 的正式實作範圍只包含：
+
+1. Profile Metadata Schema、Catalog 與驗證工具。
+2. Changed Module 為中心的 Profile Selection Contract。
+3. Core Skill 的最小 Routing 調整與向後相容性。
+4. C#、Python、TypeScript 與 React 四個 `experimental` Profile。
+5. Go、Rust、Java 與 Vue 的 `planned` Metadata 與 Roadmap，不建立空白 Reference。
+6. README、Profile Authoring Guide 與一個可重現的 Specialist Package 範例。
+
+本文件後段的 Profile Pilot、Full Run、Go、Rust、Java 與 Vue Reference 實作屬於 `v0.5.0` 後續工作。除非另有明確核准，不應把 M2、M3 自動納入第一個 Codex Implementation Plan。
+
 ## 背景
 
 目前 `clean-code-ai-collaboration` 已經不是單純的 Clean Code 語法指南。它具備下列跨語言能力：
@@ -60,7 +73,7 @@ Core Skill
 7. Source of Truth 只保留一份。未來可由 CI 產生可獨立安裝的 Specialist Skill，但不得手動維護重複的 Core 內容。
 8. `v0.5.0` 不改 Repository 名稱、不改 Core Skill 名稱，也不改既有明確呼叫政策。
 9. 新增 Profile 不授權安裝工具、修改依賴、改動公開契約或執行破壞性操作。
-10. 所有新 Profile 初始狀態均為 `experimental`；只有完成對應證據 Gate 後才能升級成熟度。
+10. 已完成 Reference 與 Contract Test 的新 Profile 從 `experimental` 開始；只有 Roadmap Metadata 的 Profile 使用 `planned`，兩者都必須經過對應 Evidence Gate 才能升級。
 
 ## 目標
 
@@ -190,7 +203,9 @@ Core Skill 永遠存在。Profile 是條件式補充，不會獨立取代 Core�
 
 ## Repository 結構
 
-`v0.5.0` 採取「先相容、再擴充」的目錄策略。既有七份 Core Reference 不在本版本重新命名，避免同時製造大量無價值 Diff。
+### `v0.5.0` 實際 Source 結構
+
+`v0.5.0` 採取「先相容、再擴充」策略。既有七份 Core Reference 不在本版本重新命名，避免同時製造大量無價值 Diff；只建立首批四個 Profile Reference。
 
 ```text
 Clean-Code-AI-Collaboration-Skill/
@@ -214,13 +229,9 @@ Clean-Code-AI-Collaboration-Skill/
 │       ├── testing-and-change-safety.md
 │       ├── profile-selection.md
 │       ├── language-csharp.md
-│       ├── language-go.md
-│       ├── language-rust.md
 │       ├── language-python.md
-│       ├── language-java.md
 │       ├── language-typescript.md
-│       ├── framework-react.md
-│       └── framework-vue.md
+│       └── framework-react.md
 │
 ├── profiles/
 │   ├── profile.schema.json
@@ -247,20 +258,35 @@ Clean-Code-AI-Collaboration-Skill/
 │   └── existing tests...
 │
 ├── evals/
-│   ├── existing benchmark assets...
-│   └── profiles/
-│       ├── shared/
-│       ├── csharp/
-│       ├── python/
-│       ├── typescript-react/
-│       ├── go/
-│       ├── rust/
-│       ├── java/
-│       └── vue/
+│   └── existing benchmark assets...
 │
 └── dist/                         # Generated、Git ignored
     ├── clean-code-ai-collaboration/
-    └── specialist packages...
+    └── sample specialist package...
+```
+
+Go、Rust、Java 與 Vue 在 `v0.5.0` 只有 Planned Metadata。不得建立空白或只有標題的 `language-go.md`、`language-rust.md`、`language-java.md`、`framework-vue.md`，也不得把未完成 Reference 放入可安裝產物。
+
+### 後續完整結構
+
+Go、Rust、Java 與 Vue 進入 Experimental 時，才加入：
+
+```text
+clean-code-ai-collaboration/references/
+├── language-go.md
+├── language-rust.md
+├── language-java.md
+└── framework-vue.md
+
+evals/profiles/
+├── shared/
+├── csharp/
+├── python/
+├── typescript-react/
+├── go/
+├── rust/
+├── java/
+└── vue/
 ```
 
 ### 目錄規則
@@ -269,7 +295,7 @@ Clean-Code-AI-Collaboration-Skill/
 2. `profiles/*.yaml` 是本 Repository 的 Profile Registry，不是 Consumer Repository 的設定檔。
 3. Profile Markdown 放在既有 `references/` 內，讓 `SKILL.md` 能以相對連結漸進式載入。
 4. `dist/` 只能由 Script 產生，不得手動修改或作為 Source of Truth。
-5. Planned Profile 可以先存在於 `catalog.yaml`；未有完整 Reference 時不得被打包或宣稱為可用。
+5. Planned Profile 可以先存在於 `catalog.yaml` 與 Metadata；未有完整 Reference 時不得被打包或宣稱為可用。
 6. 本版本不搬動既有 Benchmark 歷史結果，也不改寫已發布 Result 的路徑。
 
 ## Core Skill 修改範圍
@@ -289,7 +315,9 @@ Clean-Code-AI-Collaboration-Skill/
 
 ## Profile Metadata Contract
 
-每個已實作 Profile 必須有一份 YAML Metadata，並通過 `profiles/profile.schema.json`。以下為 Language Profile 範例：
+每個 Profile 都有一份 YAML Metadata，並通過 `profiles/profile.schema.json`。Planned Profile 可省略尚未存在的 Reference；其他狀態必須連結實際檔案。
+
+以下為 Language Profile 範例：
 
 ```yaml
 schema_version: "1.0"
@@ -310,7 +338,7 @@ detection:
 
 routing:
   scope: changed-module
-  priority: 100
+  load_order: 100
 
 composition:
   requires: []
@@ -346,7 +374,7 @@ detection:
 
 routing:
   scope: changed-module
-  priority: 200
+  load_order: 200
 
 composition:
   requires: []
@@ -360,6 +388,42 @@ evidence:
   results: []
 ```
 
+`load_order` 只控制已選 Profile 的載入與 Review 順序：Language 通常先於 Framework。它不是 Winner-Takes-All 分數，也不得因數值較高就排除其他相關 Profile。
+
+### Planned Profile 範例
+
+```yaml
+schema_version: "1.0"
+id: go
+kind: language
+display_name: "Go"
+status: planned
+suite_version: "0.5.0"
+
+detection:
+  manifest_files:
+    - "go.mod"
+  file_extensions:
+    - ".go"
+  dependency_markers: []
+
+routing:
+  scope: changed-module
+  load_order: 100
+
+composition:
+  requires: []
+  recommends: []
+  conflicts: []
+
+evidence:
+  benchmark_status: not_started
+  manifests: []
+  results: []
+```
+
+Planned Metadata 用來鎖定 ID、分類與 Roadmap，不代表 Runtime 支援。Routing 與 Packaging 必須忽略 Planned Profile。
+
 ### 必要欄位
 
 | 欄位 | 說明 |
@@ -370,9 +434,9 @@ evidence:
 | `display_name` | README 與產物顯示名稱 |
 | `status` | `planned`、`experimental`、`beta`、`stable` 或 `deprecated` |
 | `suite_version` | 目前所屬 Skill Suite 版本 |
-| `reference` | 已實作 Profile 的 Markdown 路徑；`planned` 可省略 |
+| `reference` | 非 Planned Profile 的 Markdown 路徑；Planned 必須省略 |
 | `detection` | Manifest、Extension 與 Dependency 訊號 |
-| `routing` | Changed Module 選擇策略與優先順序 |
+| `routing` | Changed Module 選擇策略與載入順序 |
 | `composition` | Requires、Recommends 與 Conflicts |
 | `evidence` | Benchmark 狀態與可稽核路徑 |
 
@@ -380,13 +444,14 @@ evidence:
 
 1. `id` 必須符合 `^[a-z][a-z0-9-]*$`。
 2. 非 `planned` Profile 必須存在 `reference`，且該檔案可讀。
-3. `stable` 必須至少連結一份公開 Full Run Result。
-4. `beta` 必須至少連結通過的 Pilot 或等價證據。
-5. `experimental` 可以只有文件與 Contract Test，但 README 必須明確標示未完成效果驗證。
-6. `deprecated` 必須提供 Replacement 或移除原因。
-7. `requires`、`recommends`、`conflicts` 只能引用 Catalog 中存在的 ID。
-8. Profile ID、Reference Path 與產物名稱必須在大小寫不敏感檔案系統上仍保持唯一。
-9. Planned Profile 不得進入正式打包清單，也不得由 Routing 自動選取。
+3. `planned` Profile 必須省略 `reference`，避免指向空白或不存在的文件。
+4. `stable` 必須至少連結一份公開 Full Run Result。
+5. `beta` 必須至少連結通過的 Pilot 或等價證據。
+6. `experimental` 可以只有文件與 Contract Test，但 README 必須明確標示未完成效果驗證。
+7. `deprecated` 必須提供 Replacement 或移除原因。
+8. `requires`、`recommends`、`conflicts` 只能引用 Catalog 中存在的 ID。
+9. Profile ID、Reference Path 與產物名稱必須在大小寫不敏感檔案系統上仍保持唯一。
+10. Planned Profile 不得進入正式打包清單，也不得由 Routing 自動選取。
 
 ## Profile Reference Contract
 
@@ -443,10 +508,14 @@ Profile Selection 必須以本次任務的 Changed Module 與 Expected Diff 為�
 3. 尋找該模組最近的 Manifest 與設定檔
 4. 以檔案副檔名確認主要語言候選
 5. 以 Dependency Marker 確認 Framework 候選
-6. 套用零到多個 Language／Framework Profile
-7. 保留 Core、Repository Policy 與既有 Gate
-8. 回報實際套用 Profile 與無法確定的訊號
+6. 移除 Planned、Deprecated 或不相容候選
+7. 套用零到多個 Language／Framework Profile
+8. 依 load_order 載入已選 Profile
+9. 保留 Core、Repository Policy 與既有 Gate
+10. 回報實際套用 Profile 與無法確定的訊號
 ```
+
+Metadata Validator／Routing Fixture 負責驗證預期選擇；實際 Agent 執行仍必須讀取 Repository Facts。Script 的靜態推導不能取代 Agent 對 Expected Diff、Ownership 與行為邊界的判斷。
 
 ### 選擇優先順序
 
@@ -457,7 +526,7 @@ Profile Selection 必須以本次任務的 Changed Module 與 Expected Diff 為�
 5. Repository Root 訊號，只能作為補充，不能覆蓋更接近 Changed Module 的事實。
 6. 無充分訊號時使用 Core Only。
 
-`v0.5.0` 不新增必要的 Consumer Profile 設定檔。使用者可用自然語言或 Repository Instruction 明確指定 Profile，但不要求額外 Parser。
+`v0.5.0` 不新增必要的 Consumer Profile 設定檔。使用者可用自然語言或 Repository Instruction 明確指定 Profile，但不要求額外 Parser，也不新增另一組穩定 YAML 指令契約。
 
 ### 單一技術棧
 
@@ -477,16 +546,28 @@ TypeScript React 專案：
 Core + TypeScript + React
 ```
 
-TypeScript Vue 專案：
+TypeScript Vue 專案在 Vue 仍為 Planned 時：
+
+```text
+Core + TypeScript
+Vue Profile: not available in v0.5.0
+```
+
+Vue 進入 Experimental 後才可使用：
 
 ```text
 Core + TypeScript + Vue
 ```
 
-純 JavaScript React／Vue 專案允許：
+純 JavaScript React 專案允許：
 
 ```text
 Core + React
+```
+
+純 JavaScript Vue 專案要等 Vue Profile 進入 Experimental 後才允許：
+
+```text
 Core + Vue
 ```
 
@@ -497,8 +578,8 @@ Core + Vue
 若任務同時修改：
 
 ```text
-backend/   C# / .NET
-frontend/  TypeScript / React
+backend/    C# / .NET
+frontend/   TypeScript / React
 automation/ Python
 ```
 
@@ -514,12 +595,13 @@ automation/* → Core + Python
 
 ### 模糊與衝突處理
 
-1. 多個 Profile 同時符合但都與 Expected Diff 有關時，可以組合使用。
+1. 多個 Profile 同時符合且都與 Expected Diff 有關時，可以組合使用。
 2. 多個 Profile 符合但任務範圍不清楚時，先查閱鄰近 Manifest、測試與 Repository Instruction。
 3. 仍無法確認，而 Profile 差異會影響公開行為、資料、資源或副作用時，列為 Unknown 並停止在需要人類確認的邊界。
 4. 差異只影響非關鍵 Review 視角時，可以 Core Only 繼續，但必須回報未套用 Profile 的原因。
 5. Metadata `conflicts` 命中時不得自行選一個；必須依 User／Repository Policy 解決，否則停止。
 6. 找不到支援 Profile 不是錯誤；Core Skill 必須保持可用。
+7. Planned Profile 命中偵測訊號時，只能回報「規劃中」，不得讀取不存在的 Reference 或假裝套用。
 
 ## Profile 套用後的輸出
 
@@ -603,6 +685,8 @@ TypeScript Profile 不包含 React Hook 或 Vue Reactivity 規則。
 
 ## 後續 Profile 範圍
 
+以下內容定義 Roadmap 與未來 Reference 邊界，不屬於首個 `v0.5.0` Implementation Plan。
+
 ### Go Language Profile
 
 - Error Value、Wrapping、Sentinel 與錯誤比對。
@@ -647,13 +731,13 @@ Spring Boot、JPA Transaction 等應由 Framework Profile 處理。
 
 | 狀態 | 進入條件 | 可公開宣稱 |
 | --- | --- | --- |
-| `planned` | 已列入 Roadmap，可能只有 Metadata | 僅宣稱規劃中，不可自動路由或打包 |
+| `planned` | 已列入 Roadmap，只有 Metadata | 僅宣稱規劃中，不可自動路由或打包 |
 | `experimental` | Reference、Metadata 與 Contract Test 完成 | 可供試用；未證明相對 Core 的額外效果 |
 | `beta` | 固定 Fixture 與 Pilot 通過，Result／限制可稽核 | 已通過有限情境 Pilot，不外推到所有 Repository |
 | `stable` | Full Run、公開 Result、回歸 Gate 與維護 Owner 完整 | 在已記錄條件下具備穩定證據，仍不宣稱普遍保證 |
 | `deprecated` | 有替代方案或停止維護決策 | 明確標示 Replacement、遷移與移除版本 |
 
-首批 C#、Python、TypeScript、React 在程式碼合併時一律先標為 `experimental`。既有 .NET、TypeScript／React 與 Python Benchmark 可以作為 Fixture 與研究方法基礎，但不能直接把新 Profile 升級成 `beta`，因為過去比較的是 Core Skill，不是 Core + Profile 的增量效果。
+首批 C#、Python、TypeScript、React 在程式碼合併時一律先標為 `experimental`。Go、Rust、Java、Vue 在 `v0.5.0` 維持 `planned`。既有 .NET、TypeScript／React 與 Python Benchmark 可以作為 Fixture 與研究方法基礎，但不能直接把新 Profile 升級成 `beta`，因為過去比較的是 Core Skill，不是 Core + Profile 的增量效果。
 
 ## Versioning
 
@@ -679,7 +763,7 @@ Spring Boot、JPA Transaction 等應由 Framework Profile 處理。
 
 ### Core Package
 
-`clean-code-ai-collaboration/` 繼續是主要可安裝產物。它包含所有已啟用 Profile Reference，但透過漸進式路由避免每次載入全部內容。
+`clean-code-ai-collaboration/` 繼續是主要可安裝產物。它包含所有非 Planned、非 Deprecated 的 Profile Reference，但透過漸進式路由避免每次載入全部內容。
 
 ### Specialist Package
 
@@ -698,7 +782,7 @@ clean-code-ai-vue
 
 每個 Specialist Package 可以複製必要 Core 文件以確保獨立安裝，但只能由 `build_skill_package.py` 產生。生成檔案應包含來源 Commit、Suite Version、Profile ID 與內容雜湊，避免產物無法追蹤。
 
-`v0.5.0` 的 Definition of Done 不要求公開發行全部 Specialist Package。至少要完成可重現的單一範例打包與 Contract Test，證明架構可行；正式發布應等待對應 Profile 至少達到 `beta`。
+`v0.5.0` 的 Definition of Done 不要求公開發行全部 Specialist Package。至少要完成一個可重現的範例打包與 Contract Test，證明架構可行；正式發布應等待對應 Profile 至少達到 `beta`。
 
 ### Plugin Suite
 
@@ -717,6 +801,7 @@ Plugin Manifest、Marketplace 發布與完整 Suite 安裝屬於後續版本。`
 7. 既有 Benchmark Result、Manifest 與 Receipt 不因新 Profile 改寫。
 8. Profile 不得讓原本 Standard 任務自動升級成 Full Audit；只有實際發現的風險事實可以升級。
 9. Profile 不得把原本未授權的外部操作變成已授權。
+10. Planned Profile 不得改變既有 Core 行為。
 
 ## 驗證與 CI
 
@@ -727,11 +812,12 @@ Plugin Manifest、Marketplace 發布與完整 Suite 安裝屬於後續版本。`
 - 所有 YAML 通過 JSON Schema。
 - ID、Reference Path 與 Generated Package Name 唯一。
 - 非 Planned Reference 實際存在。
+- Planned Profile 沒有 `reference`。
 - Required／Recommended／Conflict ID 可解析。
 - Stable／Beta 的 Evidence 路徑與狀態符合成熟度規則。
 - Planned Profile 不會進入 Routing 或 Packaging。
 - Profile Markdown 具備所有必要章節。
-- Profile 與 Core 文件不存在 `TODO`、`TBD` 或 Scaffold Placeholder。
+- Profile 與 Core 文件不存在未完成占位內容。
 - Entry Point 仍低於既有篇幅限制。
 
 ### Routing Tests
@@ -742,12 +828,14 @@ Plugin Manifest、Marketplace 發布與完整 Suite 安裝屬於後續版本。`
 2. Python 模組只選 `python`。
 3. TypeScript React 模組選 `typescript + react`。
 4. JavaScript React 模組只選 `react`，不得假裝套用 TypeScript。
-5. TypeScript Vue 模組選 `typescript + vue`。
-6. Polyglot Repository 依 Changed Module 分開選擇。
-7. 根目錄 `.sln` 不得污染前端 Changed Module。
-8. 無支援語言時回到 Core Only。
-9. User／Repository 明確指定優先於自動訊號。
-10. Conflict 無法解析時 Fail Closed。
+5. TypeScript Vue 模組在 `v0.5.0` 只選 `typescript`，並把 Vue 標示為 Planned／Unavailable。
+6. Vue 進入 Experimental 後，相同 Fixture 才選 `typescript + vue`。
+7. Polyglot Repository 依 Changed Module 分開選擇。
+8. 根目錄 `.sln` 不得污染前端 Changed Module。
+9. 無支援語言時回到 Core Only。
+10. User／Repository 明確指定優先於自動訊號。
+11. Conflict 無法解析時 Fail Closed。
+12. Planned Profile 命中訊號時不會被載入或打包。
 
 ### Packaging Tests
 
@@ -756,10 +844,11 @@ Plugin Manifest、Marketplace 發布與完整 Suite 安裝屬於後續版本。`
 - Generated `SKILL.md` Frontmatter 名稱與 Metadata 一致。
 - Generated Package 可通過 `agentskills validate`。
 - `dist/` 不是手動 Source，乾淨 Checkout 可重新產生。
+- Planned Profile 無法作為 Packaging Target。
 
 ### Existing Regression Tests
 
-既有 `test_skill_contract.py`、Benchmark Harness Test、Strategy Full Run Verification 與 Open Standard Validation 必須繼續通過。若需要重構固定的 `REFERENCE_NAMES`，測試應改成「Core Reference + Catalog Profile Reference」契約，不得單純刪除完整性檢查。
+既有 `test_skill_contract.py`、Benchmark Harness Test、Strategy Full Run Verification 與 Open Standard Validation 必須繼續通過。若需要重構固定的 `REFERENCE_NAMES`，測試應改成「Core Reference + Catalog 中可用的 Profile Reference」契約，不得單純刪除完整性檢查。
 
 ### CI 建議流程
 
@@ -777,16 +866,37 @@ Plugin Manifest、Marketplace 發布與完整 Suite 安裝屬於後續版本。`
 
 ## Profile Benchmark 設計
 
-### 比較組
+Profile Benchmark 屬於 M2，不是首個 `v0.5.0` Implementation Plan 的完成條件；本節先固定研究方法，避免日後先看結果再決定比較方式。
 
-新增 Profile 效果評測時，至少包含四組：
+### 單一 Profile 的最低比較組
+
+對只有一個 Profile 的 Scenario，至少包含：
 
 1. `control`：只有任務與 Repository Instruction。
 2. `generic-clean-code`：額外要求遵守 Clean Code。
 3. `core-only`：載入相同版本 Core Skill，但禁止 Profile。
-4. `core-plus-profile`：載入相同版本 Core Skill 與指定 Profile。
+4. `core-plus-profile`：載入相同版本 Core Skill與指定 Profile。
 
-只有比較第 3、4 組，才能回答 Profile 是否提供 Core 之外的增量價值。
+只有比較第 3、4 組，才能回答該 Profile 是否提供 Core 之外的增量價值。
+
+### 複合技術棧的歸因
+
+TypeScript + React 不能只比較 `core-only` 與 `core-plus-typescript-react`，然後分別宣稱 TypeScript 或 React 有效。至少需要：
+
+1. `core-only`
+2. `core-plus-typescript`
+3. `core-plus-typescript-plus-react`
+
+TypeScript 的增量效果比較第 1、2 組；React 的增量效果比較第 2、3 組。Control 與 Generic Clean Code 仍可保留作廣義 Baseline。
+
+若純 JavaScript React Scenario 要測 React，可比較：
+
+```text
+core-only
+core-plus-react
+```
+
+每份公開 Result 必須明確說明它評估的是單一 Profile、Profile Pack，或整個組合，不得把組合結果錯誤歸因給其中一層。
 
 ### Scenario 類型
 
@@ -794,6 +904,8 @@ Plugin Manifest、Marketplace 發布與完整 Suite 安裝屬於後續版本。`
 
 1. **Shared Business Scenario**：與其他語言共用相同業務規則，例如時間邊界、狀態轉換、錯誤契約或外部副作用。
 2. **Ecosystem-native Scenario**：專門測量該語言或框架的語意，例如 Cancellation、Goroutine Leak、Ownership、Effect Cleanup。
+
+不同 Profile 可以共用 Fixture Repository 與業務題目，但 Treatment Arm、Allowed Diff、Oracle 與歸因邊界必須能區分。
 
 ### 建議矩陣
 
@@ -823,13 +935,13 @@ Plugin Manifest、Marketplace 發布與完整 Suite 安裝屬於後續版本。`
 1. Core + Profile 架構簡介。
 2. Supported Profile Matrix。
 3. Language 與 Framework 的分類說明。
-4. 自動選擇與 Explicit Override 的使用方式。
+4. 自動選擇與 Explicit Instruction 的使用方式。
 5. Polyglot Repository 範例。
 6. Profile 成熟度與 Evidence Link。
 7. 貢獻新 Profile 的入口。
 8. Specialist Package 尚未正式發布時的清楚限制。
 
-建議矩陣：
+`v0.5.0` 發布時建議矩陣：
 
 | Profile | Kind | Status | Reference | Benchmark |
 | --- | --- | --- | --- | --- |
@@ -837,16 +949,16 @@ Plugin Manifest、Marketplace 發布與完整 Suite 安裝屬於後續版本。`
 | Python | Language | Experimental | Available | Not started |
 | TypeScript | Language | Experimental | Available | Not started |
 | React | Framework | Experimental | Available | Not started |
-| Go | Language | Planned | Not packaged | Not started |
-| Rust | Language | Planned | Not packaged | Not started |
-| Java | Language | Planned | Not packaged | Not started |
-| Vue | Framework | Planned | Not packaged | Not started |
+| Go | Language | Planned | Not available | Not started |
+| Rust | Language | Planned | Not available | Not started |
+| Java | Language | Planned | Not available | Not started |
+| Vue | Framework | Planned | Not available | Not started |
 
 矩陣必須由 `catalog.yaml` 產生或至少由 CI 驗證一致，避免 README 與真實狀態漂移。
 
 ## 貢獻者契約
 
-新增 Profile 的 Pull Request 必須同時提供：
+新增 Experimental Profile 的 Pull Request 必須同時提供：
 
 1. Profile Metadata。
 2. 符合固定章節的 Profile Reference。
@@ -856,6 +968,8 @@ Plugin Manifest、Marketplace 發布與完整 Suite 安裝屬於後續版本。`
 6. Evidence Status 與未完成項目，不得空白省略。
 7. 原創內容或清楚授權與 Attribution。
 8. 不重複 Core 規則的自我檢查。
+
+只新增 Planned Profile 時，可以只有 Metadata 與 Catalog 更新，但必須省略 `reference`，且不得啟用 Routing／Packaging。
 
 Profile Reviewer 至少檢查：
 
@@ -890,6 +1004,7 @@ Profile Reviewer 至少檢查：
 
 - Schema、Catalog、ID、Status、Reference 與 Composition 驗證全數通過。
 - Planned Profile 不可被 Routing 或 Packaging 使用。
+- Planned Profile 不建立空白 Reference。
 
 ### M0-B：Profile Selection 與 Core Routing
 
@@ -905,6 +1020,7 @@ Profile Reviewer 至少檢查：
 - 既有 Prompt 不需修改。
 - 無 Profile 時維持 Core 行為。
 - TypeScript React 能選出兩層 Profile。
+- Planned Vue 不會被誤載入。
 - Entry Point 篇幅與所有既有測試通過。
 
 ### M1-A：C# Profile
@@ -913,7 +1029,7 @@ Profile Reviewer 至少檢查：
 
 - 完成 `language-csharp.md`。
 - 增加 C# Routing 與 Semantic Contract Tests。
-- 先標示為 `experimental`。
+- 標示為 `experimental`。
 
 完成條件：
 
@@ -926,7 +1042,7 @@ Profile Reviewer 至少檢查：
 
 - 完成 `language-python.md`。
 - 增加 Python Routing 與 Semantic Contract Tests。
-- 先標示為 `experimental`。
+- 標示為 `experimental`。
 
 完成條件：
 
@@ -939,7 +1055,7 @@ Profile Reviewer 至少檢查：
 
 - 完成 `language-typescript.md` 與 `framework-react.md`。
 - 驗證 TypeScript React 與 JavaScript React 的不同組合。
-- 先標示為 `experimental`。
+- 標示為 `experimental`。
 
 完成條件：
 
@@ -961,18 +1077,23 @@ Profile Reviewer 至少檢查：
 - Generated Package 通過 Open Standard Validation。
 - 不公開發布未達 Beta 的 Specialist Package。
 
+### `v0.5.0` Release Boundary
+
+M0-A、M0-B、M1-A、M1-B、M1-C 與 M1-D 是 `v0.5.0` 的實作與驗收範圍。完成後先進行規格對照、測試與 Release Review；不要在同一個未重新核准的計畫中自動接續 M2 或 M3。
+
 ### M2：Profile Pilot
 
 範圍：
 
-- 為首批四個 Profile建立 Core Only 與 Core + Profile 比較。
-- 固定 Fixture、Prompt、Allowed Diff、Oracle 與 Rubric。
+- 為首批四個 Profile 建立 Core Only、Core + Language 與必要的 Core + Language + Framework 比較。
+- 固定 Fixture、Prompt、Allowed Diff、Oracle、Rubric 與歸因邊界。
 - 公開 Pilot Result 與限制。
 
 完成條件：
 
 - 只有通過固定 Pilot 的 Profile 可升級為 `beta`。
 - 失敗與無差異結果同樣保留，不因結果不理想而重寫契約。
+- 複合 Stack 結果不錯誤歸因給單一 Profile。
 
 ### M3：Go、Rust、Java、Vue
 
@@ -983,7 +1104,18 @@ Profile Reviewer 至少檢查：
 3. Java：驗證企業型語言的 Exception、Resource 與 Concurrency。
 4. Vue：建立在 TypeScript Profile 與前端 Routing 經驗上。
 
-每個 Profile 仍走 Experimental → Pilot → Beta → Full Run → Stable，不得因文件完成直接跳級。
+每個 Profile 仍走 Planned → Experimental → Pilot → Beta → Full Run → Stable，不得因文件完成直接跳級。
+
+## Codex 執行邊界
+
+Codex 開始開發前應先：
+
+1. 讀取本規格、目前 `SKILL.md`、所有既有 Core Reference、Tests、CI 與 Benchmark Contract。
+2. 盤點本規格與目前 Repository 的實際差異，不假設目錄或工具已存在。
+3. 產生獨立 Implementation Plan，將 M0-A 至 M1-D 拆成可驗證的小步驟。
+4. 保留現有 Tests 與公開 Result，不以重寫歷史證據來讓新 Contract 通過。
+5. 對依賴安裝、Release、Tag、外部 Repository、正式 Benchmark Run 或其他外部操作保留 Authorization Gate。
+6. 在未取得下一階段核准前停止於 `v0.5.0` Release Boundary。
 
 ## 驗收條件
 
@@ -993,14 +1125,16 @@ Profile Reviewer 至少檢查：
 2. `$clean-code-ai-collaboration` 與既有設定契約保持相容。
 3. Profile Metadata、Schema、Catalog 與 Markdown Contract 完整。
 4. C#、Python、TypeScript、React 四個 Experimental Profile 可被正確選取。
-5. Go、Rust、Java、Vue 以 Planned 狀態存在，且不會被誤用。
+5. Go、Rust、Java、Vue 以 Planned 狀態存在，沒有空白 Reference，且不會被誤用。
 6. Polyglot Routing 使用 Changed Module，不依 Root 一次套用全部。
 7. Core Only Fallback 可用。
 8. Profile 不重複或覆蓋 Core 授權、路徑與輸出契約。
 9. Existing Tests、Profile Tests、Routing Tests、Packaging Sample 與 `agentskills validate` 全數通過。
 10. README 不把 Experimental／Planned 描述成 Stable Support。
 11. 既有 Benchmark Result 未被改寫。
-12. 沒有 `TODO`、`TBD`、空白 Evidence 宣稱或不可解析的 Profile 引用。
+12. 文件與 Metadata 沒有未完成占位內容、空白 Evidence 宣稱或不可解析的 Profile 引用。
+13. TypeScript + React Benchmark 設計具備可分離的 Profile 歸因邊界。
+14. M2、M3 未在沒有下一階段核准的情況下被提前實作。
 
 ## 風險與緩解
 
@@ -1012,6 +1146,10 @@ Profile Reviewer 至少檢查：
 
 緩解：以 Changed Module 與最近 Manifest 為主；Root 只作補充；允許 Core Only；關鍵衝突 Fail Closed。
 
+### 風險：Planned Profile 被當成已支援
+
+緩解：Planned 必須省略 Reference；Routing、Packaging 與 README Contract Test 都要阻止誤用。
+
 ### 風險：Profile 過度規範生態系
 
 緩解：每項規則必須說明適用條件、替代方案與 Repository Facts；禁止把特定 Pattern 當成普遍答案。
@@ -1022,7 +1160,11 @@ Profile Reviewer 至少檢查：
 
 ### 風險：Profile 存在但沒有證據
 
-緩解：成熟度模型與 Evidence 欄位強制分離；全部新 Profile 從 Experimental 開始；README 顯示真實狀態。
+緩解：成熟度模型與 Evidence 欄位強制分離；已實作 Profile 從 Experimental 開始；README 顯示真實狀態。
+
+### 風險：Benchmark 錯誤歸因
+
+緩解：Language 與 Framework 使用階梯式 Treatment Arm；公開 Result 明確標示評估的是單一 Profile 或 Profile Pack。
 
 ### 風險：Generated Specialist Skill 漂移
 
@@ -1030,7 +1172,7 @@ Profile Reviewer 至少檢查：
 
 ### 風險：一次開發八個 Profile 導致品質下降
 
-緩解：先完成 Architecture 與四個首批 Profile；Go、Rust、Java、Vue 在前一批 Contract 穩定後分階段加入。
+緩解：`v0.5.0` 只完成 Architecture 與四個首批 Profile；Go、Rust、Java、Vue 在前一批 Contract 穩定並重新核准後加入。
 
 ## 未來拆分 Repository 的條件
 
@@ -1050,6 +1192,6 @@ Profile Reviewer 至少檢查：
 
 `Clean-Code-AI-Collaboration-Skill` 將以 Monorepo 繼續發展。`clean-code-ai-collaboration` 保持單一 Core Skill，Language Profile 與 Framework Profile 依 Changed Module 組合使用；TypeScript 作為 React／Vue 共同語言層，React 與 Vue 保持 Framework 分類。
 
-`v0.5.0` 先完成 Profile Contract、Routing、C#、Python、TypeScript 與 React；Go、Rust、Java 與 Vue 依成熟度流程逐步加入。獨立 Specialist Skill 只作自動生成的 Distribution Artifact，不作新的手動維護來源。
+`v0.5.0` 完成 Profile Contract、Routing、C#、Python、TypeScript 與 React，並只為 Go、Rust、Java、Vue 建立 Planned Metadata。獨立 Specialist Skill 只作自動生成的 Distribution Artifact，不作新的手動維護來源。
 
-這個設計的核心不是增加更多規則，而是讓共用判斷維持一致、讓語言差異只在需要時被載入，並讓每個「支援」主張都能對應到清楚的 Repository Facts、驗證與 Evidence Boundary。
+Profile Pilot、正式結果與剩餘 Profile 屬於下一階段。這個設計的核心不是增加更多規則，而是讓共用判斷維持一致、讓語言差異只在需要時被載入，並讓每個「支援」主張都能對應到清楚的 Repository Facts、驗證與 Evidence Boundary。
