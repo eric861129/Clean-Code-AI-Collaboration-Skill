@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from pathlib import PurePosixPath, PureWindowsPath
+import re
+
 from jsonschema import Draft202012Validator
 
 from evals.harness.models import BenchmarkManifest, RunSlot
@@ -18,6 +21,7 @@ TERMINAL_STATES = {
     "timeout",
     "infrastructure_failure",
 }
+WINDOWS_ABSOLUTE_PATH = re.compile(r"^[A-Za-z]:[\\/]")
 
 
 def can_retry(reason: str, attempt: int) -> bool:
@@ -248,14 +252,32 @@ def _public_oracle_results(value: object) -> object:
         commands = group.get("commands")
         if isinstance(commands, list):
             public_group["commands"] = [
-                {
-                    key: item
-                    for key, item in command.items()
-                    if key not in {"stdout", "stderr"}
-                }
+                _public_oracle_command(command)
                 if isinstance(command, dict)
                 else command
                 for command in commands
             ]
         groups.append(public_group)
     return groups
+
+
+def _public_oracle_command(command: dict[str, object]) -> dict[str, object]:
+    public_command = {
+        key: item
+        for key, item in command.items()
+        if key not in {"stdout", "stderr"}
+    }
+    args = command.get("args")
+    if isinstance(args, list):
+        public_command["args"] = [_public_command_argument(item) for item in args]
+    return public_command
+
+
+def _public_command_argument(value: object) -> object:
+    if not isinstance(value, str):
+        return value
+    if WINDOWS_ABSOLUTE_PATH.match(value):
+        return PureWindowsPath(value).name or "[absolute-path]"
+    if value.startswith("/"):
+        return PurePosixPath(value).name or "[absolute-path]"
+    return value

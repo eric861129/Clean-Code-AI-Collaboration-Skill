@@ -35,6 +35,7 @@ from evals.harness.models import (
 from evals.harness.planner import build_run_slots
 from evals.harness.profile_outcomes import build_profile_outcomes
 from evals.harness.result_builder import (
+    _public_oracle_results,
     build_public_result,
     validate_profile_pilot_result,
 )
@@ -368,6 +369,35 @@ def _profile_pilot_manifest_raw() -> dict[str, object]:
 
 
 class ProfilePilotHarnessContractTests(unittest.TestCase):
+    def test_public_oracle_results_remove_absolute_command_paths(self) -> None:
+        public = _public_oracle_results(
+            [
+                {
+                    "group": "public",
+                    "commands": [
+                        {
+                            "args": [
+                                r"C:\Program Files\dotnet\dotnet.EXE",
+                                "test",
+                                "/home/example/project/tests.csproj",
+                            ],
+                            "exit_code": 0,
+                            "stdout": "private",
+                            "stderr": "private",
+                        }
+                    ],
+                }
+            ]
+        )
+
+        command = public[0]["commands"][0]
+        self.assertEqual(
+            ["dotnet.EXE", "test", "tests.csproj"],
+            command["args"],
+        )
+        self.assertNotIn("stdout", command)
+        self.assertNotIn("stderr", command)
+
     def test_profile_fixture_runtime_supports_typescript_and_csharp(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
