@@ -16,6 +16,7 @@ When sources conflict, record the conflict, the revision and environment for eac
 
 - Repository, branch or ref, commit, merge base when relevant, and active working-tree state
 - Task, change reason, acceptance criteria, and expected Diff boundary
+- Requested and effective `development_rhythm`; requested and effective `validation_profile`; source of each value and any unmet prerequisite
 - Related source revisions, generated artifacts, configuration, migration state, or deployed version when they can change behavior
 - Environment, dependency lock state, feature flags, test data assumptions, and access limits that affect the conclusion
 

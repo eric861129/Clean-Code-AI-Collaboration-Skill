@@ -8,6 +8,51 @@ Use this reference for a feature, defect, refactor, acceptance outcome, side eff
 
 Choose an observable behavior and an independent Oracle before selecting a development rhythm. Existing tests are evidence of covered behavior; they can also preserve an old misunderstanding.
 
+## User-Selected Development Rhythm
+
+Treat development rhythm and validation depth as separate decisions. TDD and TCR control the development rhythm. E2E and mutation testing control validation depth. A User can therefore request TDD while also requiring an acceptance-level check.
+
+Resolve the values in this order:
+
+1. An explicit value in the current User prompt.
+2. A value in Repository Policy when the current prompt does not choose one.
+3. `auto` when neither source chooses one.
+
+The source records where the requested value came from. An explicit `auto` is sourced from the current User prompt; `default-auto` applies only when neither the Prompt nor Repository Policy supplies a value. Explain the evidence used to infer the effective value separately.
+
+Use these fields when the Client supports structured settings, or accept the same names in ordinary Prompt or Repository Instruction text:
+
+```yaml
+development_rhythm: auto
+validation_profile: auto
+```
+
+### `development_rhythm`
+
+| Value | Meaning | Required conditions |
+| --- | --- | --- |
+| `auto` | Recommend and use the smallest safe rhythm supported by Repository evidence. | Report which rhythm became effective and why. |
+| `direct` | Implement the bounded change, then run the selected validation without requiring an artificial RED step. | The behavior is understood, the change is reversible, and an existing Oracle gives fast feedback. Direct does not mean untested. |
+| `tdd` | Establish a meaningful RED for the requested behavior, make the smallest GREEN change, then refactor and run regression gates. | The expected behavior can be stated independently, and the failing test fails for the intended reason before production code changes. |
+| `tcr` | Work in tiny checkpoints; test each checkpoint, commit GREEN, and revert RED. | Tests are fast and reliable, the working tree can be isolated safely, and the User has granted explicit version-control authorization for commit and revert operations. |
+| `characterization-first` | Capture current observable behavior before changing a legacy or poorly understood implementation. | The existing behavior is the critical unknown; label accidental or disputed behavior instead of silently treating it as the desired contract. |
+
+### `validation_profile`
+
+| Value | Meaning | Boundary |
+| --- | --- | --- |
+| `auto` | Select validation from the actual risk and available Repository gates. | Report the effective profile and uncovered risk. |
+| `focused` | Run the smallest test, build, lint, static, or contract checks that observe the changed behavior. | It cannot waive broader gates required by Repository Policy or Production-Ready delivery. |
+| `repository` | Run all Repository-required gates relevant to the Diff. | Passing does not prove deployment, external systems, or untested behavior. |
+| `acceptance-e2e` | Add an acceptance or E2E path for a user-visible outcome that crosses boundaries. | Keep lower-level checks when they are needed for diagnosis or boundary cases. |
+| `mutation-assisted` | Challenge an important established suite with scoped mutation testing. | Use only when the Oracle is reliable and the authorized toolchain can execute it. |
+
+For `auto`, infer a recommendation from risk, Oracle reliability, feedback speed, working-tree state, and authorization. For an explicit choice, first check its required conditions. If a required condition is missing, report `blocked`, name the missing condition, recommend the nearest feasible option, and wait for the User when changing the requested rhythm would alter the workflow. The Agent must not silently substitute another development rhythm.
+
+When the Client supports machine-readable prerequisite IDs, use `fast-test-feedback`, `reliable-test-oracle`, `isolated-working-tree`, `version-control-authorization`, and `mutation-tool-and-install-authorization`. Report every missing prerequisite; do not collapse test speed, Oracle reliability, workspace isolation, and version-control authority into one generic TCR failure.
+
+An explicit `validation_profile` can add checks but cannot remove mandatory Repository gates. Do not install a testing, coverage, mutation, or E2E tool, change CI, commit, revert, or touch an external environment without the authority required for that action.
+
 ## Executable Gate Routing
 
 Inventory existing repository gates before selecting validation. Use the smallest set that observes the actual risk; do not install a fashionable tool or change CI without authorization.

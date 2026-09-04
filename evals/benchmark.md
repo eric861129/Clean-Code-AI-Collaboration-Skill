@@ -2,7 +2,7 @@
 
 ## Purpose
 
-本 Benchmark 以公開、唯讀的 `AI-CleanCode-API-Demo` 固定 Commit 作為 Fixture，記錄 `clean-code-ai-collaboration v0.2.0` 在指定條件下的觀察。它提供可重跑的契約，不宣稱任何結果可普遍化。
+本 Benchmark 保存不同版本、不同目的的公開評測。`v0.2.0` 使用公開、唯讀的 `AI-CleanCode-API-Demo` 固定 Commit 觀察 Repository 任務；`v0.4.0` 則以小型決策案例驗證開發節奏與驗證範圍的策略契約。兩者都提供可重跑的契約，不宣稱結果可普遍化，也不能彼此替代。
 
 ## Comparison Arms
 
@@ -13,6 +13,8 @@
 3. `skill-v0.2.0`：明確載入 `clean-code-ai-collaboration v0.2.0`。
 
 `v0.1.0` 可作版本回歸參考，但不混入這三組的主要比較。
+
+本節描述的是 `v0.2.0` Repository 評測；`v0.4.0` 的比較組與結果另列於後文。
 
 ## Fixed Variables
 
@@ -45,6 +47,27 @@ Micro-eval 的每組對照各執行五個情境；每組完整 Repository Scenar
 每筆 Result 都要保存 exact list、Pattern snapshot、逐路徑放行依據與真正越界的路徑。Pattern 通過只表示修改仍在任務外圍，不能取代人工檢查 Diff、Repository 事實與責任歸屬。`scripts/`、共用 HTTP Contract 或無關架構層不會因檔名看起來相似而自動獲准。
 
 早期 v0.1 Baseline 曾以固定檔名誤判合理的 Provider Contract Test 與競態協調類別。`rescoring_history` 保留舊邊界、舊分數與重評原因；原始 Diff、雜湊、Oracle、Automatic Failure 與比較資格不因這次契約修正而改寫。
+
+## v0.4.0 Strategy Decision-Conformance Full Run
+
+完整機器可讀結果存放於 [`results/v0.4.0-strategy-full-run.json`](results/v0.4.0-strategy-full-run.json)。這輪評測回答一個窄而重要的問題：Controller 分派 Subject 載入 Skill 後，能不能穩定判斷使用者要求的開發節奏與驗證範圍，並在前提不足時停止，不自行換成另一種做法？公開收據可重播 Prompt、輸出與決策 Oracle，但無法獨立認證 Subject 的 Context 或服務端模型身分。
+
+評測包含 9 種決策情境：Prompt 覆寫 Repository Policy、由 Repository Policy 提供預設值、`auto` 選擇直接修改或特性測試、明確 TDD 搭配 E2E、TCR 具備完整條件、缺少版本控制授權、缺少快速測試回饋或隔離工作樹，以及缺少變異測試工具。每個 Skill 情境重複兩次，因此共有 18 組 Full Run；另有 9 組無 Skill 對照，各執行一次。
+
+### Observed
+
+- 9 組無 Skill 對照有 5／9 符合預先固定的決策契約；偏差出現在 `auto` 的來源歸屬、驗證設定名稱，以及阻擋後是否提出最近的可行替代方案。
+- v0.4.0 Skill 的 18／18 次執行全部通過，且都保留 Repository 必要 Gate，沒有把使用者明確但不可執行的選項偷偷換掉。
+- 阻擋案例實際涵蓋測試回饋速度、隔離工作樹、版本控制授權，以及 Mutation 工具／安裝授權；`reliable-test-oracle` 雖屬正式前置條件 ID，本輪沒有獨立情境，因此不能把結果擴張成所有阻擋前提都已驗證。
+- 開發期間的早期 Run 曾發現「Prompt 明寫 `auto`」的來源定義不夠清楚，後續獨立 Review 又找出收據重播與 TCR 前提覆蓋不足。這些調校記錄目前只保留在本機 Benchmark Workspace，沒有納入公開 Result；公開 Checkout 能驗證的是最終 Skill Run、無 Skill 對照的偏差，以及其中內嵌的收據，不能回放早期 Generation。
+
+### Claim Boundary
+
+這輪 Full Run 只驗證策略決策契約是否被一致解讀。它不衡量程式碼品質、不比較實際 Diff，也不宣稱節省 Token、時間或費用；9 組小型案例也不能推論所有語言、模型、Client 與 Repository 都會得到相同結果。
+
+公開 Result 內嵌每次執行的固定 Prompt、Controller Dispatch、原始 Subject JSON 與重播後 Terminal，並保存 Manifest、Harness 與 Skill 快照雜湊。乾淨 Checkout 可執行 `py -3 -m evals.v040_strategy_full_run verify-result`，重新比對固定情境與每一筆決策。`model` 與 `reasoning_effort` 是 Controller 啟動 Subject 時的要求值，不是第三方簽章；公開收據無法獨立證明服務端實際模型身分。
+
+`v0.3.0` 的跨語言程式碼 Benchmark 是另一條證據線，Full Run 尚未完成，也不納入 v0.4.0 的結果。補齊公開 Result 與收據前，不用本機進度數字替代可稽核的發布證據。
 
 ## Initial v0.2.0 Results
 

@@ -1,6 +1,6 @@
 interface:
   display_name: "Clean Code AI Collaboration"
   short_description: "Use repository-aware Clean Code judgment for AI coding"
-  default_prompt: "Use $clean-code-ai-collaboration to plan, implement, or review this change from repository facts. Preserve behavior gates, compare viable options, keep the Diff local, report validation blind spots, and stop at authorization boundaries."
+  default_prompt: "Use $clean-code-ai-collaboration to plan, implement, or review this change from repository facts. Honor explicit development_rhythm and validation_profile preferences, preserve mandatory behavior gates, and report feasibility blocks. Never silently substitute an infeasible explicit strategy. Compare viable options, keep the Diff local, report validation blind spots, and stop at authorization boundaries."
 policy:
   allow_implicit_invocation: false

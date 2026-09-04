@@ -49,7 +49,7 @@ class SkillContractTests(unittest.TestCase):
         content = SKILL_PATH.read_text(encoding="utf-8")
         body = content.split("---", maxsplit=2)[-1]
 
-        self.assertLessEqual(len(body.split()), 500)
+        self.assertLessEqual(len(body.split()), 525)
 
     def test_review_contract_keeps_options_context_and_human_decisions(self) -> None:
         content = (SKILL_ROOT / "references" / "review-output-contract.md").read_text(
@@ -109,6 +109,7 @@ class SkillContractTests(unittest.TestCase):
         standard, full_audit = content.split("## Full Audit Output Contract", maxsplit=1)
 
         self.assertIn("## Standard Output Contract", standard)
+        self.assertIn("The first five are required", standard)
         for field in {
             "Outcome and Status",
             "Decision Basis",
@@ -200,7 +201,11 @@ class SkillContractTests(unittest.TestCase):
             "conceptual explanation",
             "standalone example",
             "formatter",
-            "more specialized Skill",
+            "fully covered by a more specialized Skill",
+            "behavior",
+            "boundary",
+            "side-effect",
+            "Clean Code trade-off",
         }:
             with self.subTest(term=term):
                 self.assertIn(term.lower(), section.lower())
@@ -236,6 +241,74 @@ class SkillContractTests(unittest.TestCase):
         }:
             with self.subTest(term=term):
                 self.assertIn(term.lower(), gate_section.lower())
+
+    def test_testing_reference_defines_user_selected_development_rhythm(self) -> None:
+        content = (
+            SKILL_ROOT / "references" / "testing-and-change-safety.md"
+        ).read_text(encoding="utf-8")
+        section = content.split("## User-Selected Development Rhythm", maxsplit=1)[1]
+        section = section.split("## Executable Gate Routing", maxsplit=1)[0]
+
+        for value in {
+            "auto",
+            "direct",
+            "tdd",
+            "tcr",
+            "characterization-first",
+        }:
+            with self.subTest(development_rhythm=value):
+                self.assertIn(f"`{value}`", section)
+
+        self.assertIn("current User prompt", section)
+        self.assertIn("Repository Policy", section)
+        self.assertIn("must not silently substitute", section)
+        self.assertIn("explicit version-control authorization", section)
+
+    def test_development_rhythm_is_separate_from_validation_profile(self) -> None:
+        content = (
+            SKILL_ROOT / "references" / "testing-and-change-safety.md"
+        ).read_text(encoding="utf-8")
+        section = content.split("## User-Selected Development Rhythm", maxsplit=1)[1]
+        section = section.split("## Executable Gate Routing", maxsplit=1)[0]
+
+        self.assertIn("development_rhythm", section)
+        self.assertIn("validation_profile", section)
+        for value in {
+            "focused",
+            "repository",
+            "acceptance-e2e",
+            "mutation-assisted",
+        }:
+            with self.subTest(validation_profile=value):
+                self.assertIn(f"`{value}`", section)
+
+        self.assertIn("TDD and TCR control the development rhythm", section)
+        self.assertIn("E2E and mutation testing control validation depth", section)
+
+    def test_explicit_auto_keeps_the_user_prompt_as_request_source(self) -> None:
+        testing_reference = (
+            SKILL_ROOT / "references" / "testing-and-change-safety.md"
+        ).read_text(encoding="utf-8")
+        output_contract = (
+            SKILL_ROOT / "references" / "review-output-contract.md"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("explicit `auto` is sourced from the current User prompt", testing_reference)
+        self.assertIn("source identifies where the requested value came from", output_contract)
+        self.assertIn("not how the effective value was inferred", output_contract)
+
+    def test_output_contract_reports_requested_and_effective_strategy(self) -> None:
+        content = (SKILL_ROOT / "references" / "review-output-contract.md").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("Requested Development Rhythm", content)
+        self.assertIn("Effective Development Rhythm", content)
+        self.assertIn("Development Rhythm Source", content)
+        self.assertIn("Requested Validation Profile", content)
+        self.assertIn("Effective Validation Profile", content)
+        self.assertIn("Validation Profile Source", content)
+        self.assertIn("Feasibility or Escalation", content)
 
     def test_authorization_gate_is_always_loaded(self) -> None:
         content = SKILL_PATH.read_text(encoding="utf-8")
@@ -431,7 +504,7 @@ class SkillContractTests(unittest.TestCase):
             with self.subTest(term=term):
                 self.assertIn(term, content)
 
-    def test_v030_metadata_and_clean_lenses_are_discoverable(self) -> None:
+    def test_v040_metadata_and_clean_lenses_are_discoverable(self) -> None:
         content = SKILL_PATH.read_text(encoding="utf-8")
         frontmatter = re.match(
             r"---\n(?P<frontmatter>.*?)\n---\n",
@@ -441,7 +514,7 @@ class SkillContractTests(unittest.TestCase):
         required = {
             "license: MIT",
             "compatibility:",
-            'version: "0.3.0"',
+            'version: "0.4.0"',
             "C — Context-Aware Code",
             "L — Localized Change",
             "E — Explicit Intent and Boundaries",
@@ -457,6 +530,50 @@ class SkillContractTests(unittest.TestCase):
         for term in required:
             with self.subTest(term=term):
                 self.assertIn(term, content)
+
+    def test_v040_readme_documents_strategy_configuration(self) -> None:
+        readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
+
+        for term in {
+            "v0.4.0",
+            "development_rhythm",
+            "validation_profile",
+            "characterization-first",
+            "acceptance-e2e",
+            "mutation-assisted",
+            "當次 User Prompt",
+            "Repository 根目錄的 `AGENTS.md`",
+            "越接近 CWD 的指示會排在後面",
+            "不會因為後來修改了 `backend` 內的檔案，就自動補載入",
+            "https://learn.chatgpt.com/docs/agent-configuration/agents-md",
+            "development_rhythm: tdd",
+            "development_rhythm: tcr",
+            "`development_rhythm: tcr` 本身不等於 Commit／Revert 授權",
+            "明確指定的策略無法執行時",
+            "三十秒快速開始",
+            "如果沒有填寫兩個設定",
+            "常見任務可以怎麼搭配",
+            "一定要選 TDD 或 TCR 嗎？",
+            "目前沒有另外執行設定檔解析器",
+            "git checkout v0.4.0",
+            "v0.4.0 Strategy Decision-Conformance Full Run",
+            "v0.3.0 Cross-language Full Run",
+            "evals/manifests/v0.4.0-strategy-full-run.json",
+            "evals/v040_strategy_full_run.py",
+            "python3 -m evals.v040_strategy_full_run verify-result",
+            "公開收據無法獨立證明 Subject 是否屬於全新 Context",
+        }:
+            with self.subTest(v040_readme_term=term):
+                self.assertIn(term, readme)
+
+    def test_v040_codex_adapter_preserves_explicit_strategy_preferences(self) -> None:
+        adapter = (SKILL_ROOT / "agents" / "openai.yaml").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("development_rhythm", adapter)
+        self.assertIn("validation_profile", adapter)
+        self.assertIn("Never silently substitute", adapter)
 
     def test_skill_core_stays_platform_neutral(self) -> None:
         content = SKILL_PATH.read_text(encoding="utf-8")

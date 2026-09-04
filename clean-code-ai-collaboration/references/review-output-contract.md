@@ -2,7 +2,7 @@
 
 ## Standard Output Contract
 
-Use this contract for a Standard Path. Report the following headings in order. The first four are required; include Stop or Human Decision only when a stop, unresolved authority, or Owner decision affects the result. Omit non-material fields instead of emitting empty placeholders, but never omit a known risk or required investigation.
+Use this contract for a Standard Path. Report the following headings in order. The first five are required; include Stop or Human Decision only when a stop, unresolved authority, or Owner decision affects the result. Omit non-material fields instead of emitting empty placeholders, but never omit a known risk or required investigation.
 
 ### Outcome and Status
 
@@ -15,6 +15,10 @@ List only Repository facts that changed the decision. Add assumptions or unknown
 ### Selected Approach
 
 State the selected approach and why it fits this Repository. When another viable approach exists, state the observable condition that would make it fit better.
+
+### Development and Validation Strategy
+
+State `Requested Development Rhythm`, `Development Rhythm Source`, `Effective Development Rhythm`, `Requested Validation Profile`, `Validation Profile Source`, and `Effective Validation Profile`. The source identifies where each requested value came from, not how the effective value was inferred; an explicit `auto` therefore remains sourced from the User prompt. Add `Feasibility or Escalation` when a requested rhythm or profile lacks an Oracle, feedback speed, isolation, tool, or authorization prerequisite. Do not imply that an automatically selected or substituted strategy was explicitly requested.
 
 ### Behavior, Diff, and Validation
 
@@ -57,6 +61,10 @@ Record each `O1` with its fit conditions, protected behavior or boundary, cost, 
 ### Selected Option and Reason
 
 State the selected option and link the relevant `F`, `A`, `U`, `O`, and `E` identifiers. Explain why it fits the current repository facts, authorization boundary, and expected behavior rather than presenting it as a universal winner.
+
+### Development and Validation Strategy
+
+Record `Requested Development Rhythm`, `Development Rhythm Source`, `Effective Development Rhythm`, `Requested Validation Profile`, `Validation Profile Source`, and `Effective Validation Profile`. Name the Prompt, Repository Policy, or default that supplied each requested value. The source identifies where the requested value came from, not how the effective value was inferred; an explicit `auto` remains sourced from the User prompt. Record `Feasibility or Escalation` with linked facts, unknowns, and authorization when the effective strategy cannot match an explicit request. Never hide a substitution inside the implementation summary.
 
 ### When Other Options Fit Better
 

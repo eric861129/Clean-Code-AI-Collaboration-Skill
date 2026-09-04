@@ -105,6 +105,13 @@ DIFF_BOUNDARY_PATTERN_VERSION = "regex-fullmatch-v1"
 
 
 class EvalContractTests(unittest.TestCase):
+    def test_hash_inputs_use_repository_forced_lf_endings(self) -> None:
+        attributes = (ROOT / ".gitattributes").read_text(encoding="utf-8")
+
+        for pattern in {"*.md", "*.py", "*.json", "*.yaml", "*.yml"}:
+            with self.subTest(pattern=pattern):
+                self.assertIn(f"{pattern} text eol=lf", attributes)
+
     def load_manifest(self) -> dict:
         return json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
 
@@ -1223,6 +1230,70 @@ class EvalContractTests(unittest.TestCase):
                     r"(?<![A-Za-z0-9])[A-Za-z]:[\\/]",
                 )
                 self.assertNotRegex(serialized, unix_home_pattern)
+
+    def test_v040_strategy_full_run_result_is_complete(self) -> None:
+        result_path = EVAL_ROOT / "results" / "v0.4.0-strategy-full-run.json"
+        self.assertTrue(result_path.is_file())
+        result = json.loads(result_path.read_text(encoding="utf-8"))
+
+        self.assertEqual("complete", result["status"])
+        self.assertEqual("0.4.0", result["skill_version"])
+        self.assertEqual(9, result["baseline_run_count"])
+        self.assertEqual(5, result["baseline_conforming_count"])
+        self.assertEqual(18, result["full_run_count"])
+        self.assertEqual(18, result["passed_full_run_count"])
+        self.assertEqual(64, len(result["manifest_sha256"]))
+        self.assertEqual(64, len(result["skill_tree_sha256"]))
+        self.assertEqual(9, len(result["baseline_runs"]))
+        self.assertEqual(18, len(result["full_runs"]))
+        self.assertEqual(27, len(result["receipts"]))
+        self.assertFalse(
+            result["execution_attestation"]["independent_runtime_identity_verified"]
+        )
+        self.assertNotIn("fresh Codex subjects", result["claim_boundary"])
+        self.assertIn("controller-dispatched subjects", result["claim_boundary"])
+        self.assertIn(
+            "fresh Context",
+            result["execution_attestation"]["limitation"],
+        )
+        self.assertTrue(
+            any(
+                "selected blocked prerequisites" in observation
+                for observation in result["observations"]
+            )
+        )
+        self.assertFalse(
+            any(
+                "blocked prerequisites were all represented" in observation
+                for observation in result["observations"]
+            )
+        )
+        for receipt in result["receipts"]:
+            self.assertEqual(
+                {"run_id", "prompt", "dispatch", "subject_result", "terminal"},
+                set(receipt),
+            )
+        self.assertTrue(
+            all(run["terminal_state"] == "passed" for run in result["full_runs"])
+        )
+        self.assertIn("does not measure code quality", result["claim_boundary"])
+
+    def test_v040_strategy_result_is_explained_without_overclaiming(self) -> None:
+        benchmark = (EVAL_ROOT / "benchmark.md").read_text(encoding="utf-8")
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+        for content in {benchmark, readme}:
+            with self.subTest(document="benchmark" if content is benchmark else "readme"):
+                self.assertIn("v0.4.0-strategy-full-run.json", content)
+                self.assertIn("18／18", content)
+                self.assertIn("不衡量程式碼品質", content)
+                self.assertIn("不宣稱節省 Token", content)
+
+        self.assertIn("9 組無 Skill 對照", benchmark)
+        self.assertIn("5／9", benchmark)
+        self.assertIn("v0.3.0", benchmark)
+        self.assertIn("Full Run 尚未完成", benchmark)
+        self.assertIn("不納入 v0.4.0", benchmark)
 
 
 if __name__ == "__main__":

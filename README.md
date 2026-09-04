@@ -4,6 +4,26 @@
 
 這個 Skill 不會替 Repository 發明規則，也不會把某次實驗勝出的方案當成所有專案的標準答案。它要求 Agent 先讀懂專案情境，再交代選項、取捨、行為邊界、驗證方式，以及什麼情況應該改採其他做法。
 
+## 三十秒快速開始
+
+1. 依照[安裝說明](#安裝)，把 `clean-code-ai-collaboration` 資料夾放進 Project 或個人的 `.agents/skills`。
+2. 在任務 Prompt 明確寫出 `$clean-code-ai-collaboration`。
+3. 不確定要用哪一種開發方式時，先保留 `auto`；已有明確需求時，再指定 TDD、TCR 或其他節奏。
+4. 檢查 Agent 是否回報實際採用的節奏、驗證範圍、執行結果與未涵蓋風險。
+
+可以先從這個 Prompt 開始：
+
+```text
+請使用 $clean-code-ai-collaboration 實作這個需求。
+development_rhythm: auto
+validation_profile: auto
+
+先讀取 Repository 規則與既有測試，再決定適合的開發節奏與驗證範圍。
+保留必要 Gate，完成後回報實際驗證結果與仍未涵蓋的風險。
+```
+
+如果沒有填寫兩個設定，Skill 也會使用 `auto`。一般使用者不必先理解所有模式才能開始。
+
 ## 這個 Skill 解決什麼問題
 
 只對 Agent 說「請遵守 Clean Code」，通常不夠具體。Agent 可能把函式拆得很短，卻增加大量跳轉；也可能建立漂亮的分層，卻順手改掉 API Contract、資料語意或副作用順序。
@@ -72,6 +92,201 @@ Skill 會先盤點 Repository 既有的 Formatter、Linter、Static Analysis、B
 
 Prototype／Production-Ready 不會覆蓋風險路徑。實驗若碰到正式資料、Provider、安全或公開契約，仍需 Full Audit 與對應授權。
 
+## 自己選擇開發節奏與驗證範圍
+
+`v0.4.0` 把「怎麼開發」與「驗證到多深」拆成兩個設定。TDD、TCR 屬於開發節奏；E2E、Mutation Testing 屬於驗證方式。兩者可以自由搭配，例如使用 TDD 開發，再用 E2E 驗證跨邊界的使用者結果。
+
+```yaml
+development_rhythm: auto
+validation_profile: auto
+```
+
+這兩個欄位是 Skill 使用的**指令契約**，目前沒有額外的 `config.yml` 需要建立。請依使用範圍放在下列位置：
+
+| 使用範圍 | 設定位置 | 適合情境 |
+| --- | --- | --- |
+| 只套用一次任務 | 當次 User Prompt | 這次要使用 TDD、TCR，或需要不同的驗證深度 |
+| 作為整個 Repository 的預設值 | Repository 根目錄的 `AGENTS.md` | 團隊希望後續任務採用一致的預設節奏與驗證範圍 |
+| 只套用特定子目錄 | 該子目錄內的 `AGENTS.md`，並從該目錄啟動 Codex 或將它設為目前工作目錄 | 前端、後端或 Legacy 模組需要不同策略 |
+| 其他 Agent Client | 該 Client 支援的 Repository Instruction | 檔名與載入規則須以 Client 官方文件為準 |
+
+請勿直接修改安裝後的 `clean-code-ai-collaboration/SKILL.md` 來設定單一專案。這會改變 Skill 本身，後續更新也可能覆蓋你的設定。
+
+### 單次任務：直接寫在 Prompt
+
+以下 Prompt 要求 Agent 使用 TDD，並加入跨邊界的 E2E 驗證：
+
+```text
+請使用 $clean-code-ai-collaboration 實作這個需求。
+development_rhythm: tdd
+validation_profile: acceptance-e2e
+
+先確認 RED 的失敗原因符合需求缺口，再完成最小 GREEN。
+保留 Repository 既有 Gate，並回報尚未涵蓋的外部環境與副作用。
+```
+
+若這次要使用 TCR，除了選擇 `tcr`，還要明確授權版本控制操作：
+
+```text
+請使用 $clean-code-ai-collaboration 處理這次高風險重構。
+development_rhythm: tcr
+validation_profile: repository
+
+我授權 Agent 在這次任務中：
+1. 每個通過測試的小步驟可以 Commit。
+2. 測試失敗時，可以 Revert 該步驟由 Agent 建立的變更。
+3. 不得復原或覆蓋任務開始前已存在的使用者變更。
+```
+
+`development_rhythm: tcr` 本身不等於 Commit／Revert 授權。缺少快速可靠的測試、隔離工作樹或當次明確授權時，Skill 會回報阻礙並提出可行替代方案。
+
+### 專案預設值：寫入 Repository 的 AGENTS.md
+
+例如，團隊希望平常由 Skill 判斷開發節奏，並至少執行 Repository 規定的驗證，可以在 Repository 根目錄的 `AGENTS.md` 加入：
+
+````markdown
+## Clean Code AI Collaboration Policy
+
+```yaml
+development_rhythm: auto
+validation_profile: repository
+```
+
+- 保留 Repository 既有的 Build、Test、Lint 與 Architecture Gate。
+- 回報實際採用的開發節奏、驗證範圍與尚未涵蓋的風險。
+````
+
+如果專案的功能大多適合先寫測試，也可以把預設節奏改成：
+
+```yaml
+development_rhythm: tdd
+validation_profile: repository
+```
+
+Repository Policy 可以指定偏好，仍然不能長期預先授權所有 TCR 的 Commit／Revert。執行 TCR 時，請在當次 Prompt 重新確認範圍與版本控制授權。
+
+如果不同模組需要不同預設值，可以使用巢狀 `AGENTS.md`。例如：
+
+```text
+my-repository/
+├─ AGENTS.md
+├─ backend/
+│  └─ AGENTS.md
+└─ frontend/
+   └─ AGENTS.md
+```
+
+根目錄的 `AGENTS.md` 可以保留整個專案都要遵守的 Gate；`backend/AGENTS.md` 則只放後端模組要覆寫的偏好：
+
+````markdown
+## Clean Code AI Collaboration Policy
+
+```yaml
+development_rhythm: characterization-first
+validation_profile: repository
+```
+````
+
+以 Codex 為例，`AGENTS.md` 不是根據「準備修改哪一個檔案」動態載入。Codex 每次啟動時，會從 Repository 根目錄一路讀到目前工作目錄（CWD）；越接近 CWD 的指示會排在後面，發生衝突時也由它覆寫上層偏好。因此，要使用 `backend/AGENTS.md`，請把 `backend` 設為這次任務的工作目錄，或先進入該目錄再啟動 Codex：
+
+```powershell
+Set-Location .\backend
+codex
+```
+
+如果從 Repository 根目錄啟動，Codex 不會因為後來修改了 `backend` 內的檔案，就自動補載入 `backend/AGENTS.md`。其他 Agent Client 的搜尋路徑與覆寫規則可能不同，請以該 Client 的文件為準。Codex 的完整規則可參考[官方 `AGENTS.md` 說明](https://learn.chatgpt.com/docs/agent-configuration/agents-md)。
+
+### 怎麼選擇 TDD、TCR 或其他節奏？
+
+`development_rhythm` 支援下列設定：
+
+| 設定 | 建議使用情境 | 不適合時的處理方式 |
+| --- | --- | --- |
+| `auto` | 尚未決定節奏，希望 Skill 依風險、Oracle、測試速度、工作樹與授權判斷 | Agent 必須回報最後採用哪一種節奏及原因 |
+| `direct` | 修改範圍小、行為已知、容易復原，現有測試能快速觀察結果 | 新規則、Bug 邊界或狀態轉換能先形成 RED 時，改用 TDD |
+| `tdd` | 可以在修改正式程式碼前，用失敗測試清楚描述預期行為 | Legacy 行為尚未釐清時，先用 `characterization-first` |
+| `tcr` | 高風險修改可切成極小步驟，測試快速可靠，而且工作樹已隔離 | 缺少任一前提時先停止；常見替代方案是 TDD |
+| `characterization-first` | Legacy Code 的現有行為不明，重構前需要先固定可觀察結果 | 已有清楚的新需求與獨立 Oracle 時，可改用 TDD |
+
+通常可依下列方式快速判斷：
+
+- 一般需求或 Bug，而且能先寫出有意義的失敗測試：選 `tdd`。
+- 高風險重構、每一步都要能立即丟棄，而且測試夠快：選 `tcr`。
+- Legacy Code 行為不清楚：選 `characterization-first`。
+- 很小、可逆、已有快速測試的修改：選 `direct`。
+- 無法確定：保留 `auto`，讓 Skill 根據 Repository 證據判斷。
+
+### 常見任務可以怎麼搭配？
+
+下表提供起點，最後仍以 Repository 的風險、工具與必要 Gate 為準：
+
+| 任務情境 | `development_rhythm` | `validation_profile` | 原因 |
+| --- | --- | --- | --- |
+| 小型、可逆，而且已有快速測試的修正 | `direct` | `focused` | 避免為低風險修改製造多餘流程 |
+| 新增業務規則、邊界值或修正 Bug | `tdd` | `focused` 或 `repository` | 先用 RED 說清楚需求缺口，再完成最小 GREEN |
+| 影響 UI、API、資料庫或外部服務的使用者流程 | `tdd` | `acceptance-e2e` | 同時保留測試驅動節奏與跨邊界驗收 |
+| 高風險重構，而且每一步都能快速驗證與安全復原 | `tcr` | `repository` | 用極小 Checkpoint 限制錯誤累積；仍需當次版本控制授權 |
+| Legacy Code 行為不明，準備重構或移轉 | `characterization-first` | `repository` | 先記錄現有可觀察行為，避免整理時誤改系統答案 |
+| 已有重要測試，但不確定 Assertion 能否抓到錯誤 | `tdd` 或 `auto` | `mutation-assisted` | 用 Mutation Testing 檢查既有 Oracle 的偵錯能力 |
+
+### 驗證範圍是另一個設定
+
+`validation_profile` 支援：
+
+| 設定 | 驗證範圍 |
+| --- | --- |
+| `auto` | 依實際風險與 Repository 現有工具選擇 |
+| `focused` | 執行最小且能觀察本次行為的 Test、Build、Lint 或 Contract Check |
+| `repository` | 執行 Repository 對本次 Diff 規定的完整 Gate |
+| `acceptance-e2e` | 加入跨 UI、API、Persistence、Messaging 或 Provider 的使用者結果驗證 |
+| `mutation-assisted` | 用範圍受控的 Mutation Testing 檢查重要測試能否抓到錯誤變化 |
+
+這個設定只能增加或選擇適合的檢查，不能略過 Repository 規定的必要 Gate。例如選擇 `focused`，而 `AGENTS.md` 規定合併前必須跑完整測試與 Lint，Agent 仍要執行這些 Gate。
+
+### 設定優先順序
+
+Skill 依下列順序解析：
+
+1. 當次 User Prompt 的明確設定。
+2. 距離目前工作目錄最近、且已被 Client 載入的巢狀 Repository Policy。
+3. Repository 根目錄或更上層已載入的 Policy。
+4. 上述來源都沒指定時使用 `auto`。
+
+這是 Skill 的設定解析順序；實際載入哪些 Repository Instruction，仍由 Agent Client 決定。當次 Prompt 或較近工作目錄的 Policy 可以覆寫開發節奏與驗證 Profile 的偏好，仍然無法取消必要 Gate、安全限制或授權邊界。明確指定的策略無法執行時，Skill 必須停止、說明缺少的條件並提出替代方案，等使用者決定是否更換節奏。
+
+執行開始前或結果回報中，應該看得到：
+
+- 要求的 `development_rhythm`、設定來源與實際採用值。
+- 要求的 `validation_profile`、設定來源與實際採用值。
+- 缺少的前提、無法執行的原因與建議替代方案。
+- Repository 必要 Gate 是否保留，以及仍未驗證的風險。
+
+### 常見設定問題
+
+#### 一定要選 TDD 或 TCR 嗎？
+
+不用。保留 `development_rhythm: auto`，Skill 會根據行為是否明確、Oracle 是否可靠、測試速度、工作樹狀態與現有授權提出選擇。
+
+#### 設定一定要寫成 YAML 嗎？
+
+不用。欄位名稱固定即可，可以直接寫在一般 Prompt，也可以放在 `AGENTS.md` 的 YAML Code Block。它們是給 Agent 讀取的指令契約，目前沒有另外執行設定檔解析器。
+
+#### `AGENTS.md` 已設定 TDD，這次可以改用 Direct 嗎？
+
+可以。當次 Prompt 的明確設定優先於 Repository 預設值。Agent 仍需確認 Direct 符合目前情境，而且不能略過 Repository 必要 Gate。
+
+#### `AGENTS.md` 設定 TCR 後，Agent 就能自行 Commit 與 Revert 嗎？
+
+不能。TCR 的偏好與版本控制授權分開處理。每次執行 TCR 都要在當次任務確認可操作的工作樹、Commit 範圍與 Revert 邊界。
+
+#### 選擇 `focused` 會不會只跑一項測試？
+
+不一定。`focused` 代表先選擇最能觀察本次風險的最小驗證集合。Repository 若規定完整測試、Lint 或其他 Gate，這些檢查仍然要執行。
+
+#### Skill 為什麼阻擋我的 TCR 要求？
+
+常見原因包括測試回饋太慢、測試 Oracle 不可靠、工作樹沒有隔離，或尚未授權 Commit／Revert。Skill 會列出缺少的前提與替代方案，再由使用者決定是否調整節奏。
+
 ## 安裝
 
 先取得 Repository：
@@ -86,6 +301,27 @@ macOS／Linux：
 ```bash
 git clone https://github.com/eric861129/Clean-Code-AI-Collaboration-Skill.git
 cd Clean-Code-AI-Collaboration-Skill
+```
+
+正式發布後，如果要安裝固定的 `v0.4.0`，請先切換到對應 Tag，避免日後 `main` 更新時安裝到不同版本：
+
+```shell
+git fetch --tags
+git checkout v0.4.0
+```
+
+接著確認 Skill Frontmatter 的版本：
+
+Windows PowerShell：
+
+```powershell
+Select-String -LiteralPath ".\clean-code-ai-collaboration\SKILL.md" -Pattern 'version: "0.4.0"'
+```
+
+macOS／Linux：
+
+```bash
+grep 'version: "0.4.0"' ./clean-code-ai-collaboration/SKILL.md
 ```
 
 真正需要安裝的只有 `clean-code-ai-collaboration` 資料夾；`evals`、`tests`、`docs` 與 `.github` 是評測、驗證與維護資料。
@@ -169,7 +405,7 @@ mkdir -p "$skills_root"
 cp -R "./clean-code-ai-collaboration" "$target"
 ```
 
-安裝完成後，建議先在任務中明確指定 `$clean-code-ai-collaboration`；這也是 `v0.3.0` 的正式使用方式。Codex adapter 設定為 `allow_implicit_invocation: false`。如果 Skill 清單沒有出現，請重新啟動 Client，再確認安裝路徑與 Skill Frontmatter。
+安裝完成後，建議先在任務中明確指定 `$clean-code-ai-collaboration`；這也是 `v0.4.0` 的正式使用方式。Codex adapter 設定為 `allow_implicit_invocation: false`。如果 Skill 清單沒有出現，請重新啟動 Client，再確認安裝路徑與 Skill Frontmatter。
 
 ### Client 支援狀態
 
@@ -177,7 +413,7 @@ Agent Skills 的檔案格式可以攜帶內容，不代表每個 Client 的載�
 
 | Client | 內容與格式 | 本專案驗證狀態 |
 | --- | --- | --- |
-| Codex | Skill 核心可用，並提供 Codex adapter | 核心評測已完成，adapter 結構已驗證；v0.3.0 採 explicit-only，尚未以觸發準確率評測重新開啟 implicit invocation |
+| Codex | Skill 核心可用，並提供 Codex adapter | 核心評測已完成，adapter 結構已驗證；v0.4.0 採 explicit-only，尚未以觸發準確率評測重新開啟 implicit invocation |
 | GitHub Copilot | 核心 Markdown 內容可移植 | 尚未完成實機驗證；安裝位置與觸發方式請以 Client 官方文件為準 |
 | Claude Code | 核心 Markdown 內容可移植 | 尚未完成實機驗證；安裝位置與觸發方式請以 Client 官方文件為準 |
 | 其他 Agent Skills 相容 Client | 原則與參考文件可移植 | 尚未驗證，不宣稱工具、授權或輸出行為相容 |
@@ -218,8 +454,31 @@ Agent Skills 的檔案格式可以攜帶內容，不代表每個 Client 的載�
 - [評測情境與契約](evals/manifest.json)
 - [v0.1.0 行為基準](evals/results/v0.1.0-baseline.json)
 - [v0.2.0 初始評測](evals/results/v0.2.0-initial.json)
+- [v0.4.0 Strategy Decision-Conformance Manifest](evals/manifests/v0.4.0-strategy-full-run.json)
+- [v0.4.0 Strategy Decision-Conformance Harness](evals/v040_strategy_full_run.py)
+- [v0.4.0 Strategy Decision-Conformance Full Run Result](evals/results/v0.4.0-strategy-full-run.json)
 
-`v0.3.0` 的三層路由尚未產生新 Result；下列數字仍來自 `v0.2.0` 的固定情境。
+`v0.4.0 Strategy Decision-Conformance Full Run` 專門驗證 Subject 能否一致解讀 `development_rhythm` 與 `validation_profile`。9 組無 Skill 對照中有 5／9 符合預先固定的決策契約；Controller 分派載入 v0.4.0 Skill 的執行後，9 種情境各重複兩次，共 18／18 通過。涵蓋 Prompt 優先權、Repository Policy 預設值、`auto` 推導、TCR 權限與執行前提、必要 Gate，以及不可執行時的阻擋與替代建議。
+
+這項結果只支持「固定情境下的策略契約解讀較一致」。它不衡量程式碼品質、不比較實作結果，也不宣稱節省 Token、時間或費用。`v0.3.0 Cross-language Full Run` 維持獨立狀態，目前尚未完成；不能拿 v0.4.0 的決策測試代替，也不把未發布的進度寫成正式結果。
+
+公開 Result 會保存固定 Prompt、Controller Dispatch、原始 Subject JSON、重播後 Terminal，以及 Manifest、Harness、Skill 快照雜湊。可在乾淨 Checkout 重播決策 Oracle：
+
+Windows PowerShell：
+
+```powershell
+py -3 -m evals.v040_strategy_full_run verify-result
+```
+
+macOS／Linux：
+
+```bash
+python3 -m evals.v040_strategy_full_run verify-result
+```
+
+`18／18` 是 Controller 觀察到且可重播的契約結果；公開收據無法獨立證明 Subject 是否屬於全新 Context，也無法認證服務端實際模型身分。`model` 與 `reasoning_effort` 只代表 Controller 分派時的要求值。
+
+下列 Repository 情境數字仍來自 `v0.2.0` 的固定情境：
 
 目前 Repository 情境評測的觀察如下：
 

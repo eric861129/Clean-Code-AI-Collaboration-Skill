@@ -1,0 +1,281 @@
+{
+  "schema_version": "1.0",
+  "benchmark_version": "0.4.0-strategy-full-run-v2",
+  "skill_version": "0.4.0",
+  "full_run_generation": 4,
+  "model": "gpt-5.6-sol",
+  "reasoning_effort": "high",
+  "repetitions": 2,
+  "claim_boundary": "This Full Run checks whether controller-dispatched subjects consistently interpret the v0.4.0 strategy contract. Public receipts do not independently attest a fresh Context or provider-side model identity. The run does not measure code quality, compare implementations, establish a causal comparison with v0.3.0, or prove general effectiveness.",
+  "scenarios": [
+    {
+      "id": "explicit-tdd-and-acceptance-e2e",
+      "input": {
+        "current_prompt": {
+          "development_rhythm": "tdd",
+          "validation_profile": "acceptance-e2e"
+        },
+        "repository_policy": {
+          "required_gates": ["unit-tests", "lint"]
+        },
+        "facts": {
+          "observable_behavior": true,
+          "meaningful_red_available": true,
+          "acceptance_e2e_available": true,
+          "working_tree_isolated": true
+        }
+      },
+      "expected": {
+        "status": "ready",
+        "requested_development_rhythm": "tdd",
+        "effective_development_rhythm": "tdd",
+        "development_rhythm_source": "user-prompt",
+        "requested_validation_profile": "acceptance-e2e",
+        "effective_validation_profile": "acceptance-e2e",
+        "validation_profile_source": "user-prompt",
+        "mandatory_gates_preserved": true,
+        "missing_prerequisites": [],
+        "recommended_alternative": null
+      }
+    },
+    {
+      "id": "explicit-tcr-without-version-control-authority",
+      "input": {
+        "current_prompt": {
+          "development_rhythm": "tcr",
+          "validation_profile": "repository"
+        },
+        "repository_policy": {
+          "required_gates": ["repository-tests"]
+        },
+        "facts": {
+          "tests_fast_and_reliable": true,
+          "working_tree_isolated": true,
+          "commit_and_revert_authorized": false,
+          "meaningful_red_available": true
+        }
+      },
+      "expected": {
+        "status": "blocked",
+        "requested_development_rhythm": "tcr",
+        "effective_development_rhythm": null,
+        "development_rhythm_source": "user-prompt",
+        "requested_validation_profile": "repository",
+        "effective_validation_profile": "repository",
+        "validation_profile_source": "user-prompt",
+        "mandatory_gates_preserved": true,
+        "missing_prerequisites": ["version-control-authorization"],
+        "recommended_alternative": "tdd"
+      }
+    },
+    {
+      "id": "explicit-characterization-and-unavailable-mutation",
+      "input": {
+        "current_prompt": {
+          "development_rhythm": "characterization-first",
+          "validation_profile": "mutation-assisted"
+        },
+        "repository_policy": {
+          "required_gates": ["repository-tests"]
+        },
+        "facts": {
+          "legacy_behavior_is_critical_unknown": true,
+          "characterization_tests_can_run": true,
+          "mutation_tool_available": false,
+          "tool_install_authorized": false
+        }
+      },
+      "expected": {
+        "status": "blocked",
+        "requested_development_rhythm": "characterization-first",
+        "effective_development_rhythm": "characterization-first",
+        "development_rhythm_source": "user-prompt",
+        "requested_validation_profile": "mutation-assisted",
+        "effective_validation_profile": null,
+        "validation_profile_source": "user-prompt",
+        "mandatory_gates_preserved": true,
+        "missing_prerequisites": ["mutation-tool-and-install-authorization"],
+        "recommended_alternative": "repository"
+      }
+    },
+    {
+      "id": "repository-policy-supplies-defaults",
+      "input": {
+        "current_prompt": {},
+        "repository_policy": {
+          "development_rhythm": "tdd",
+          "validation_profile": "repository",
+          "required_gates": ["unit-tests", "integration-tests", "lint"]
+        },
+        "facts": {
+          "observable_behavior": true,
+          "meaningful_red_available": true,
+          "repository_gates_available": true
+        }
+      },
+      "expected": {
+        "status": "ready",
+        "requested_development_rhythm": "tdd",
+        "effective_development_rhythm": "tdd",
+        "development_rhythm_source": "repository-policy",
+        "requested_validation_profile": "repository",
+        "effective_validation_profile": "repository",
+        "validation_profile_source": "repository-policy",
+        "mandatory_gates_preserved": true,
+        "missing_prerequisites": [],
+        "recommended_alternative": null
+      }
+    },
+    {
+      "id": "prompt-overrides-policy-without-waiving-gates",
+      "input": {
+        "current_prompt": {
+          "development_rhythm": "direct",
+          "validation_profile": "focused"
+        },
+        "repository_policy": {
+          "development_rhythm": "tdd",
+          "validation_profile": "repository",
+          "required_gates": ["repository-tests", "lint"]
+        },
+        "facts": {
+          "bounded_reversible_change": true,
+          "behavior_understood": true,
+          "fast_oracle_available": true
+        }
+      },
+      "expected": {
+        "status": "ready",
+        "requested_development_rhythm": "direct",
+        "effective_development_rhythm": "direct",
+        "development_rhythm_source": "user-prompt",
+        "requested_validation_profile": "focused",
+        "effective_validation_profile": "focused",
+        "validation_profile_source": "user-prompt",
+        "mandatory_gates_preserved": true,
+        "missing_prerequisites": [],
+        "recommended_alternative": null
+      }
+    },
+    {
+      "id": "auto-selects-direct-focused-for-local-change",
+      "input": {
+        "current_prompt": {
+          "development_rhythm": "auto",
+          "validation_profile": "auto"
+        },
+        "repository_policy": {
+          "required_gates": ["focused-test"]
+        },
+        "facts": {
+          "bounded_reversible_change": true,
+          "behavior_understood": true,
+          "fast_oracle_available": true,
+          "no_public_contract_or_external_effect": true
+        }
+      },
+      "expected": {
+        "status": "ready",
+        "requested_development_rhythm": "auto",
+        "effective_development_rhythm": "direct",
+        "development_rhythm_source": "user-prompt",
+        "requested_validation_profile": "auto",
+        "effective_validation_profile": "focused",
+        "validation_profile_source": "user-prompt",
+        "mandatory_gates_preserved": true,
+        "missing_prerequisites": [],
+        "recommended_alternative": null
+      }
+    },
+    {
+      "id": "auto-selects-characterization-for-legacy-unknowns",
+      "input": {
+        "current_prompt": {},
+        "repository_policy": {
+          "required_gates": ["repository-tests"]
+        },
+        "facts": {
+          "legacy_behavior_is_critical_unknown": true,
+          "characterization_tests_can_run": true,
+          "repository_gates_available": true
+        }
+      },
+      "expected": {
+        "status": "ready",
+        "requested_development_rhythm": "auto",
+        "effective_development_rhythm": "characterization-first",
+        "development_rhythm_source": "default-auto",
+        "requested_validation_profile": "auto",
+        "effective_validation_profile": "repository",
+        "validation_profile_source": "default-auto",
+        "mandatory_gates_preserved": true,
+        "missing_prerequisites": [],
+        "recommended_alternative": null
+      }
+    },
+    {
+      "id": "explicit-tcr-with-required-authority",
+      "input": {
+        "current_prompt": {
+          "development_rhythm": "tcr",
+          "validation_profile": "repository"
+        },
+        "repository_policy": {
+          "required_gates": ["repository-tests", "lint"]
+        },
+        "facts": {
+          "tests_fast_and_reliable": true,
+          "working_tree_isolated": true,
+          "commit_and_revert_authorized": true,
+          "repository_gates_available": true
+        }
+      },
+      "expected": {
+        "status": "ready",
+        "requested_development_rhythm": "tcr",
+        "effective_development_rhythm": "tcr",
+        "development_rhythm_source": "user-prompt",
+        "requested_validation_profile": "repository",
+        "effective_validation_profile": "repository",
+        "validation_profile_source": "user-prompt",
+        "mandatory_gates_preserved": true,
+        "missing_prerequisites": [],
+        "recommended_alternative": null
+      }
+    },
+    {
+      "id": "explicit-tcr-without-fast-feedback-or-isolation",
+      "input": {
+        "current_prompt": {
+          "development_rhythm": "tcr",
+          "validation_profile": "repository"
+        },
+        "repository_policy": {
+          "required_gates": ["repository-tests"]
+        },
+        "facts": {
+          "tests_fast": false,
+          "tests_reliable": true,
+          "working_tree_isolated": false,
+          "commit_and_revert_authorized": true,
+          "meaningful_red_available": true
+        }
+      },
+      "expected": {
+        "status": "blocked",
+        "requested_development_rhythm": "tcr",
+        "effective_development_rhythm": null,
+        "development_rhythm_source": "user-prompt",
+        "requested_validation_profile": "repository",
+        "effective_validation_profile": "repository",
+        "validation_profile_source": "user-prompt",
+        "mandatory_gates_preserved": true,
+        "missing_prerequisites": [
+          "fast-test-feedback",
+          "isolated-working-tree"
+        ],
+        "recommended_alternative": "tdd"
+      }
+    }
+  ]
+}
