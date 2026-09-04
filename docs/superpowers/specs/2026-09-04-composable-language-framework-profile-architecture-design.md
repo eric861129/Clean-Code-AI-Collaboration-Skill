@@ -1,11 +1,11 @@
-# Clean Code AI Collaboration Skill v0.5.0 可組合語言與框架 Profile 架構設計規格
+# Clean Code AI Collaboration Skill v0.5.x 可組合語言與框架 Profile 架構設計規格
 
 ## 文件狀態
 
 - 日期：2026-09-04
-- 狀態：設計已核准；下一步制定 Implementation Plan，計畫再次核准後才開始開發
-- 目標版本：`v0.5.0`
-- 目前版本：`v0.4.0`
+- 狀態：`v0.5.0` 已發布；`v0.5.1` M2 Profile Pilot 對話設計已核准，書面 SPEC 待確認後制定獨立 Implementation Plan
+- 已完成版本：`v0.5.0`
+- 目前目標版本：`v0.5.1`
 - Repository：`Clean-Code-AI-Collaboration-Skill`
 - 主要決策：採用單一 Monorepo、保留一個 Core Skill，透過 Language Profile 與 Framework Profile 擴充
 
@@ -23,6 +23,8 @@
 6. README、Profile Authoring Guide 與一個可重現的 Specialist Package 範例。
 
 本文件後段的 Profile Pilot、Full Run、Go、Rust、Java 與 Vue Reference 實作屬於 `v0.5.0` 後續工作。除非另有明確核准，不應把 M2、M3 自動納入第一個 Codex Implementation Plan。
+
+`v0.5.0` 已於 2026-09-04 發布。使用者已另行核准 `v0.5.1` 的 M2 Profile Pilot，並授權建立與 Push 公開 Fixture Tag、執行隔離 Subject Runs／匿名 Review，以及將 Result Push 至開發分支。Merge、`v0.5.1` Tag 與 GitHub Release 仍保留在本階段之外。
 
 ## 背景
 
@@ -1160,6 +1162,78 @@ core-plus-react
 | Java | 狀態與錯誤契約 | Resource／Exception／Concurrency |
 | Vue | UI 狀態與錯誤保留 | Watch Cleanup／Reactivity Identity |
 
+### `v0.5.1` M2 Pilot 固定範圍
+
+M2 只評估 `v0.5.0` 已發布的 C#、Python、TypeScript 與 React Profile。受測 Skill 固定為 `v0.5.0` Tag 與 Commit `bd895776a80566381003182bfdb24f0f02784731`；Pilot 期間不得修改受測 Core 或 Profile Reference。`v0.5.1` 只新增評測契約、公開結果、Evidence Link 與由結果支持的成熟度變更。
+
+Fixture Repository 沿用公開的 `Clean-Code-AI-Collaboration-Benchmark-Fixtures`。新 Fixture Contract 固定為 immutable `profile-pilot-v1` Annotated Tag，包含下列八個 Scenario：
+
+| Profile 歸因 | Scenario ID | 類型 | Fixture 來源 |
+| --- | --- | --- | --- |
+| C# | `csharp-overdue-rule` | Shared Business | 新增 High Priority 兩小時邊界 Fixture |
+| C# | `csharp-cancellation-cleanup` | Ecosystem-native | 新增 Cancellation 傳遞與 Async Cleanup Fixture |
+| Python | `fastapi-overdue-rule` | Shared Business | 沿用 `cross-language-v3` 候選 Fixture |
+| Python | `fastapi-provider-boundary` | Ecosystem-native | 沿用 `cross-language-v3` 候選 Fixture |
+| TypeScript | `typescript-overdue-rule` | Shared Business | 沿用 `fixtures/react-overdue-rule`，只評估 TypeScript 時間規則責任 |
+| TypeScript | `typescript-runtime-validation` | Ecosystem-native | 新增 Union Narrowing 與外部輸入 Runtime Validation Fixture |
+| React | `react-state-error-retention` | Shared Business | 新增 Loading、Error、Success State 保留 Fixture |
+| React | `react-effect-lifecycle` | Ecosystem-native | 沿用 `cross-language-v3` 候選 Fixture |
+
+每個 Fixture 必須在固定 Tag 前通過 Public Gate 與 Preservation Oracle，並讓乾淨 Baseline 的 Acceptance Oracle 只因預期需求缺口呈現 RED。每個 Fixture 另保存一個故意破壞既有契約的 Mutation，證明 Evaluator 能攔截回歸。Fixture、Prompt、Allowed Diff、Oracle、Rubric、Lockfile 與歸因規則一旦開始 Pilot 就不得就地修改；任何 Scenario Contract 變更會使該 Scenario 的所有 Arms 一起失效並留下 Invalidation Receipt。
+
+### Comparison Arms 與執行矩陣
+
+M2 Manifest 定義七個可重用 Arm，但每個 Scenario 只執行自身的 `comparison_arms`：
+
+| Arm | 載入內容 | 用途 |
+| --- | --- | --- |
+| `control` | Repository Instruction 與任務 | 廣義 Baseline |
+| `generic-clean-code` | Control 加通用 Clean Code 指示 | 廣義 Baseline |
+| `core-only` | 固定版本 Core，明確指定 Core Only | Language Profile 的直接 Comparator |
+| `core-plus-csharp` | Core + C# | C# Treatment |
+| `core-plus-python` | Core + Python | Python Treatment |
+| `core-plus-typescript` | Core + TypeScript | TypeScript Treatment 與 React Comparator |
+| `core-plus-typescript-plus-react` | Core + TypeScript + React | React Treatment |
+
+C#、Python 與 TypeScript 各有兩個 Scenario，每個 Scenario 執行 Control、Generic、Core Only 與對應 Language Treatment，共 24 組。React 的兩個 Scenario 各執行五個 Arms，以 `core-plus-typescript` 對照 `core-plus-typescript-plus-react`，共 10 組。M2 Pilot 固定只有 Repetition 1，合計 34 個 Run Slot；不得省略失敗、逾時、Infrastructure Failure 或失效的 Slot。
+
+TypeScript Profile 的增量只使用 `core-only` 與 `core-plus-typescript` 比較。React Profile 的增量只使用 `core-plus-typescript` 與 `core-plus-typescript-plus-react` 比較。Control 與 Generic 結果只提供背景，不作為 Profile 成熟度的直接 Comparator。
+
+執行條件固定為 `gpt-5.6-sol`、`high` Reasoning Effort、`codex-desktop-collaboration`、`desktop-subject-v4`、Subject Timeout 480 秒、Fixture／Oracle Timeout 各 120 秒與 Random Seed `560501`。網路強制狀態與 Token Telemetry 無法由 Desktop Harness 取得時必須記為 `not_available`，不得推估。
+
+### Manifest-driven Harness 演進
+
+既有 `evals/harness/` 保留單一實作，改由 Manifest 宣告合法 Arm、Scenario、`comparison_arms`、Prompt Instruction、Staged Skill 與必須查閱的 Skill 檔案。每個 M2 Scenario 另固定 `profile_under_test`、`scenario_type`、`direct_comparator`、`treatment_arm` 與 `incremental_criteria`；Reviewer 對每個匿名候選獨立評定這些 Criteria，Controller 解盲後才比較直接 Comparator 與 Treatment。Production Parser 不再把 v0.3.0 的三個 Arm、四個 Scenario 與 36 組結果寫死；`evals/manifests/v0.3.0-cross-language.json` 的既有 Contract Tests 仍固定其原始 ID、順序與 36 組歷史行為，防止相容性漂移。
+
+M2 新增且只新增下列公開評測來源：
+
+- `evals/manifests/v0.5.1-profile-pilot.json`：固定 Fixture／Skill Revision、34 個 Slot、Scenario-specific Arms、Prompt 與 Outcome Contract。
+- `evals/results/v0.5.1-profile-pilot.json`：保存全部 Terminal States、Profile Comparisons、匿名 Review、限制與 Profile Outcome。
+- `evals/rubrics/profile-increment.md`：固定單一候選的 Profile-specific Criteria 評分方式，不顯示 Arm 或直接比較結果。
+
+所有 Skill Arms 都從相同 `v0.5.0` Source Tree 暫存完整 `clean-code-ai-collaboration`，Treatment 差異只來自固定 Prompt 指定的 Applied Profiles。Controller 依 Arm 要求 Subject 回報實際查閱檔案的 SHA-256：Core Only 至少包含 `SKILL.md` 與 `references/profile-selection.md`；Treatment 另包含對應 Language／Framework Reference。遺漏、額外宣稱或 Hash 不符一律記為 `skill_not_used` 或 `invalid_claim`，不得納入 Profile 效果比較。
+
+### Pilot Outcome 與成熟度
+
+每個 Profile 只能得到下列一個 Outcome：
+
+- `passed`：Treatment 通過兩個固定 Scenario 的 Public、Preservation、Acceptance 與 Diff Boundary Gate；相對直接 Comparator 至少改善一項預先固定的 Profile-specific Oracle 或 Blind Review 維度，且沒有新增 Regression。
+- `no_difference`：Treatment 與直接 Comparator 都通過，但預先固定的 Profile-specific 比較沒有觀察到增量，或差異不足以支持歸因。
+- `failed`：Treatment 發生 Automatic Failure、破壞 Preservation、越過 Allowed Diff，或相對 Comparator 出現可歸因的 Regression。
+- `inconclusive`：存在未能依 Retry Policy 排除的 Infrastructure、Evidence Completeness 或 Blind Review 缺口，無法作成增量判定。
+
+Outcome 依固定優先順序判定：任何未排除的 Infrastructure 或 Evidence 缺口先得到 `inconclusive`；其餘結果若 Treatment 失敗或 Regression，得到 `failed`；Treatment 通過全部 Gate，且至少一個 `incremental_criteria` 的匿名分數高於直接 Comparator、其他 Criteria 不降低時，得到 `passed`；剩餘情況得到 `no_difference`。不得在解盲後新增或修改 Criteria、門檻與比較組。
+
+`passed` 不代表普遍優於所有 Repository，只支持固定模型、Client、Fixture、Prompt 與一次 Pilot Repetition 下的有限觀察。只有 `passed` 的 Profile 可在同一 Evidence Commit 升級為 `beta`。其他 Profile 保持 `experimental`；四個 Profile 完成有效 Pilot 後都將 `benchmark_status` 更新為 `pilot_recorded`，並在 `evidence.results` 保存自身 Outcome、公開 Result Path 與重新計算的 SHA-256。
+
+公開 Result 必須有可由機器重算的 `profile_outcomes`，逐一保存 Profile ID、直接 Comparator、Treatment、兩個 Scenario、Outcome、限制與對應 Run IDs。Profile Validator 除了驗證 Result File Hash，還必須確認 Metadata 的 Stage／Outcome 與公開 Result 中同一 Profile 的摘要一致，避免 Metadata 單方面宣稱 `passed`。
+
+### CI、匿名 Review 與交付邊界
+
+CI 不重新執行 34 個付費或耗時的 Subject Runs。Ubuntu 與 Windows 共同驗證 Manifest Schema、34 個唯一 Slot、Prompt／Fixture／Skill Hash、Result 完整性、Profile Outcome Cross-check、歷史 v0.3.0 行為、Profile Metadata 與既有 Repository Gates。實際 Subject Run 由已授權的隔離 Codex Sub-agent 依不可變 Dispatch 執行；匿名 Reviewer 只能看到 Task、Contract、Diff、Oracle、Blind Spots 與 Rubric，不得看到 Arm、Run 順序或私有 Mapping。
+
+M2 完成時必須 Push 公開 Fixture Commit／`profile-pilot-v1` Tag，以及包含 Manifest、Result、Evidence Link 與 CI 結果的 `codex/v0.5.1-profile-pilot` 開發分支。這個終點不包含 Merge、`v0.5.1` Tag、GitHub Release、Full Run、`stable`、M3 Profile 或 Specialist Package 發布。
+
 ### 歷史證據邊界
 
 - `v0.2.0` Repository Benchmark 保持歷史結果。
@@ -1346,15 +1420,18 @@ Preflight、M0-A、M0-B、M1-A、M1-B、M1-C 與 M1-D 是 `v0.5.0` 的實作與�
 
 範圍：
 
-- 為首批四個 Profile 建立 Core Only、Core + Language 與必要的 Core + Language + Framework 比較。
-- 固定 Fixture、Prompt、Allowed Diff、Oracle、Rubric 與歸因邊界。
-- 公開 Pilot Result 與限制。
+- 依「Profile Benchmark 設計」固定的八個 Scenario 與七個 Scenario-specific Arms，執行 34 個 Pilot Run Slot。
+- 將既有 Harness 改成 Manifest-driven，同時保留 v0.3.0 的 36 組歷史契約。
+- 固定並 Push 公開 Fixture `profile-pilot-v1` Tag、Prompt、Allowed Diff、Oracle、Rubric 與歸因邊界。
+- 公開 `evals/results/v0.5.1-profile-pilot.json`、Profile Outcome、限制與 Metadata Evidence Link。
 
 完成條件：
 
 - 只有通過固定 Pilot 的 Profile 可升級為 `beta`。
 - 失敗與無差異結果同樣保留，不因結果不理想而重寫契約。
 - 複合 Stack 結果不錯誤歸因給單一 Profile。
+- 全部 34 個 Slot 都有可驗證 Terminal State，且 Profile Metadata 與 Result Outcome 可交叉驗證。
+- 開發分支與 Fixture Tag 已公開 Push；Merge、`v0.5.1` Tag 與 GitHub Release 保持未執行。
 
 ### M3：Go、Rust、Java、Vue
 
