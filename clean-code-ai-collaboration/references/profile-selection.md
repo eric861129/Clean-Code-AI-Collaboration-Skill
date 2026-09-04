@@ -52,8 +52,8 @@ Standard output records Profiles Applied and Profile Basis per Changed Module. F
 
 - ID: `python`
 - Kind: `language`
-- Status / Availability: `planned` / `unavailable`
-- Reference: Not available
+- Status / Availability: `experimental` / `available`
+- Reference: [language-python.md](language-python.md)
 - Load Order: `100`
 - Owning Manifests: `pyproject.toml` (project), `setup.py` (project), `setup.cfg` (project)
 - Supporting Files: `requirements*.txt`, `Pipfile`, `poetry.lock`, `uv.lock`

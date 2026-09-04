@@ -54,6 +54,10 @@ class ProfileContractTests(unittest.TestCase):
         self.temporary_directory = tempfile.TemporaryDirectory()
         self.fixture_root = Path(self.temporary_directory.name)
         shutil.copytree(ROOT / "profiles", self.fixture_root / "profiles")
+        shutil.copytree(
+            ROOT / "clean-code-ai-collaboration" / "references",
+            self.fixture_root / "clean-code-ai-collaboration" / "references",
+        )
 
     def tearDown(self) -> None:
         self.temporary_directory.cleanup()
@@ -99,7 +103,7 @@ class ProfileContractTests(unittest.TestCase):
             / "references"
             / "profile-selection.md"
         )
-        runtime_path.parent.mkdir(parents=True)
+        runtime_path.parent.mkdir(parents=True, exist_ok=True)
         runtime_path.write_text(runtime, encoding="utf-8", newline="\n")
 
     def test_catalog_has_the_fixed_v050_order(self) -> None:
@@ -107,17 +111,20 @@ class ProfileContractTests(unittest.TestCase):
 
         self.assertEqual(PROFILE_IDS, [profile["id"] for profile in profiles])
 
-    def test_registry_has_only_csharp_as_experimental(self) -> None:
+    def test_registry_has_csharp_and_python_as_experimental(self) -> None:
         self.assertEqual([], list(validate_repository(ROOT)))
         for profile in load_registry(ROOT):
             with self.subTest(profile=profile["id"]):
                 expected_status = (
-                    "experimental" if profile["id"] == "csharp" else "planned"
+                    "experimental"
+                    if profile["id"] in {"csharp", "python"}
+                    else "planned"
                 )
                 self.assertEqual(expected_status, profile["status"])
-                if profile["id"] == "csharp":
+                if profile["id"] in {"csharp", "python"}:
                     self.assertEqual(
-                        "clean-code-ai-collaboration/references/language-csharp.md",
+                        "clean-code-ai-collaboration/references/"
+                        + f"language-{profile['id']}.md",
                         profile["reference"],
                     )
                 else:
@@ -157,6 +164,41 @@ class ProfileContractTests(unittest.TestCase):
             with self.subTest(term=term):
                 self.assertIn(term.lower(), content.lower())
         self.assertNotIn("ASP.NET Core is required", content)
+
+    def test_python_profile_has_complete_semantic_contract(self) -> None:
+        content = (
+            ROOT
+            / "clean-code-ai-collaboration"
+            / "references"
+            / "language-python.md"
+        ).read_text(encoding="utf-8")
+
+        for heading in REQUIRED_PROFILE_HEADINGS:
+            with self.subTest(heading=heading):
+                self.assertIn(heading, content)
+        for term in {
+            "pyproject.toml",
+            "Python version",
+            "dynamic typing",
+            "mutable default",
+            "aliasing",
+            "asyncio",
+            "cancellation",
+            "context manager",
+            "exception boundary",
+            "type checker",
+        }:
+            with self.subTest(term=term):
+                self.assertIn(term.lower(), content.lower())
+        for statement in {
+            "FastAPI is required",
+            "Django is required",
+            "Pydantic is required",
+            "mypy is required",
+            "pyright is required",
+        }:
+            with self.subTest(statement=statement):
+                self.assertNotIn(statement, content)
 
     def test_generated_region_rejects_missing_duplicate_and_reordered_markers(
         self,

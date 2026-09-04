@@ -2,8 +2,9 @@ schema_version: "1.0"
 id: python
 kind: language
 display_name: Python
-status: planned
+status: experimental
 suite_version: "0.5.0"
+reference: clean-code-ai-collaboration/references/language-python.md
 detection:
   owning_manifests:
     - pattern: pyproject.toml

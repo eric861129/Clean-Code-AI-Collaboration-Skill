@@ -52,6 +52,16 @@ class ProfileRoutingTests(unittest.TestCase):
         self.assertEqual("selected", result["outcome"])
         self.assertEqual(["csharp"], result["modules"][0]["profiles"])
 
+    def test_real_registry_selects_only_the_experimental_python_profile(self) -> None:
+        result = route_changed_files(
+            FIXTURES / "python",
+            load_registry(ROOT),
+            ["automation/job.py"],
+        )
+
+        self.assertEqual("selected", result["outcome"])
+        self.assertEqual(["python"], result["modules"][0]["profiles"])
+
     def test_typescript_react_selects_language_then_framework(self) -> None:
         result = self.route_case("typescript-react")
 
