@@ -1561,6 +1561,11 @@ class CrossLanguageHarnessTests(unittest.TestCase):
         documents = [
             {
                 "run_id": slot.run_id,
+                "scenario_id": slot.scenario_id,
+                "language": slot.language,
+                "arm_id": slot.arm_id,
+                "repetition": slot.repetition,
+                "order_index": slot.order_index,
                 "terminal_state": "passed",
             }
             for slot in slots
@@ -1580,6 +1585,11 @@ class CrossLanguageHarnessTests(unittest.TestCase):
         documents = [
             {
                 "run_id": slot.run_id,
+                "scenario_id": slot.scenario_id,
+                "language": slot.language,
+                "arm_id": slot.arm_id,
+                "repetition": slot.repetition,
+                "order_index": slot.order_index,
                 "terminal_state": "passed",
             }
             for slot in slots

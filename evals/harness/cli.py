@@ -36,7 +36,12 @@ from evals.harness.models import (
 from evals.harness.oracle_runner import run_oracles
 from evals.harness.planner import build_run_slots, full_slots, pilot_slots
 from evals.harness.process import run_process
-from evals.harness.result_builder import build_public_result, can_retry
+from evals.harness.profile_outcomes import build_profile_outcomes
+from evals.harness.result_builder import (
+    build_public_result,
+    can_retry,
+    validate_profile_pilot_result,
+)
 from evals.harness.subject_runner import build_prompt, run_subject
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -1351,7 +1356,7 @@ def _write_review_packets(
             document,
             _scenario_contract_sha256(manifest, paths, slot.scenario_id),
         )
-        packet = write_review_packet(document, paths.runs_root)
+        packet = write_review_packet(document, paths.runs_root, manifest)
         if not packet.is_file():  # pragma: no cover - writer guarantees this
             raise FileNotFoundError("review packet was not written")
     print(f"review packets: {len(slots)}")
@@ -1386,17 +1391,106 @@ def _write_result(
     output: Path,
 ) -> None:
     _verify_runs(manifest, paths, "all")
-    _verify_reviews(manifest, paths)
     slots = build_run_slots(manifest)
     documents = [_read_run_document(slot, paths) for slot in slots]
     reviews = _reviews_by_run(manifest, paths)
-    for document in documents:
-        document["review"] = reviews[str(document["run_id"])]
-    result = build_public_result(
-        slots,
-        documents,
-        benchmark_version=manifest.benchmark_version,
+    is_profile_campaign = all(
+        "profile_under_test" in scenario for scenario in manifest.scenarios
     )
+    if not is_profile_campaign:
+        _verify_reviews(manifest, paths)
+        for document in documents:
+            document["review"] = reviews[str(document["run_id"])]
+        result = build_public_result(
+            slots,
+            documents,
+            benchmark_version=manifest.benchmark_version,
+        )
+    else:
+        public_documents = []
+        complete_review_count = 0
+        slots_by_id = {slot.run_id: slot for slot in slots}
+        for document in documents:
+            updated = dict(document)
+            review = reviews.get(str(document["run_id"]), "not_available")
+            try:
+                if not isinstance(review, dict):
+                    raise ValueError("review is unavailable")
+                _validate_review(
+                    manifest,
+                    slots_by_id[str(document["run_id"])],
+                    review,
+                )
+            except ValueError:
+                updated["review"] = "not_available"
+            else:
+                updated["review"] = review
+                complete_review_count += 1
+            public_documents.append(updated)
+        outcomes = build_profile_outcomes(manifest, public_documents)
+
+        contract = _freeze_document(manifest, paths)
+        contract_sha256 = _canonical_sha256(contract)
+        if paths.manifest_path is None:
+            raise ValueError("campaign manifest path is missing")
+        source_revisions = {
+            "fixture_tag": manifest.fixture_tag,
+            "fixture_commit": manifest.fixture_commit,
+            "skill_tag": manifest.skill_tag,
+            "skill_commit": manifest.skill_commit,
+            "manifest_path": str(
+                paths.manifest_path.relative_to(paths.repository_root)
+            ).replace("\\", "/"),
+            "manifest_sha256": contract["manifest_sha256"],
+            "harness_sha256": contract["harness_sha256"],
+            "contract_sha256": contract_sha256,
+            "prompts": contract["prompts"],
+            "evaluators": contract["evaluators"],
+            "rubrics": contract["rubrics"],
+        }
+        result = build_public_result(
+            slots,
+            public_documents,
+            benchmark_version=manifest.benchmark_version,
+            source_revisions=source_revisions,
+            execution={
+                "model": manifest.model,
+                "reasoning_effort": manifest.reasoning_effort,
+                "client": manifest.client,
+                "subject_executor": manifest.subject_executor,
+                "subject_timeout_seconds": manifest.subject_timeout_seconds,
+                "fixture_timeout_seconds": manifest.fixture_timeout_seconds,
+                "oracle_timeout_seconds": manifest.oracle_timeout_seconds,
+                "repetitions": manifest.repetitions,
+                "random_seed": manifest.random_seed,
+            },
+            review_metadata={
+                "anonymization": "single-candidate",
+                "reviewer_model": "gpt-5.6-terra",
+                "reviewer_reasoning_effort": "max",
+                "expected_candidates": len(slots),
+                "completed_candidates": complete_review_count,
+                "rubric_ids": list(RUBRIC_IDS),
+                "incremental_criteria_scored": complete_review_count == len(slots),
+            },
+            profile_outcomes=outcomes,
+        )
+        schema = _read_json(ROOT / "evals" / "profile-pilot-result.schema.json")
+        expected_scenario_contracts = {
+            str(scenario["id"]): _scenario_contract_sha256(
+                manifest,
+                paths,
+                str(scenario["id"]),
+            )
+            for scenario in manifest.scenarios
+        }
+        validate_profile_pilot_result(
+            result,
+            manifest,
+            schema,
+            expected_source_revisions=source_revisions,
+            expected_scenario_contracts=expected_scenario_contracts,
+        )
     _write_json(output, result)
     print(output)
 
@@ -1412,38 +1506,79 @@ def _verify_reviews(
         missing = sorted(expected - set(reviews))
         extra = sorted(set(reviews) - expected)
         raise ValueError(f"reviews mismatch; missing={missing}, extra={extra}")
+    slots_by_id = {slot.run_id: slot for slot in slots}
     for run_id, review in reviews.items():
-        rubrics = review.get("rubrics")
-        if not isinstance(rubrics, dict) or set(rubrics) != set(RUBRIC_IDS):
-            raise ValueError(f"invalid rubrics for {run_id}")
-        for rubric_id, value in rubrics.items():
-            if not isinstance(value, dict):
-                raise ValueError(f"invalid rubric {rubric_id} for {run_id}")
-            if value.get("score") not in {0, 1, 2}:
-                raise ValueError(f"invalid score for {run_id}/{rubric_id}")
-            reason = value.get("reason")
-            if not isinstance(reason, str) or not reason.strip():
-                raise ValueError(f"empty reason for {run_id}/{rubric_id}")
-        if any("aggregate" in key or "total" in key for key in review):
-            raise ValueError(f"aggregate score is not allowed for {run_id}")
+        _validate_review(manifest, slots_by_id[run_id], review)
     print(f"reviews verified: {len(reviews)}")
+
+
+def _validate_review(
+    manifest: BenchmarkManifest,
+    slot: RunSlot,
+    review: dict[str, object],
+) -> None:
+    scenario = next(
+        item for item in manifest.scenarios if item["id"] == slot.scenario_id
+    )
+    requires_incremental_review = "incremental_criteria" in scenario
+    expected_fields = {"rubrics"}
+    if requires_incremental_review:
+        expected_fields.add("incremental_criteria")
+    if set(review) != expected_fields:
+        raise ValueError(f"invalid review fields for {slot.run_id}")
+    rubrics = review.get("rubrics")
+    if not isinstance(rubrics, dict) or set(rubrics) != set(RUBRIC_IDS):
+        raise ValueError(f"invalid rubrics for {slot.run_id}")
+    for rubric_id, value in rubrics.items():
+        if not isinstance(value, dict) or set(value) != {"score", "reason"}:
+            raise ValueError(f"invalid rubric {rubric_id} for {slot.run_id}")
+        score = value.get("score")
+        if not isinstance(score, int) or isinstance(score, bool) or score not in {0, 1, 2}:
+            raise ValueError(f"invalid score for {slot.run_id}/{rubric_id}")
+        reason = value.get("reason")
+        if not isinstance(reason, str) or not reason.strip():
+            raise ValueError(f"empty reason for {slot.run_id}/{rubric_id}")
+    if not requires_incremental_review:
+        return
+    expected_criteria = list(scenario["incremental_criteria"])
+    criteria = review.get("incremental_criteria")
+    if not isinstance(criteria, list) or len(criteria) != len(expected_criteria):
+        raise ValueError(f"invalid incremental criteria for {slot.run_id}")
+    for index, value in enumerate(criteria):
+        if not isinstance(value, dict) or set(value) != {
+            "criterion",
+            "score",
+            "reason",
+        }:
+            raise ValueError(f"invalid incremental criterion for {slot.run_id}")
+        if value.get("criterion") != expected_criteria[index]:
+            raise ValueError(f"incremental criterion drift for {slot.run_id}")
+        score = value.get("score")
+        if not isinstance(score, int) or isinstance(score, bool) or score not in {0, 1, 2}:
+            raise ValueError(f"invalid incremental score for {slot.run_id}")
+        reason = value.get("reason")
+        if not isinstance(reason, str) or not reason.strip():
+            raise ValueError(f"empty incremental reason for {slot.run_id}")
 
 
 def _reviews_by_run(
     manifest: BenchmarkManifest,
     paths: HarnessPaths,
 ) -> dict[str, dict[str, object]]:
-    current_evidence = {
-        str(document["evidence_id"]): slot.run_id
-        for slot in build_run_slots(manifest)
-        for document in [_read_run_document(slot, paths)]
-    }
+    current_evidence: dict[str, str] = {}
+    for slot in build_run_slots(manifest):
+        document = _read_run_document(slot, paths)
+        evidence_id = str(document["evidence_id"])
+        if evidence_id in current_evidence:
+            raise ValueError(f"duplicate run evidence ID: {evidence_id}")
+        current_evidence[evidence_id] = slot.run_id
     mapping = _read_json(paths.review_key_path)
     candidates = mapping.get("candidates")
     if not isinstance(candidates, dict):
         raise ValueError("invalid private review mapping")
     reviews_root = paths.reviews_root
     reviews: dict[str, dict[str, object]] = {}
+    claimed_evidence: dict[str, str] = {}
     for candidate_id, identity in candidates.items():
         if not isinstance(identity, dict):
             raise ValueError("invalid private review identity")
@@ -1452,6 +1587,12 @@ def _reviews_by_run(
         )
         if evidence_id not in current_evidence:
             continue
+        if evidence_id in claimed_evidence:
+            raise ValueError(
+                "duplicate review candidate for evidence ID: "
+                f"{evidence_id} ({claimed_evidence[evidence_id]}, {candidate_id})"
+            )
+        claimed_evidence[evidence_id] = str(candidate_id)
         path = reviews_root / f"{candidate_id}.json"
         if not path.is_file():
             continue

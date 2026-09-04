@@ -11,6 +11,15 @@ DESKTOP_REPORT_PATH = ".benchmark-subject-report.json"
 DESKTOP_DISPATCH_MODE = "external-collaboration-subagent"
 FREEZE_POLICIES = {"post_pilot", "pre_execution"}
 PROFILE_SCENARIO_TYPES = {"shared_business", "ecosystem_native"}
+PROFILE_COMPARISON_ARMS = {
+    "csharp": ("core-only", "core-plus-csharp"),
+    "python": ("core-only", "core-plus-python"),
+    "typescript": ("core-only", "core-plus-typescript"),
+    "react": (
+        "core-plus-typescript",
+        "core-plus-typescript-plus-react",
+    ),
+}
 IDENTIFIER_PATTERN = r"[a-z0-9]+(?:[.-][a-z0-9]+)*"
 REQUIRED_SCENARIO_FIELDS = {
     "id",
@@ -312,6 +321,9 @@ def _validate_profile_attribution(
     profile_under_test = scenario.get("profile_under_test")
     if not isinstance(profile_under_test, str) or not profile_under_test.strip():
         raise ValueError("profile under test is required")
+    expected_comparison = PROFILE_COMPARISON_ARMS.get(profile_under_test)
+    if expected_comparison is None:
+        raise ValueError("profile under test is not part of the fixed pilot")
     if scenario.get("scenario_type") not in PROFILE_SCENARIO_TYPES:
         raise ValueError("scenario type is invalid")
     direct_comparator = scenario.get("direct_comparator")
@@ -322,6 +334,10 @@ def _validate_profile_attribution(
         raise ValueError("treatment arm is not a scenario comparison arm")
     if direct_comparator == treatment_arm:
         raise ValueError("direct comparator and treatment arm must differ")
+    if (direct_comparator, treatment_arm) != expected_comparison:
+        raise ValueError(
+            f"profile comparison arms are invalid: {profile_under_test}"
+        )
     incremental_criteria = scenario.get("incremental_criteria")
     if (
         not isinstance(incremental_criteria, list)

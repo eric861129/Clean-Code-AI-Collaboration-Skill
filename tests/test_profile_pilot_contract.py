@@ -1,14 +1,18 @@
 import copy
 import hashlib
 import json
+import re
 import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from jsonschema import Draft202012Validator
+
 import evals.harness.cli as harness_cli
 import evals.harness.fixture_builder as fixture_builder
+from evals.harness.anonymizer import build_review_packet
 from evals.harness.cli import main as harness_main
 from evals.harness.desktop_subject import (
     DesktopSubjectValidationError,
@@ -22,6 +26,11 @@ from evals.harness.fixture_builder import build_workspace
 from evals.harness.manifest import validate_manifest
 from evals.harness.models import HarnessPaths, RunSlot, SubjectDispatch, Workspace
 from evals.harness.planner import build_run_slots
+from evals.harness.profile_outcomes import build_profile_outcomes
+from evals.harness.result_builder import (
+    build_public_result,
+    validate_profile_pilot_result,
+)
 from evals.harness.subject_runner import IMPLEMENTATION_AUTHORIZATION, build_prompt
 
 
@@ -53,6 +62,65 @@ ARM_INSPECTION_PATHS = {
         f"{SKILL_ROOT}/references/framework-react.md",
     ),
 }
+
+
+def _terminal_documents(
+    slots: tuple[RunSlot, ...], terminal_state: str = "passed"
+) -> list[dict[str, object]]:
+    return [
+        {
+            "run_id": slot.run_id,
+            "scenario_id": slot.scenario_id,
+            "language": slot.language,
+            "arm_id": slot.arm_id,
+            "repetition": slot.repetition,
+            "order_index": slot.order_index,
+            "terminal_state": terminal_state,
+            "contract_sha256": "a" * 64,
+            "scenario_contract_sha256": "b" * 64,
+            "prompt_sha256": "c" * 64,
+            "diff_sha256": "d" * 64,
+            "automatic_failure_reasons": [],
+            "oracle_results": [],
+            "telemetry": "not_available",
+        }
+        for slot in slots
+    ]
+
+
+def _review_with_scores(
+    criteria: list[str], scores: list[int]
+) -> dict[str, object]:
+    return {
+        "rubrics": {
+            rubric_id: {"score": 1, "reason": "review evidence"}
+            for rubric_id in (
+                "context-and-locality",
+                "behavior-and-validation",
+                "decision-and-escalation",
+            )
+        },
+        "incremental_criteria": [
+            {
+                "criterion": criterion,
+                "score": score,
+                "reason": "criterion evidence",
+            }
+            for criterion, score in zip(criteria, scores, strict=True)
+        ],
+    }
+
+
+def _profile_documents(manifest) -> list[dict[str, object]]:
+    documents = _terminal_documents(build_run_slots(manifest))
+    scenarios = {str(item["id"]): item for item in manifest.scenarios}
+    for document in documents:
+        scenario = scenarios[str(document["scenario_id"])]
+        criteria = list(scenario["incremental_criteria"])
+        score = 2 if document["arm_id"] == scenario["treatment_arm"] else 1
+        document["review"] = _review_with_scores(criteria, [score] * len(criteria))
+        document["automatic_failure_reasons"] = []
+    return documents
 
 
 PROFILE_PILOT_MATRIX = (
@@ -253,6 +321,454 @@ def _profile_pilot_manifest_raw() -> dict[str, object]:
 
 
 class ProfilePilotHarnessContractTests(unittest.TestCase):
+    def test_profile_pilot_result_schema_requires_complete_public_evidence(
+        self,
+    ) -> None:
+        manifest = validate_manifest(_profile_pilot_manifest_raw())
+        slots = build_run_slots(manifest)
+        documents = _profile_documents(manifest)
+        documents[0]["oracle_results"] = [
+            {
+                "group": "public",
+                "commands": [
+                    {
+                        "args": ["python", "-m", "unittest"],
+                        "exit_code": 0,
+                        "elapsed_seconds": 0.1,
+                        "timed_out": False,
+                        "classification": "passed",
+                        "attempt": 1,
+                        "stdout_sha256": "3" * 64,
+                        "stderr_sha256": "4" * 64,
+                        "stdout": "complete private raw output",
+                        "stderr": "private diagnostic output",
+                    }
+                ],
+            }
+        ]
+        source_revisions = {
+            "fixture_tag": "profile-pilot-v1",
+            "fixture_commit": "a" * 40,
+            "skill_tag": "v0.5.0",
+            "skill_commit": "b" * 40,
+            "manifest_path": "evals/manifests/v0.5.1-profile-pilot.json",
+            "manifest_sha256": "c" * 64,
+            "harness_sha256": "d" * 64,
+            "contract_sha256": "a" * 64,
+            "prompts": {
+                f"{slot.scenario_id}/{slot.arm_id}": "c" * 64 for slot in slots
+            },
+            "evaluators": {
+                str(scenario["id"]): "1" * 64 for scenario in manifest.scenarios
+            },
+            "rubrics": {"evals/rubrics/profile-increment.md": "2" * 64},
+        }
+        expected_scenario_contracts = {
+            str(scenario["id"]): "b" * 64 for scenario in manifest.scenarios
+        }
+        execution = {
+            "model": manifest.model,
+            "reasoning_effort": manifest.reasoning_effort,
+            "client": manifest.client,
+            "subject_executor": manifest.subject_executor,
+            "subject_timeout_seconds": manifest.subject_timeout_seconds,
+            "fixture_timeout_seconds": manifest.fixture_timeout_seconds,
+            "oracle_timeout_seconds": manifest.oracle_timeout_seconds,
+            "repetitions": manifest.repetitions,
+            "random_seed": manifest.random_seed,
+        }
+        review_metadata = {
+            "anonymization": "single-candidate",
+            "reviewer_model": "gpt-5.6-terra",
+            "reviewer_reasoning_effort": "max",
+            "expected_candidates": 34,
+            "completed_candidates": 34,
+            "rubric_ids": [
+                "context-and-locality",
+                "behavior-and-validation",
+                "decision-and-escalation",
+            ],
+            "incremental_criteria_scored": True,
+        }
+        result = build_public_result(
+            slots,
+            documents,
+            benchmark_version=manifest.benchmark_version,
+            source_revisions=source_revisions,
+            execution=execution,
+            review_metadata=review_metadata,
+            profile_outcomes=build_profile_outcomes(manifest, documents),
+        )
+        schema = json.loads(
+            (
+                Path(__file__).resolve().parents[1]
+                / "evals"
+                / "profile-pilot-result.schema.json"
+            ).read_text(encoding="utf-8")
+        )
+        validator = Draft202012Validator(schema)
+        self.assertEqual([], list(validator.iter_errors(result)))
+        validate_profile_pilot_result(
+            result,
+            manifest,
+            schema,
+            expected_source_revisions=source_revisions,
+            expected_scenario_contracts=expected_scenario_contracts,
+        )
+        public_command = result["runs"][0]["oracle_results"][0]["commands"][0]
+        self.assertNotIn("stdout", public_command)
+        self.assertNotIn("stderr", public_command)
+        self.assertEqual("3" * 64, public_command["stdout_sha256"])
+        self.assertEqual("4" * 64, public_command["stderr_sha256"])
+
+        invalid_results = []
+        extra = copy.deepcopy(result)
+        extra["unexpected"] = True
+        invalid_results.append(extra)
+        missing_run = copy.deepcopy(result)
+        missing_run["runs"].pop()
+        invalid_results.append(missing_run)
+        duplicate_profile = copy.deepcopy(result)
+        duplicate_profile["profile_outcomes"][0]["profile_id"] = "react"
+        invalid_results.append(duplicate_profile)
+        invalid_hash = copy.deepcopy(result)
+        invalid_hash["source_revisions"]["manifest_sha256"] = "not-a-hash"
+        invalid_results.append(invalid_hash)
+        for invalid in invalid_results:
+            with self.subTest(invalid=invalid):
+                self.assertTrue(list(validator.iter_errors(invalid)))
+
+        run_id_drift = copy.deepcopy(result)
+        run_id_drift["runs"][0]["run_id"] = "different-run-id"
+        with self.assertRaisesRegex(ValueError, "run IDs"):
+            validate_profile_pilot_result(
+                run_id_drift,
+                manifest,
+                schema,
+                expected_source_revisions=source_revisions,
+                expected_scenario_contracts=expected_scenario_contracts,
+            )
+
+        outcome_drift = copy.deepcopy(result)
+        outcome_drift["profile_outcomes"][0]["outcome"] = "no_difference"
+        with self.assertRaisesRegex(ValueError, "do not replay"):
+            validate_profile_pilot_result(
+                outcome_drift,
+                manifest,
+                schema,
+                expected_source_revisions=source_revisions,
+                expected_scenario_contracts=expected_scenario_contracts,
+            )
+
+        revision_drift = copy.deepcopy(result)
+        revision_drift["source_revisions"]["fixture_commit"] = "9" * 40
+        with self.assertRaisesRegex(ValueError, "source revisions"):
+            validate_profile_pilot_result(
+                revision_drift,
+                manifest,
+                schema,
+                expected_source_revisions=source_revisions,
+                expected_scenario_contracts=expected_scenario_contracts,
+            )
+
+        hash_drift = copy.deepcopy(result)
+        hash_drift["source_revisions"]["manifest_sha256"] = "9" * 64
+        with self.assertRaisesRegex(ValueError, "source revisions"):
+            validate_profile_pilot_result(
+                hash_drift,
+                manifest,
+                schema,
+                expected_source_revisions=source_revisions,
+                expected_scenario_contracts=expected_scenario_contracts,
+            )
+
+        for field, value, message in (
+            ("contract_sha256", "9" * 64, "contract hash"),
+            ("scenario_contract_sha256", "8" * 64, "scenario contract hash"),
+            ("prompt_sha256", "7" * 64, "prompt hash"),
+        ):
+            with self.subTest(field=field):
+                run_hash_drift = copy.deepcopy(result)
+                run_hash_drift["runs"][0][field] = value
+                with self.assertRaisesRegex(ValueError, message):
+                    validate_profile_pilot_result(
+                        run_hash_drift,
+                        manifest,
+                        schema,
+                        expected_source_revisions=source_revisions,
+                        expected_scenario_contracts=expected_scenario_contracts,
+                    )
+
+    def test_dynamic_result_requires_exact_profile_pilot_slot_identities(
+        self,
+    ) -> None:
+        manifest = validate_manifest(_profile_pilot_manifest_raw())
+        slots = build_run_slots(manifest)
+        documents = _terminal_documents(slots)
+
+        result = build_public_result(
+            slots,
+            documents,
+            benchmark_version=manifest.benchmark_version,
+        )
+        self.assertEqual(34, len(result["runs"]))
+
+        cases = (
+            ("terminal states", documents[:-1]),
+            ("unique run IDs", [*documents[:-1], copy.deepcopy(documents[0])]),
+            (
+                "invalid terminal state",
+                [
+                    {**document, "terminal_state": "pending"}
+                    if index == 0
+                    else document
+                    for index, document in enumerate(documents)
+                ],
+            ),
+            (
+                "aggregate score",
+                [
+                    {**document, "aggregate_score": 6}
+                    if index == 0
+                    else document
+                    for index, document in enumerate(documents)
+                ],
+            ),
+            (
+                "identity mismatch",
+                [
+                    {**document, "arm_id": "not-the-arm"}
+                    if index == 0
+                    else document
+                    for index, document in enumerate(documents)
+                ],
+            ),
+        )
+        for message, invalid_documents in cases:
+            with self.subTest(message=message):
+                with self.assertRaisesRegex(ValueError, message):
+                    build_public_result(
+                        slots,
+                        invalid_documents,
+                        benchmark_version=manifest.benchmark_version,
+                    )
+
+    def test_profile_review_packet_exposes_criteria_without_treatment_identity(
+        self,
+    ) -> None:
+        manifest = validate_manifest(_profile_pilot_manifest_raw())
+        scenario = next(
+            item
+            for item in manifest.scenarios
+            if item["id"] == "react-effect-lifecycle"
+        )
+        run_id = (
+            "react-effect-lifecycle--core-plus-typescript-plus-react--r01"
+        )
+        run_document = {
+            "run_id": run_id,
+            "scenario_id": scenario["id"],
+            "language": scenario["language"],
+            "arm_id": scenario["treatment_arm"],
+            "task": scenario["task"],
+            "must_preserve": scenario["must_preserve"],
+            "diff": " ".join(
+                [
+                    run_id,
+                    f"{run_id}.json",
+                    *(arm.id for arm in manifest.arms),
+                    *(f"{arm.id}.patch" for arm in manifest.arms),
+                    *(f"artifact-{arm.id}-output.json" for arm in manifest.arms),
+                    f".benchmark-runs/workspaces/{run_id}/candidate.patch",
+                    f"/workspace/{run_id}/candidate.patch",
+                    "C:/Users/Eric Huang/workspace/private.patch",
+                    SKILL_NAME,
+                    "AbortController",
+                ]
+            ),
+            "oracle_results": [],
+            "automatic_failure_reasons": [],
+            "blind_spots": ["single fixture"],
+        }
+
+        packet = build_review_packet(
+            run_document,
+            candidate_id="candidate-a1b2c3d4",
+            manifest=manifest,
+        )
+        self.assertEqual("typescript-react", packet["language"])
+        self.assertEqual("react", packet["profile_under_test"])
+        self.assertEqual("ecosystem_native", packet["scenario_type"])
+        self.assertEqual(
+            [
+                {"criterion": criterion, "score": None, "reason": ""}
+                for criterion in scenario["incremental_criteria"]
+            ],
+            packet["incremental_criteria"],
+        )
+        self.assertNotIn("direct_comparator", packet)
+        self.assertNotIn("treatment_arm", packet)
+        self.assertNotIn("run_id", packet)
+        serialized = json.dumps(packet, ensure_ascii=False).casefold()
+        for arm in manifest.arms:
+            self.assertIsNone(
+                re.search(
+                    rf"(?<![a-z0-9_.-]){re.escape(arm.id)}(?![a-z0-9_.-])",
+                    serialized,
+                )
+            )
+        self.assertNotIn(SKILL_NAME, serialized)
+        self.assertNotIn(".benchmark-runs", serialized)
+        self.assertNotIn("/workspace/", serialized)
+        self.assertNotIn("eric huang", serialized)
+        self.assertNotIn("huang/workspace", serialized)
+        self.assertNotIn(run_id, serialized)
+        self.assertIn("AbortController", packet["diff"])
+
+    def test_profile_outcome_priority_and_direct_comparators(self) -> None:
+        manifest = validate_manifest(_profile_pilot_manifest_raw())
+
+        def outcomes_for(documents: list[dict[str, object]]):
+            return {
+                item["profile_id"]: item
+                for item in build_profile_outcomes(manifest, documents)
+            }
+
+        documents = _profile_documents(manifest)
+        outcomes = outcomes_for(documents)
+        self.assertEqual(
+            {"csharp", "python", "typescript", "react"}, set(outcomes)
+        )
+        self.assertTrue(
+            all(item["outcome"] == "passed" for item in outcomes.values())
+        )
+        react = outcomes["react"]
+        self.assertEqual("core-plus-typescript", react["direct_comparator"])
+        self.assertEqual(
+            "core-plus-typescript-plus-react", react["treatment_arm"]
+        )
+        self.assertTrue(
+            all(
+                "--core-plus-typescript--" in run_id
+                for run_id in react["comparator_run_ids"]
+            )
+        )
+        self.assertTrue(
+            all(
+                "--core-plus-typescript-plus-react--" in run_id
+                for run_id in react["treatment_run_ids"]
+            )
+        )
+
+        control_document = next(
+            item
+            for item in documents
+            if item["scenario_id"] == "react-effect-lifecycle"
+            and item["arm_id"] == "control"
+        )
+        control_document["terminal_state"] = "automatic_failure"
+        control_document["automatic_failure_reasons"] = ["outside_boundary"]
+        self.assertEqual("passed", outcomes_for(documents)["react"]["outcome"])
+
+        treatment = next(
+            item
+            for item in documents
+            if item["scenario_id"] == "csharp-overdue-rule"
+            and item["arm_id"] == "core-plus-csharp"
+        )
+        treatment.pop("review")
+        self.assertEqual(
+            "inconclusive", outcomes_for(documents)["csharp"]["outcome"]
+        )
+
+        documents = _profile_documents(manifest)
+        treatment = next(
+            item
+            for item in documents
+            if item["scenario_id"] == "csharp-overdue-rule"
+            and item["arm_id"] == "core-plus-csharp"
+        )
+        treatment["review"].pop("rubrics")
+        self.assertEqual(
+            "inconclusive", outcomes_for(documents)["csharp"]["outcome"]
+        )
+
+        documents = _profile_documents(manifest)
+        treatment = next(
+            item
+            for item in documents
+            if item["scenario_id"] == "csharp-overdue-rule"
+            and item["arm_id"] == "core-plus-csharp"
+        )
+        treatment["terminal_state"] = "automatic_failure"
+        treatment["automatic_failure_reasons"] = ["acceptance_failed"]
+        self.assertEqual("failed", outcomes_for(documents)["csharp"]["outcome"])
+
+        documents = _profile_documents(manifest)
+        treatment = next(
+            item
+            for item in documents
+            if item["scenario_id"] == "csharp-overdue-rule"
+            and item["arm_id"] == "core-plus-csharp"
+        )
+        treatment["review"]["incremental_criteria"][0]["score"] = 0
+        self.assertEqual("failed", outcomes_for(documents)["csharp"]["outcome"])
+
+        documents = _profile_documents(manifest)
+        for document in documents:
+            if document["arm_id"] in {
+                "core-only",
+                "core-plus-csharp",
+            }:
+                scenario = next(
+                    item
+                    for item in manifest.scenarios
+                    if item["id"] == document["scenario_id"]
+                )
+                if scenario["profile_under_test"] == "csharp":
+                    for criterion in document["review"]["incremental_criteria"]:
+                        criterion["score"] = 1
+        self.assertEqual(
+            "no_difference", outcomes_for(documents)["csharp"]["outcome"]
+        )
+
+    def test_profile_outcome_treats_infrastructure_and_evidence_gaps_first(
+        self,
+    ) -> None:
+        manifest = validate_manifest(_profile_pilot_manifest_raw())
+        documents = _profile_documents(manifest)
+        csharp_treatment = next(
+            item
+            for item in documents
+            if item["scenario_id"] == "csharp-cancellation-cleanup"
+            and item["arm_id"] == "core-plus-csharp"
+        )
+        csharp_treatment["terminal_state"] = "infrastructure_failure"
+        csharp_treatment["automatic_failure_reasons"] = ["environment_error"]
+        outcomes = {
+            item["profile_id"]: item
+            for item in build_profile_outcomes(manifest, documents)
+        }
+        self.assertEqual("inconclusive", outcomes["csharp"]["outcome"])
+
+        documents = _profile_documents(manifest)
+        csharp_treatment = next(
+            item
+            for item in documents
+            if item["scenario_id"] == "csharp-cancellation-cleanup"
+            and item["arm_id"] == "core-plus-csharp"
+        )
+        csharp_treatment["terminal_state"] = "automatic_failure"
+        csharp_treatment["automatic_failure_reasons"] = [
+            "outside_boundary",
+            "skill_not_used",
+        ]
+        outcomes = {
+            item["profile_id"]: item
+            for item in build_profile_outcomes(manifest, documents)
+        }
+        self.assertEqual("inconclusive", outcomes["csharp"]["outcome"])
+
     def test_profile_arms_drive_prompt_and_complete_inspection_sets(self) -> None:
         manifest = validate_manifest(_profile_pilot_manifest_raw())
         scenario = manifest.scenarios[0]
@@ -713,6 +1229,15 @@ class ProfilePilotHarnessContractTests(unittest.TestCase):
                     "scenario_type", "unknown"
                 ),
             ),
+            (
+                "profile comparison arms",
+                lambda raw: (
+                    raw["scenarios"][6].__setitem__("direct_comparator", "control"),
+                    raw["scenarios"][6].__setitem__(
+                        "treatment_arm", "generic-clean-code"
+                    ),
+                ),
+            ),
         )
         for expected_message, mutate in cases:
             with self.subTest(expected_message=expected_message):
@@ -720,6 +1245,44 @@ class ProfilePilotHarnessContractTests(unittest.TestCase):
                 mutate(raw)
                 with self.assertRaisesRegex(ValueError, expected_message):
                     validate_manifest(raw)
+
+    def test_reviews_reject_duplicate_candidates_for_one_evidence_id(self) -> None:
+        manifest = validate_manifest(_profile_pilot_manifest_raw())
+        slot = build_run_slots(manifest)[0]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            review_key_path = root / "review-key.json"
+            reviews_root = root / "reviews"
+            reviews_root.mkdir()
+            review_key_path.write_text(
+                json.dumps(
+                    {
+                        "candidates": {
+                            "candidate-one": {"evidence_id": "evidence-one"},
+                            "candidate-two": {"evidence_id": "evidence-one"},
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            for candidate_id in ("candidate-one", "candidate-two"):
+                (reviews_root / f"{candidate_id}.json").write_text(
+                    json.dumps({"rubrics": {}}), encoding="utf-8"
+                )
+            paths = SimpleNamespace(
+                review_key_path=review_key_path,
+                reviews_root=reviews_root,
+            )
+            with (
+                patch.object(harness_cli, "build_run_slots", return_value=(slot,)),
+                patch.object(
+                    harness_cli,
+                    "_read_run_document",
+                    return_value={"evidence_id": "evidence-one"},
+                ),
+            ):
+                with self.assertRaisesRegex(ValueError, "duplicate review candidate"):
+                    harness_cli._reviews_by_run(manifest, paths)
 
     def test_cli_uses_repository_relative_manifest_and_campaign_runs_root(self) -> None:
         manifest = validate_manifest(_profile_pilot_manifest_raw())
@@ -1118,6 +1681,11 @@ class ProfilePilotHarnessContractTests(unittest.TestCase):
             run_slot = slot
             return {
                 "run_id": run_slot.run_id,
+                "scenario_id": run_slot.scenario_id,
+                "language": run_slot.language,
+                "arm_id": run_slot.arm_id,
+                "repetition": run_slot.repetition,
+                "order_index": run_slot.order_index,
                 "terminal_state": "infrastructure_failure",
                 "contract_sha256": contract_sha256,
                 "scenario_contract_sha256": scenario_contract_sha256,
@@ -1312,7 +1880,19 @@ class ProfilePilotHarnessContractTests(unittest.TestCase):
                                     "reason": "scoped review",
                                 }
                                 for rubric_id in harness_cli.RUBRIC_IDS
-                            }
+                            },
+                            "incremental_criteria": [
+                                {
+                                    "criterion": criterion,
+                                    "score": 1,
+                                    "reason": "scoped profile review",
+                                }
+                                for criterion in next(
+                                    scenario
+                                    for scenario in manifest.scenarios
+                                    if scenario["id"] == timeout_slot.scenario_id
+                                )["incremental_criteria"]
+                            ],
                         }
                     ),
                     encoding="utf-8",

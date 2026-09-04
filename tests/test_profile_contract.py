@@ -666,13 +666,113 @@ class ProfileContractTests(unittest.TestCase):
 
         self.assertIn("evidence-hash-mismatch", self.diagnostic_codes())
 
+    def test_evidence_metadata_must_match_public_profile_outcome(self) -> None:
+        evidence_path = self.fixture_root / "evidence" / "result.json"
+        evidence_path.parent.mkdir()
+
+        cases = (
+            ("passed", "pilot", True, "passed", "pilot", None),
+            (
+                "no_difference",
+                "pilot",
+                True,
+                "passed",
+                "pilot",
+                "evidence-result-mismatch",
+            ),
+            (
+                "passed",
+                "full_run",
+                True,
+                "passed",
+                "pilot",
+                "evidence-result-mismatch",
+            ),
+            (
+                "passed",
+                "pilot",
+                False,
+                "passed",
+                "pilot",
+                "evidence-public-required",
+            ),
+        )
+        for (
+            metadata_outcome,
+            metadata_stage,
+            public,
+            result_outcome,
+            result_stage,
+            expected_code,
+        ) in cases:
+            with self.subTest(expected_code=expected_code):
+                shutil.copytree(
+                    ROOT / "profiles",
+                    self.fixture_root / "profiles",
+                    dirs_exist_ok=True,
+                )
+                payload = (
+                    '{"status":"complete","profile_outcomes":['
+                    f'{{"profile_id":"csharp","stage":"{result_stage}",'
+                    f'"outcome":"{result_outcome}"}}]}}\n'
+                )
+                evidence_path.write_text(payload, encoding="utf-8")
+                digest = hashlib.sha256(evidence_path.read_bytes()).hexdigest()
+                self._set_evidence_profile(
+                    status="experimental",
+                    benchmark_status=(
+                        "full_run_recorded"
+                        if metadata_stage == "full_run"
+                        else "pilot_recorded"
+                    ),
+                    stage=metadata_stage,
+                    outcome=metadata_outcome,
+                    digest=digest,
+                    public=public,
+                )
+
+                codes = self.diagnostic_codes()
+                if expected_code is None:
+                    self.assertNotIn("evidence-result-mismatch", codes)
+                    self.assertNotIn("evidence-public-required", codes)
+                else:
+                    self.assertIn(expected_code, codes)
+
+        evidence_path.write_text(
+            (
+                '{"status":"complete","profile_outcomes":['
+                '{"profile_id":"react","stage":"pilot",'
+                '"outcome":"passed"}]}\n'
+            ),
+            encoding="utf-8",
+        )
+        digest = hashlib.sha256(evidence_path.read_bytes()).hexdigest()
+        self._set_evidence_profile(
+            status="experimental",
+            benchmark_status="pilot_recorded",
+            stage="pilot",
+            outcome="passed",
+            digest=digest,
+            public=True,
+        )
+        self.assertIn("evidence-profile-mismatch", self.diagnostic_codes())
+
     def test_beta_and_stable_require_public_passed_stage_evidence(self) -> None:
         evidence_path = self.fixture_root / "evidence" / "result.json"
         evidence_path.parent.mkdir()
-        evidence_path.write_text('{"status":"passed"}\n', encoding="utf-8")
-        digest = hashlib.sha256(evidence_path.read_bytes()).hexdigest()
         reference = self.fixture_root / "evidence" / "profile.md"
         reference.write_text("# Profile\n", encoding="utf-8")
+
+        def write_result(stage: str, outcome: str) -> str:
+            evidence_path.write_text(
+                (
+                    '{"status":"complete","profile_outcomes":['
+                    f'{{"profile_id":"csharp","stage":"{stage}",'
+                    f'"outcome":"{outcome}"}}]}}\n'
+                ),
+                encoding="utf-8",
+            )
+            return hashlib.sha256(evidence_path.read_bytes()).hexdigest()
 
         valid_cases = (
             ("beta", "pilot_recorded", "pilot"),
@@ -685,6 +785,7 @@ class ProfileContractTests(unittest.TestCase):
                     self.fixture_root / "profiles",
                     dirs_exist_ok=True,
                 )
+                digest = write_result(stage, "passed")
                 self._set_evidence_profile(
                     status=status,
                     benchmark_status=benchmark_status,
@@ -703,6 +804,7 @@ class ProfileContractTests(unittest.TestCase):
                     self.fixture_root / "profiles",
                     dirs_exist_ok=True,
                 )
+                digest = write_result("pilot", outcome)
                 self._set_evidence_profile(
                     status="beta",
                     benchmark_status="pilot_recorded",

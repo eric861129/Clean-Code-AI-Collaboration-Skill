@@ -702,6 +702,7 @@ def _cross_file_diagnostics(
                     )
                 )
         for index, result in enumerate(evidence["results"]):
+            result_bytes: bytes | None = None
             try:
                 result_bytes = read_repository_file(result["path"])
             except (OSError, ValueError) as error:
@@ -724,6 +725,16 @@ def _cross_file_diagnostics(
                             "evidence sha256 does not match the repository file",
                         )
                     )
+            if result_bytes is not None:
+                diagnostics.extend(
+                    _evidence_result_diagnostics(
+                        profile_path,
+                        profile_id,
+                        index,
+                        result,
+                        result_bytes,
+                    )
+                )
 
         stages = {result["stage"] for result in evidence["results"]}
         benchmark_status = evidence["benchmark_status"]
@@ -793,6 +804,83 @@ def _cross_file_diagnostics(
 
     for profile_id in profiles_by_id:
         visit(profile_id)
+    return diagnostics
+
+
+def _evidence_result_diagnostics(
+    profile_path: str,
+    profile_id: str,
+    index: int,
+    metadata: Mapping[str, Any],
+    result_bytes: bytes,
+) -> list[Diagnostic]:
+    field = f"evidence.results.{index}"
+    try:
+        result = json.loads(result_bytes.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        return [
+            Diagnostic(
+                profile_path,
+                f"{field}.path",
+                "evidence-result-invalid",
+                f"public result must be UTF-8 JSON: {error}",
+            )
+        ]
+    if not isinstance(result, Mapping) or result.get("status") != "complete":
+        return [
+            Diagnostic(
+                profile_path,
+                f"{field}.path",
+                "evidence-result-invalid",
+                "public result must be a complete result object",
+            )
+        ]
+    outcomes = result.get("profile_outcomes")
+    if not isinstance(outcomes, list):
+        return [
+            Diagnostic(
+                profile_path,
+                f"{field}.path",
+                "evidence-result-invalid",
+                "public result must contain profile_outcomes",
+            )
+        ]
+    matches = [
+        item
+        for item in outcomes
+        if isinstance(item, Mapping) and item.get("profile_id") == profile_id
+    ]
+    diagnostics: list[Diagnostic] = []
+    if len(matches) != 1:
+        diagnostics.append(
+            Diagnostic(
+                profile_path,
+                f"{field}.path",
+                "evidence-profile-mismatch",
+                "public result must contain exactly one matching profile outcome",
+            )
+        )
+        return diagnostics
+    outcome = matches[0]
+    for key in ("stage", "outcome"):
+        if outcome.get(key) != metadata.get(key):
+            diagnostics.append(
+                Diagnostic(
+                    profile_path,
+                    f"{field}.{key}",
+                    "evidence-result-mismatch",
+                    f"metadata {key} must match the public profile outcome",
+                )
+            )
+    if metadata.get("public") is not True:
+        diagnostics.append(
+            Diagnostic(
+                profile_path,
+                f"{field}.public",
+                "evidence-public-required",
+                "recorded profile evidence must be public",
+            )
+        )
     return diagnostics
 
 

@@ -5,6 +5,8 @@ import re
 import secrets
 from pathlib import Path
 
+from evals.harness.models import BenchmarkManifest
+
 RUBRIC_IDS = (
     "context-and-locality",
     "behavior-and-validation",
@@ -15,6 +17,7 @@ RUBRIC_IDS = (
 def build_review_packet(
     run_document: dict[str, object],
     candidate_id: str,
+    manifest: BenchmarkManifest | None = None,
 ) -> dict[str, object]:
     packet = {
         "schema_version": "1.0",
@@ -31,7 +34,37 @@ def build_review_packet(
             rubric_id: {"score": None, "reason": ""} for rubric_id in RUBRIC_IDS
         },
     }
-    redacted = _redact_for_review(packet, str(run_document.get("run_id", "")))
+    sensitive_tokens = {
+        str(run_document.get("run_id", "")),
+        "skill-v0.3.0",
+        "generic-clean-code",
+        "clean-code-ai-collaboration",
+        "codex-desktop-collaboration",
+    }
+    if manifest is not None:
+        scenario_id = str(run_document.get("scenario_id", ""))
+        try:
+            scenario = next(
+                item for item in manifest.scenarios if item["id"] == scenario_id
+            )
+        except StopIteration as error:
+            raise ValueError(f"unknown review scenario: {scenario_id}") from error
+        packet.update(
+            {
+                "language": scenario["language"],
+                "profile_under_test": scenario["profile_under_test"],
+                "scenario_type": scenario["scenario_type"],
+                "incremental_criteria": [
+                    {"criterion": criterion, "score": None, "reason": ""}
+                    for criterion in scenario["incremental_criteria"]
+                ],
+            }
+        )
+        sensitive_tokens.update(arm.id for arm in manifest.arms)
+        sensitive_tokens.update(
+            arm.skill for arm in manifest.arms if arm.skill is not None
+        )
+    redacted = _redact_for_review(packet, sensitive_tokens)
     if not isinstance(redacted, dict):  # pragma: no cover - packet is a dictionary
         raise TypeError("review packet must remain a dictionary")
     return redacted
@@ -40,6 +73,7 @@ def build_review_packet(
 def write_review_packet(
     run_document: dict[str, object],
     runs_root: Path,
+    manifest: BenchmarkManifest | None = None,
 ) -> Path:
     mapping_path = runs_root / "review-key.json"
     mapping = _load_mapping(mapping_path)
@@ -63,7 +97,7 @@ def write_review_packet(
     packet_dir.mkdir(parents=True, exist_ok=True)
     packet_path = packet_dir / f"{candidate_id}.json"
     serialized = json.dumps(
-        build_review_packet(run_document, candidate_id),
+        build_review_packet(run_document, candidate_id, manifest),
         ensure_ascii=False,
         indent=2,
     )
@@ -99,28 +133,22 @@ def _candidate_for_run(
     )
 
 
-def _redact_for_review(value: object, run_id: str) -> object:
+def _redact_for_review(value: object, sensitive_tokens: set[str]) -> object:
     if isinstance(value, dict):
         return {
-            str(key): _redact_for_review(item, run_id)
+            str(key): _redact_for_review(item, sensitive_tokens)
             for key, item in value.items()
         }
     if isinstance(value, list):
-        return [_redact_for_review(item, run_id) for item in value]
+        return [_redact_for_review(item, sensitive_tokens) for item in value]
     if not isinstance(value, str):
         return value
 
     redacted = value
-    for sensitive in (
-        run_id,
-        "skill-v0.3.0",
-        "generic-clean-code",
-        "clean-code-ai-collaboration",
-        "codex-desktop-collaboration",
-    ):
+    for sensitive in sorted(sensitive_tokens, key=len, reverse=True):
         if sensitive:
             redacted = re.sub(
-                re.escape(sensitive),
+                rf"(?<![A-Za-z0-9]){re.escape(sensitive)}(?![A-Za-z0-9])",
                 "[redacted]",
                 redacted,
                 flags=re.IGNORECASE,
@@ -133,7 +161,22 @@ def _redact_for_review(value: object, run_id: str) -> object:
         flags=re.IGNORECASE,
     )
     redacted = re.sub(
-        r"(?:[A-Za-z]:[/\\][^\s\"']+|/(?:Users|home|tmp|var|private)(?:/[^\s\"']*)?)",
+        r"(?<![A-Za-z0-9_.-])(?:[.]{1,2}[/\\])?[.]benchmark-runs"
+        r"(?:[/\\][^\s\"']*)?",
+        "[private-run-path]",
+        redacted,
+        flags=re.IGNORECASE,
+    )
+    redacted = re.sub(
+        r"(?:[A-Za-z]:[/\\](?:Users|Documents and Settings)[/\\]"
+        r"[^/\\\r\n\"']+|/(?:Users|home)/[^/\\\r\n\"']+)"
+        r"(?:[/\\][^\s\"']*)?",
+        "[private-path]",
+        redacted,
+        flags=re.IGNORECASE,
+    )
+    redacted = re.sub(
+        r"(?:[A-Za-z]:[/\\][^\s\"']+|/(?:Users|home|tmp|var|private|workspace)(?:/[^\s\"']*)?)",
         "[private-path]",
         redacted,
         flags=re.IGNORECASE,

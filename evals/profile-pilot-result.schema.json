@@ -1,0 +1,460 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/eric861129/Clean-Code-AI-Collaboration-Skill/evals/profile-pilot-result.schema.json",
+  "title": "Profile Pilot Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_version",
+    "status",
+    "source_revisions",
+    "execution",
+    "review_metadata",
+    "execution_limitations",
+    "runs",
+    "profile_outcomes"
+  ],
+  "properties": {
+    "schema_version": { "const": "profile-pilot-result/v1" },
+    "benchmark_version": { "type": "string", "minLength": 1 },
+    "status": { "const": "complete" },
+    "source_revisions": { "$ref": "#/$defs/sourceRevisions" },
+    "execution": { "$ref": "#/$defs/execution" },
+    "review_metadata": { "$ref": "#/$defs/reviewMetadata" },
+    "execution_limitations": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "runs": {
+      "type": "array",
+      "minItems": 34,
+      "maxItems": 34,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/run" }
+    },
+    "profile_outcomes": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/profileOutcome" }
+    }
+  },
+  "allOf": [
+    {
+      "properties": {
+        "profile_outcomes": {
+          "contains": {
+            "type": "object",
+            "properties": { "profile_id": { "const": "csharp" } },
+            "required": ["profile_id"]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "profile_outcomes": {
+          "contains": {
+            "type": "object",
+            "properties": { "profile_id": { "const": "python" } },
+            "required": ["profile_id"]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "profile_outcomes": {
+          "contains": {
+            "type": "object",
+            "properties": { "profile_id": { "const": "typescript" } },
+            "required": ["profile_id"]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "profile_outcomes": {
+          "contains": {
+            "type": "object",
+            "properties": { "profile_id": { "const": "react" } },
+            "required": ["profile_id"]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?![A-Za-z]:).+$"
+    },
+    "hashMap": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/sha256" }
+    },
+    "sourceRevisions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fixture_tag",
+        "fixture_commit",
+        "skill_tag",
+        "skill_commit",
+        "manifest_path",
+        "manifest_sha256",
+        "harness_sha256",
+        "contract_sha256",
+        "prompts",
+        "evaluators",
+        "rubrics"
+      ],
+      "properties": {
+        "fixture_tag": { "type": "string", "minLength": 1 },
+        "fixture_commit": { "$ref": "#/$defs/commit" },
+        "skill_tag": { "type": "string", "minLength": 1 },
+        "skill_commit": { "$ref": "#/$defs/commit" },
+        "manifest_path": { "$ref": "#/$defs/relativePath" },
+        "manifest_sha256": { "$ref": "#/$defs/sha256" },
+        "harness_sha256": { "$ref": "#/$defs/sha256" },
+        "contract_sha256": { "$ref": "#/$defs/sha256" },
+        "prompts": { "$ref": "#/$defs/hashMap" },
+        "evaluators": { "$ref": "#/$defs/hashMap" },
+        "rubrics": { "$ref": "#/$defs/hashMap" }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model",
+        "reasoning_effort",
+        "client",
+        "subject_executor",
+        "subject_timeout_seconds",
+        "fixture_timeout_seconds",
+        "oracle_timeout_seconds",
+        "repetitions",
+        "random_seed"
+      ],
+      "properties": {
+        "model": { "type": "string", "minLength": 1 },
+        "reasoning_effort": { "type": "string", "minLength": 1 },
+        "client": { "type": "string", "minLength": 1 },
+        "subject_executor": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "protocol_version",
+            "dispatch_mode",
+            "report_relative_path",
+            "network_enforcement",
+            "telemetry"
+          ],
+          "properties": {
+            "kind": { "type": "string", "minLength": 1 },
+            "protocol_version": { "type": "string", "minLength": 1 },
+            "dispatch_mode": { "type": "string", "minLength": 1 },
+            "report_relative_path": { "$ref": "#/$defs/relativePath" },
+            "network_enforcement": { "const": "not_available" },
+            "telemetry": { "const": "not_available" }
+          }
+        },
+        "subject_timeout_seconds": { "type": "integer", "minimum": 1 },
+        "fixture_timeout_seconds": { "type": "integer", "minimum": 1 },
+        "oracle_timeout_seconds": { "type": "integer", "minimum": 1 },
+        "repetitions": { "const": 1 },
+        "random_seed": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "reviewMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "anonymization",
+        "reviewer_model",
+        "reviewer_reasoning_effort",
+        "expected_candidates",
+        "completed_candidates",
+        "rubric_ids",
+        "incremental_criteria_scored"
+      ],
+      "properties": {
+        "anonymization": { "const": "single-candidate" },
+        "reviewer_model": { "const": "gpt-5.6-terra" },
+        "reviewer_reasoning_effort": { "const": "max" },
+        "expected_candidates": { "const": 34 },
+        "completed_candidates": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 34
+        },
+        "rubric_ids": {
+          "const": [
+            "context-and-locality",
+            "behavior-and-validation",
+            "decision-and-escalation"
+          ]
+        },
+        "incremental_criteria_scored": { "type": "boolean" }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_id",
+        "scenario_id",
+        "language",
+        "arm_id",
+        "repetition",
+        "order_index",
+        "terminal_state",
+        "contract_sha256",
+        "scenario_contract_sha256",
+        "prompt_sha256",
+        "automatic_failure_reasons",
+        "diff_sha256",
+        "oracle_results",
+        "telemetry",
+        "review"
+      ],
+      "properties": {
+        "run_id": { "type": "string", "minLength": 1 },
+        "scenario_id": { "type": "string", "minLength": 1 },
+        "language": { "type": "string", "minLength": 1 },
+        "arm_id": { "type": "string", "minLength": 1 },
+        "repetition": { "const": 1 },
+        "order_index": { "type": "integer", "minimum": 0, "maximum": 33 },
+        "terminal_state": {
+          "enum": [
+            "passed",
+            "automatic_failure",
+            "timeout",
+            "infrastructure_failure"
+          ]
+        },
+        "contract_sha256": { "$ref": "#/$defs/sha256" },
+        "scenario_contract_sha256": { "$ref": "#/$defs/sha256" },
+        "prompt_sha256": { "$ref": "#/$defs/sha256" },
+        "automatic_failure_reasons": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "diff_sha256": { "$ref": "#/$defs/sha256" },
+        "oracle_results": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/oracleGroup" }
+        },
+        "telemetry": { "const": "not_available" },
+        "review": {
+          "oneOf": [
+            { "const": "not_available" },
+            { "$ref": "#/$defs/review" }
+          ]
+        }
+      }
+    },
+    "oracleGroup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["group", "commands"],
+      "properties": {
+        "group": { "enum": ["public", "preservation", "acceptance"] },
+        "commands": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/oracleCommand" }
+        }
+      }
+    },
+    "oracleCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "args",
+        "exit_code",
+        "elapsed_seconds",
+        "timed_out",
+        "classification",
+        "attempt",
+        "stdout_sha256",
+        "stderr_sha256"
+      ],
+      "properties": {
+        "args": { "type": "array", "items": { "type": "string" } },
+        "exit_code": { "type": ["integer", "null"] },
+        "elapsed_seconds": { "type": "number", "minimum": 0 },
+        "timed_out": { "type": "boolean" },
+        "classification": { "type": "string", "minLength": 1 },
+        "attempt": { "type": "integer", "minimum": 1 },
+        "stdout_sha256": { "$ref": "#/$defs/sha256" },
+        "stderr_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rubrics", "incremental_criteria"],
+      "properties": {
+        "rubrics": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "context-and-locality",
+            "behavior-and-validation",
+            "decision-and-escalation"
+          ],
+          "properties": {
+            "context-and-locality": { "$ref": "#/$defs/scoreReason" },
+            "behavior-and-validation": { "$ref": "#/$defs/scoreReason" },
+            "decision-and-escalation": { "$ref": "#/$defs/scoreReason" }
+          }
+        },
+        "incremental_criteria": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/criterionReview" }
+        }
+      }
+    },
+    "scoreReason": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["score", "reason"],
+      "properties": {
+        "score": { "type": "integer", "minimum": 0, "maximum": 2 },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "criterionReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["criterion", "score", "reason"],
+      "properties": {
+        "criterion": { "type": "string", "minLength": 1 },
+        "score": { "type": "integer", "minimum": 0, "maximum": 2 },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "profileOutcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_id",
+        "stage",
+        "direct_comparator",
+        "treatment_arm",
+        "scenario_ids",
+        "comparator_run_ids",
+        "treatment_run_ids",
+        "outcome",
+        "criteria_evidence",
+        "decision_reasons",
+        "limitations"
+      ],
+      "properties": {
+        "profile_id": {
+          "enum": ["csharp", "python", "typescript", "react"]
+        },
+        "stage": { "const": "pilot" },
+        "direct_comparator": { "type": "string", "minLength": 1 },
+        "treatment_arm": { "type": "string", "minLength": 1 },
+        "scenario_ids": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "comparator_run_ids": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "treatment_run_ids": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "outcome": {
+          "enum": ["passed", "failed", "no_difference", "inconclusive"]
+        },
+        "criteria_evidence": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "$ref": "#/$defs/criterionEvidence" }
+        },
+        "decision_reasons": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "criterionEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_id",
+        "criterion",
+        "comparator_run_id",
+        "treatment_run_id",
+        "comparator_score",
+        "treatment_score",
+        "delta"
+      ],
+      "properties": {
+        "scenario_id": { "type": "string", "minLength": 1 },
+        "criterion": { "type": "string", "minLength": 1 },
+        "comparator_run_id": { "type": "string", "minLength": 1 },
+        "treatment_run_id": { "type": "string", "minLength": 1 },
+        "comparator_score": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "maximum": 2
+        },
+        "treatment_score": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "maximum": 2
+        },
+        "delta": {
+          "type": ["integer", "null"],
+          "minimum": -2,
+          "maximum": 2
+        }
+      }
+    }
+  }
+}
