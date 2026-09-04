@@ -14,7 +14,7 @@ from evals.harness.models import (
     Workspace,
 )
 from evals.harness.process import run_process
-from evals.harness.subject_runner import build_prompt
+from evals.harness.subject_runner import build_prompt, canonical_prompt_bytes
 
 DISPATCH_SCHEMA_VERSION = "desktop-subject-dispatch/v4"
 LEGACY_DISPATCH_SCHEMA_VERSION = "desktop-subject-dispatch/v1"
@@ -101,8 +101,10 @@ def stage_desktop_subject(
     if report_path.exists():
         raise FileExistsError(f"subject report already exists: {report_path}")
 
-    prompt = build_prompt(_scenario_for(manifest, slot.scenario_id), slot.arm_id)
-    prompt_bytes = _utf8_lf_bytes(prompt)
+    prompt = build_prompt(
+        _scenario_for(manifest, slot.scenario_id), slot.arm_id, manifest
+    )
+    prompt_bytes = canonical_prompt_bytes(prompt)
     prompt_sha256 = _sha256_bytes(prompt_bytes)
     prompt_path = workspace.artifact_dir / "prompt.md"
     report_template_path = workspace.artifact_dir / REPORT_TEMPLATE_FILENAME
@@ -122,10 +124,7 @@ def stage_desktop_subject(
         manifest, slot.arm_id
     )
     for required_path in required_skill_inspection_paths:
-        if not (workspace.root / PurePosixPath(required_path)).is_file():
-            raise ValueError(
-                f"required staged Skill entrypoint is missing: {required_path}"
-            )
+        _validate_required_skill_file(workspace.root, required_path)
 
     payload: dict[str, object] = {
         "schema_version": DISPATCH_SCHEMA_VERSION,
@@ -559,10 +558,7 @@ def load_desktop_dispatch(path: Path) -> SubjectDispatch:
     if not report_template_path.is_file():
         raise ValueError("desktop dispatch report template is missing")
     for required_path in required_skill_inspection_paths:
-        if not (workspace.root / PurePosixPath(required_path)).is_file():
-            raise ValueError(
-                f"required staged Skill entrypoint is missing: {required_path}"
-            )
+        _validate_required_skill_file(workspace.root, required_path)
     if _paths_overlap(path.resolve(), workspace.root.resolve()) or _paths_overlap(
         path.resolve(), workspace.artifact_dir.resolve()
     ):
@@ -883,15 +879,43 @@ def _required_skill_inspection_paths(
     manifest: BenchmarkManifest, arm_id: str
 ) -> tuple[str, ...]:
     try:
-        arm = next(arm for arm in manifest.arms if arm.get("id") == arm_id)
+        arm = next(arm for arm in manifest.arms if arm.id == arm_id)
     except StopIteration as error:
         raise ValueError(f"unknown arm: {arm_id}") from error
-    skill_name = arm.get("skill")
-    if skill_name is None:
-        return ()
-    if not isinstance(skill_name, str) or not skill_name.strip():
-        raise ValueError(f"arm {arm_id} has an invalid Skill name")
-    return (f".agents/skills/{skill_name}/SKILL.md",)
+    return arm.required_skill_inspection_paths
+
+
+def _validate_required_skill_file(
+    workspace_root: Path, relative_path: str
+) -> None:
+    candidate = PurePosixPath(relative_path)
+    if (
+        len(candidate.parts) < 4
+        or candidate.parts[:2] != (".agents", "skills")
+    ):
+        raise ValueError(
+            f"required staged Skill file has an invalid path: {relative_path}"
+        )
+
+    resolved_workspace_root = workspace_root.resolve()
+    skills_root = workspace_root / ".agents" / "skills"
+    resolved_skills_root = skills_root.resolve()
+    if not _is_within(resolved_skills_root, resolved_workspace_root):
+        raise ValueError(
+            f"required staged Skill file escapes staged Skill root: {relative_path}"
+        )
+
+    skill_root = skills_root / candidate.parts[2]
+    resolved_skill_root = skill_root.resolve()
+    path = workspace_root / candidate
+    if not path.is_file():
+        raise ValueError(f"required staged Skill file is missing: {relative_path}")
+    if not _is_within(resolved_skill_root, resolved_skills_root) or not _is_within(
+        path.resolve(), resolved_skill_root
+    ):
+        raise ValueError(
+            f"required staged Skill file escapes staged Skill root: {relative_path}"
+        )
 
 
 def _validate_skill_inspection_claims(
@@ -991,11 +1015,7 @@ def _sha256_file(path: Path) -> str:
 def canonical_prompt_sha256(value: str) -> str:
     """以 v2 dispatch 的 UTF-8/LF 實體 bytes 計算 Prompt hash。"""
 
-    return _sha256_bytes(_utf8_lf_bytes(value))
-
-
-def _utf8_lf_bytes(value: str) -> bytes:
-    return value.replace("\r\n", "\n").replace("\r", "\n").encode(PROMPT_ENCODING)
+    return _sha256_bytes(canonical_prompt_bytes(value))
 
 
 def _sha256_json(value: dict[str, object]) -> str:

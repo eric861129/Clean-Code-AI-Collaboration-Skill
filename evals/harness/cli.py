@@ -1268,7 +1268,9 @@ def _run_document(
         "scenario_contract_sha256": scenario_contract_sha256,
         "generation": generation,
         "evidence_id": f"{slot.run_id}--g{generation:02d}",
-        "prompt_sha256": _sha256_text(build_prompt(scenario, slot.arm_id)),
+        "prompt_sha256": _sha256_text(
+            build_prompt(scenario, slot.arm_id, manifest)
+        ),
         "task": scenario["task"],
         "must_preserve": scenario["must_preserve"],
         "prohibited_changes": scenario["prohibited_changes"],
@@ -1314,7 +1316,9 @@ def _infrastructure_document(
         "scenario_contract_sha256": scenario_contract_sha256,
         "generation": generation,
         "evidence_id": f"{slot.run_id}--g{generation:02d}",
-        "prompt_sha256": _sha256_text(build_prompt(scenario, slot.arm_id)),
+        "prompt_sha256": _sha256_text(
+            build_prompt(scenario, slot.arm_id, manifest)
+        ),
         "task": scenario["task"],
         "must_preserve": scenario["must_preserve"],
         "prohibited_changes": scenario["prohibited_changes"],
@@ -1938,7 +1942,7 @@ def _freeze_document(
         scenario_id = str(scenario["id"])
         for arm_id in scenario["comparison_arms"]:
             arm_id = str(arm_id)
-            prompt = build_prompt(scenario, arm_id)
+            prompt = build_prompt(scenario, arm_id, manifest)
             prompts[f"{scenario_id}/{arm_id}"] = canonical_prompt_sha256(prompt)
         evaluators[scenario_id] = _tree_sha256(
             paths.fixture_clone / str(scenario["evaluator_path"])

@@ -11,6 +11,7 @@ class ArmDefinition(Mapping[str, object]):
     instruction: str
     skill: str | None = None
     version: str | None = None
+    required_skill_inspection_paths: tuple[str, ...] = ()
 
     def __getitem__(self, key: str) -> object:
         values: dict[str, object] = {
@@ -21,6 +22,10 @@ class ArmDefinition(Mapping[str, object]):
             values["skill"] = self.skill
         if self.version is not None:
             values["version"] = self.version
+        if self.required_skill_inspection_paths:
+            values["required_skill_inspection_paths"] = list(
+                self.required_skill_inspection_paths
+            )
         return values[key]
 
     def __iter__(self) -> Iterator[str]:
@@ -35,6 +40,8 @@ class ArmDefinition(Mapping[str, object]):
             keys.append("skill")
         if self.version is not None:
             keys.append("version")
+        if self.required_skill_inspection_paths:
+            keys.append("required_skill_inspection_paths")
         return tuple(keys)
 
 

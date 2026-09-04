@@ -167,9 +167,9 @@ class CrossLanguageHarnessTests(unittest.TestCase):
     def test_arm_prompts_only_contain_the_declared_difference(self) -> None:
         manifest = load_manifest(MANIFEST_PATH)
         scenario = manifest.scenarios[0]
-        control = build_prompt(scenario, "control")
-        generic = build_prompt(scenario, "generic-clean-code")
-        skill = build_prompt(scenario, "skill-v0.3.0")
+        control = build_prompt(scenario, "control", manifest)
+        generic = build_prompt(scenario, "generic-clean-code", manifest)
+        skill = build_prompt(scenario, "skill-v0.3.0", manifest)
 
         self.assertEqual(control + "\n\n請遵守 Clean Code 完成任務。", generic)
         self.assertIn("$clean-code-ai-collaboration", skill)

@@ -1,16 +1,58 @@
 import copy
+import hashlib
 import json
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import evals.harness.cli as harness_cli
+import evals.harness.fixture_builder as fixture_builder
 from evals.harness.cli import main as harness_main
-from evals.harness.desktop_subject import write_attempt_receipt
+from evals.harness.desktop_subject import (
+    DesktopSubjectValidationError,
+    canonical_prompt_sha256,
+    desktop_subject_instruction,
+    stage_desktop_subject,
+    validate_desktop_report,
+    write_attempt_receipt,
+)
+from evals.harness.fixture_builder import build_workspace
 from evals.harness.manifest import validate_manifest
-from evals.harness.models import HarnessPaths, SubjectDispatch, Workspace
+from evals.harness.models import HarnessPaths, RunSlot, SubjectDispatch, Workspace
 from evals.harness.planner import build_run_slots
+from evals.harness.subject_runner import IMPLEMENTATION_AUTHORIZATION, build_prompt
+
+
+SKILL_NAME = "clean-code-ai-collaboration"
+SKILL_ROOT = f".agents/skills/{SKILL_NAME}"
+CORE_INSPECTION_PATHS = (
+    f"{SKILL_ROOT}/SKILL.md",
+    f"{SKILL_ROOT}/references/profile-selection.md",
+)
+ARM_INSPECTION_PATHS = {
+    "control": (),
+    "generic-clean-code": (),
+    "core-only": CORE_INSPECTION_PATHS,
+    "core-plus-csharp": (
+        *CORE_INSPECTION_PATHS,
+        f"{SKILL_ROOT}/references/language-csharp.md",
+    ),
+    "core-plus-python": (
+        *CORE_INSPECTION_PATHS,
+        f"{SKILL_ROOT}/references/language-python.md",
+    ),
+    "core-plus-typescript": (
+        *CORE_INSPECTION_PATHS,
+        f"{SKILL_ROOT}/references/language-typescript.md",
+    ),
+    "core-plus-typescript-plus-react": (
+        *CORE_INSPECTION_PATHS,
+        f"{SKILL_ROOT}/references/language-typescript.md",
+        f"{SKILL_ROOT}/references/framework-react.md",
+    ),
+}
 
 
 PROFILE_PILOT_MATRIX = (
@@ -103,20 +145,44 @@ PROFILE_PILOT_MATRIX = (
 
 def _profile_pilot_manifest_raw() -> dict[str, object]:
     arms = [
-        {"id": "control", "instruction": ""},
-        {"id": "generic-clean-code", "instruction": "請遵守 Clean Code 完成任務。"},
-        {"id": "core-only", "instruction": "請使用 Core Only 完成任務。"},
-        {"id": "core-plus-csharp", "instruction": "請使用 Core 與 C# Profile 完成任務。"},
-        {"id": "core-plus-python", "instruction": "請使用 Core 與 Python Profile 完成任務。"},
+        {
+            "id": "control",
+            "instruction": "",
+            "required_skill_inspection_paths": [],
+        },
+        {
+            "id": "generic-clean-code",
+            "instruction": "請遵守 Clean Code 完成任務。",
+            "required_skill_inspection_paths": [],
+        },
+        {
+            "id": "core-only",
+            "instruction": "請使用 $clean-code-ai-collaboration Core 完成任務。",
+        },
+        {
+            "id": "core-plus-csharp",
+            "instruction": "請使用 $clean-code-ai-collaboration Core 與 C# Profile 完成任務。",
+        },
+        {
+            "id": "core-plus-python",
+            "instruction": "請使用 $clean-code-ai-collaboration Core 與 Python Profile 完成任務。",
+        },
         {
             "id": "core-plus-typescript",
-            "instruction": "請使用 Core 與 TypeScript Profile 完成任務。",
+            "instruction": "請使用 $clean-code-ai-collaboration Core 與 TypeScript Profile 完成任務。",
         },
         {
             "id": "core-plus-typescript-plus-react",
-            "instruction": "請使用 Core、TypeScript 與 React Profile 完成任務。",
+            "instruction": "請使用 $clean-code-ai-collaboration Core、TypeScript 與 React Profile 完成任務。",
         },
     ]
+    for arm in arms:
+        arm_id = str(arm["id"])
+        inspection_paths = ARM_INSPECTION_PATHS[arm_id]
+        arm["required_skill_inspection_paths"] = list(inspection_paths)
+        if inspection_paths:
+            arm["skill"] = SKILL_NAME
+            arm["version"] = "v0.5.0"
     scenarios = []
     for (
         scenario_id,
@@ -187,6 +253,348 @@ def _profile_pilot_manifest_raw() -> dict[str, object]:
 
 
 class ProfilePilotHarnessContractTests(unittest.TestCase):
+    def test_profile_arms_drive_prompt_and_complete_inspection_sets(self) -> None:
+        manifest = validate_manifest(_profile_pilot_manifest_raw())
+        scenario = manifest.scenarios[0]
+        task = str(scenario["task"]) + IMPLEMENTATION_AUTHORIZATION
+
+        for arm in manifest.arms:
+            with self.subTest(arm_id=arm.id):
+                expected_prompt = task
+                if arm.instruction:
+                    expected_prompt += f"\n\n{arm.instruction}"
+                actual_prompt = build_prompt(scenario, arm.id, manifest)
+                self.assertEqual(expected_prompt, actual_prompt)
+                self.assertNotIn("\r", actual_prompt)
+                self.assertEqual(
+                    hashlib.sha256(expected_prompt.encode("utf-8")).hexdigest(),
+                    canonical_prompt_sha256(actual_prompt),
+                )
+                self.assertEqual(
+                    ARM_INSPECTION_PATHS[arm.id],
+                    arm.required_skill_inspection_paths,
+                )
+
+        with self.assertRaisesRegex(ValueError, "unknown arm"):
+            build_prompt(scenario, "unknown-arm", manifest)
+
+        self.assertEqual(
+            "f7fedc39b00f5e895c2015e8d9cb1d5894dfbd89ca4a89187b0784f26779c545",
+            canonical_prompt_sha256(
+                build_prompt(scenario, "core-plus-csharp", manifest)
+            ),
+        )
+
+        raw = _profile_pilot_manifest_raw()
+        raw["scenarios"][0]["task"] = "第一行\r\n第二行\r第三行"
+        raw["arms"][3]["instruction"] = "C# 第一行\r\nC# 第二行"
+        normalized_manifest = validate_manifest(raw)
+        normalized_prompt = build_prompt(
+            normalized_manifest.scenarios[0],
+            "core-plus-csharp",
+            normalized_manifest,
+        )
+        self.assertNotIn("\r", normalized_prompt)
+        self.assertIn("第一行\n第二行\n第三行", normalized_prompt)
+        self.assertIn("C# 第一行\nC# 第二行", normalized_prompt)
+
+    def test_profile_arm_inspection_paths_fail_closed(self) -> None:
+        cases = (
+            (
+                "duplicate",
+                lambda arm: arm["required_skill_inspection_paths"].append(
+                    arm["required_skill_inspection_paths"][0]
+                ),
+            ),
+            (
+                "repository-relative POSIX",
+                lambda arm: arm["required_skill_inspection_paths"].__setitem__(
+                    0, f"{SKILL_ROOT}/references/../SKILL.md"
+                ),
+            ),
+            (
+                "repository-relative POSIX",
+                lambda arm: arm["required_skill_inspection_paths"].__setitem__(
+                    0, "C:/outside/SKILL.md"
+                ),
+            ),
+            (
+                "inside staged Skill root",
+                lambda arm: arm["required_skill_inspection_paths"].__setitem__(
+                    0, ".agents/skills/another-skill/SKILL.md"
+                ),
+            ),
+        )
+        for expected_message, mutate in cases:
+            with self.subTest(expected_message=expected_message):
+                raw = _profile_pilot_manifest_raw()
+                arm = raw["arms"][2]
+                mutate(arm)
+                with self.assertRaisesRegex(ValueError, expected_message):
+                    validate_manifest(raw)
+
+        raw = _profile_pilot_manifest_raw()
+        raw["arms"][0]["required_skill_inspection_paths"] = [
+            f"{SKILL_ROOT}/SKILL.md"
+        ]
+        with self.assertRaisesRegex(ValueError, "without a Skill"):
+            validate_manifest(raw)
+
+        raw = _profile_pilot_manifest_raw()
+        raw["arms"].append(
+            {
+                "id": "unsafe-skill",
+                "instruction": "unsafe",
+                "skill": "../outside",
+                "version": "v0.5.0",
+            }
+        )
+        with self.assertRaisesRegex(ValueError, "arm Skill is invalid"):
+            validate_manifest(raw)
+
+        raw = _profile_pilot_manifest_raw()
+        raw["arms"][0]["version"] = "v0.5.0"
+        with self.assertRaisesRegex(ValueError, "without a Skill"):
+            validate_manifest(raw)
+
+        raw = _profile_pilot_manifest_raw()
+        del raw["arms"][-1]["required_skill_inspection_paths"]
+        with self.assertRaisesRegex(ValueError, "must declare required Skill"):
+            validate_manifest(raw)
+
+        raw = _profile_pilot_manifest_raw()
+        raw["arms"][-1]["required_skill_inspection_paths"] = None
+        with self.assertRaisesRegex(ValueError, "inspection paths are invalid"):
+            validate_manifest(raw)
+
+        raw = _profile_pilot_manifest_raw()
+        raw["arms"][-1]["version"] = "v9.9.9"
+        with self.assertRaisesRegex(ValueError, "does not match pinned Skill"):
+            validate_manifest(raw)
+
+        raw = _profile_pilot_manifest_raw()
+        del raw["arms"][-1]["version"]
+        with self.assertRaisesRegex(ValueError, "must declare a version"):
+            validate_manifest(raw)
+
+    def test_workspace_stages_skill_for_every_declared_skill_arm(self) -> None:
+        manifest = validate_manifest(_profile_pilot_manifest_raw())
+
+        def export_tree(**kwargs: object) -> None:
+            destination = Path(str(kwargs["destination"]))
+            destination.mkdir(parents=True, exist_ok=True)
+
+        def run_checked(args: list[str], *_args: object) -> SimpleNamespace:
+            stdout = "c" * 40 if args[:2] == ["git", "rev-parse"] else ""
+            return SimpleNamespace(stdout=stdout)
+
+        with tempfile.TemporaryDirectory() as directory:
+            repository_root = Path(directory)
+            paths = HarnessPaths(
+                repository_root=repository_root,
+                runs_root=repository_root / ".benchmark-runs" / "profile-pilot",
+                fixture_clone=repository_root / "fixture-source",
+                skill_repository=repository_root / "skill-source",
+            )
+            for arm in manifest.arms:
+                slot = RunSlot(
+                    run_id=f"csharp-overdue-rule--{arm.id}--r01",
+                    scenario_id="csharp-overdue-rule",
+                    language="csharp",
+                    arm_id=arm.id,
+                    repetition=1,
+                    order_index=0,
+                )
+                with (
+                    patch.object(fixture_builder, "_verify_revision"),
+                    patch.object(
+                        fixture_builder, "_export_tree", side_effect=export_tree
+                    ) as exported,
+                    patch.object(fixture_builder, "_install_dependencies"),
+                    patch.object(
+                        fixture_builder, "_run_checked", side_effect=run_checked
+                    ),
+                ):
+                    workspace = build_workspace(slot, manifest, paths)
+
+                skill_root = workspace.root / SKILL_ROOT
+                if arm.skill is None:
+                    self.assertFalse(skill_root.parent.exists(), arm.id)
+                    self.assertEqual(1, exported.call_count)
+                else:
+                    self.assertTrue(skill_root.is_dir(), arm.id)
+                    self.assertEqual(2, exported.call_count)
+                    skill_export = exported.call_args_list[1].kwargs
+                    self.assertEqual(paths.skill_repository, skill_export["repository"])
+                    self.assertEqual(
+                        f"{manifest.skill_commit}:{SKILL_NAME}",
+                        skill_export["treeish"],
+                    )
+
+    def test_react_profile_dispatch_requires_exact_multi_file_skill_evidence(
+        self,
+    ) -> None:
+        manifest = validate_manifest(_profile_pilot_manifest_raw())
+        arm_id = "core-plus-typescript-plus-react"
+        required_paths = ARM_INSPECTION_PATHS[arm_id]
+        slot = RunSlot(
+            run_id=f"react-state-error-retention--{arm_id}--r01",
+            scenario_id="react-state-error-retention",
+            language="typescript-react",
+            arm_id=arm_id,
+            repetition=1,
+            order_index=0,
+        )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workspace_root = root / "workspace"
+            artifact_dir = root / "artifacts"
+            controller_root = root / "controller"
+            workspace_root.mkdir()
+            artifact_dir.mkdir()
+            for index, relative_path in enumerate(required_paths):
+                path = workspace_root / Path(relative_path)
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(f"profile evidence {index}\n", encoding="utf-8")
+            workspace = Workspace(workspace_root, artifact_dir, "a" * 40)
+
+            dispatch = stage_desktop_subject(
+                slot,
+                manifest,
+                workspace,
+                generation=1,
+                attempt=1,
+                physical_run_id="run-profileinspection",
+                contract_sha256="b" * 64,
+                scenario_contract_sha256="c" * 64,
+                controller_dispatch_root=controller_root,
+            )
+            self.assertEqual(required_paths, dispatch.required_skill_inspection_paths)
+            instruction = desktop_subject_instruction(dispatch)
+            for relative_path in required_paths:
+                self.assertIn(relative_path, instruction)
+
+            exact_claims = [
+                {
+                    "path": relative_path,
+                    "sha256": hashlib.sha256(
+                        (workspace_root / Path(relative_path)).read_bytes()
+                    ).hexdigest(),
+                }
+                for relative_path in required_paths
+            ]
+
+            def validate_with(
+                files_inspected: list[str], claims: list[dict[str, str]]
+            ) -> dict[str, object]:
+                result = json.loads(
+                    dispatch.report_template_path.read_text(encoding="utf-8")
+                )
+                result.update(
+                    {
+                        "summary": "完成 profile treatment。",
+                        "files_inspected": files_inspected,
+                        "skill_inspection_claims": claims,
+                    }
+                )
+                dispatch.report_path.write_text(
+                    json.dumps(result, ensure_ascii=False), encoding="utf-8"
+                )
+                return validate_desktop_report(dispatch)
+
+            with self.assertRaises(DesktopSubjectValidationError) as missing_file:
+                validate_with(list(required_paths[:-1]), exact_claims)
+            self.assertEqual("skill_not_used", missing_file.exception.reason)
+
+            with self.assertRaises(DesktopSubjectValidationError) as missing_claim:
+                validate_with(list(required_paths), exact_claims[:-1])
+            self.assertEqual("skill_not_used", missing_claim.exception.reason)
+
+            with self.assertRaises(DesktopSubjectValidationError) as duplicate_claim:
+                validate_with(list(required_paths), [*exact_claims, exact_claims[0]])
+            self.assertEqual("invalid_claim", duplicate_claim.exception.reason)
+
+            with self.assertRaises(DesktopSubjectValidationError) as extra_claim:
+                validate_with(
+                    list(required_paths),
+                    [
+                        *exact_claims,
+                        {"path": "undeclared.md", "sha256": "d" * 64},
+                    ],
+                )
+            self.assertEqual("invalid_claim", extra_claim.exception.reason)
+
+            mismatched_claims = copy.deepcopy(exact_claims)
+            mismatched_claims[-1]["sha256"] = "e" * 64
+            with self.assertRaises(DesktopSubjectValidationError) as hash_mismatch:
+                validate_with(list(required_paths), mismatched_claims)
+            self.assertEqual("invalid_claim", hash_mismatch.exception.reason)
+
+            merged = validate_with(list(required_paths), exact_claims)
+            self.assertTrue(merged["skill_inspection_verified"])
+
+    def test_profile_dispatch_rejects_missing_or_escaping_required_skill_file(
+        self,
+    ) -> None:
+        manifest = validate_manifest(_profile_pilot_manifest_raw())
+        arm_id = "core-plus-typescript-plus-react"
+        slot = RunSlot(
+            run_id=f"react-effect-lifecycle--{arm_id}--r01",
+            scenario_id="react-effect-lifecycle",
+            language="typescript-react",
+            arm_id=arm_id,
+            repetition=1,
+            order_index=0,
+        )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workspace_root = root / "workspace"
+            artifact_dir = root / "artifacts"
+            workspace_root.mkdir()
+            artifact_dir.mkdir()
+            required_paths = ARM_INSPECTION_PATHS[arm_id]
+            for relative_path in required_paths[:-1]:
+                path = workspace_root / Path(relative_path)
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("profile evidence\n", encoding="utf-8")
+            workspace = Workspace(workspace_root, artifact_dir, "a" * 40)
+
+            with self.assertRaisesRegex(ValueError, "required staged Skill file"):
+                stage_desktop_subject(
+                    slot,
+                    manifest,
+                    workspace,
+                    generation=1,
+                    attempt=1,
+                    physical_run_id="run-profilemissing",
+                    contract_sha256="b" * 64,
+                    scenario_contract_sha256="c" * 64,
+                    controller_dispatch_root=root / "controller-missing",
+                )
+
+            outside = root / "outside.md"
+            outside.write_text("outside\n", encoding="utf-8")
+            escaping_path = workspace_root / Path(required_paths[-1])
+            try:
+                escaping_path.symlink_to(outside)
+            except OSError as error:
+                self.skipTest(f"symlink creation is unavailable: {error}")
+
+            with self.assertRaisesRegex(ValueError, "escapes staged Skill root"):
+                stage_desktop_subject(
+                    slot,
+                    manifest,
+                    workspace,
+                    generation=1,
+                    attempt=1,
+                    physical_run_id="run-profileescape",
+                    contract_sha256="b" * 64,
+                    scenario_contract_sha256="c" * 64,
+                    controller_dispatch_root=root / "controller-escape",
+                )
+
     def test_implicit_legacy_comparison_arms_keep_manifest_declaration_order(
         self,
     ) -> None:

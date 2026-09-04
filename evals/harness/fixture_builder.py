@@ -6,7 +6,13 @@ import tarfile
 from pathlib import Path
 from uuid import uuid4
 
-from evals.harness.models import BenchmarkManifest, HarnessPaths, RunSlot, Workspace
+from evals.harness.models import (
+    ArmDefinition,
+    BenchmarkManifest,
+    HarnessPaths,
+    RunSlot,
+    Workspace,
+)
 from evals.harness.process import run_process
 
 
@@ -16,6 +22,7 @@ def build_workspace(
     paths: HarnessPaths,
 ) -> Workspace:
     scenario = _scenario_for(manifest, slot.scenario_id)
+    arm = _arm_for(manifest, slot.arm_id)
     workspace_root = paths.runs_root / "workspaces" / slot.run_id
     artifact_dir = paths.runs_root / "artifacts" / slot.run_id
     if workspace_root.exists() or artifact_dir.exists():
@@ -45,17 +52,12 @@ def build_workspace(
     )
     _write_workspace_gitignore(workspace_root)
 
-    if slot.arm_id == "skill-v0.3.0":
-        skill_root = (
-            workspace_root
-            / ".agents"
-            / "skills"
-            / "clean-code-ai-collaboration"
-        )
+    if arm.skill is not None:
+        skill_root = workspace_root / ".agents" / "skills" / arm.skill
         skill_root.mkdir(parents=True)
         _export_tree(
             repository=paths.skill_repository,
-            treeish=f"{manifest.skill_tag}:clean-code-ai-collaboration",
+            treeish=f"{manifest.skill_commit}:{arm.skill}",
             destination=skill_root,
             cache_root=paths.runs_root / "cache" / "archives",
             timeout_seconds=manifest.fixture_timeout_seconds,
@@ -118,6 +120,13 @@ def _scenario_for(
         )
     except StopIteration as error:
         raise ValueError(f"unknown scenario: {scenario_id}") from error
+
+
+def _arm_for(manifest: BenchmarkManifest, arm_id: str) -> ArmDefinition:
+    try:
+        return next(arm for arm in manifest.arms if arm.id == arm_id)
+    except StopIteration as error:
+        raise ValueError(f"unknown arm: {arm_id}") from error
 
 
 def _verify_revision(

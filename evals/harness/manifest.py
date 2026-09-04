@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import re
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
 from evals.harness.models import ArmDefinition, BenchmarkManifest
 
@@ -37,17 +37,22 @@ def validate_manifest(raw: dict[str, object]) -> BenchmarkManifest:
     skill = _required_mapping(raw, "skill")
     execution = _required_mapping(raw, "execution")
     subject_executor = _required_mapping(execution, "subject_executor")
-    arms = _arm_definitions(_required_mapping_sequence(raw, "arms"))
     freeze_policy = str(raw.get("freeze_policy", "post_pilot"))
     if freeze_policy not in FREEZE_POLICIES:
         raise ValueError("freeze policy is invalid")
+    requires_profile_contract = (
+        freeze_policy == "pre_execution"
+        or "profile-pilot" in str(raw.get("benchmark_version", ""))
+    )
+    arms = _arm_definitions(
+        _required_mapping_sequence(raw, "arms"),
+        require_explicit_inspection_paths=requires_profile_contract,
+    )
+    _validate_arm_skill_contract(arms, skill)
     scenarios = _scenario_definitions(
         _required_mapping_sequence(raw, "scenarios"),
         arm_ids=tuple(arm.id for arm in arms),
-        requires_profile_attribution=(
-            freeze_policy == "pre_execution"
-            or "profile-pilot" in str(raw.get("benchmark_version", ""))
-        ),
+        requires_profile_attribution=requires_profile_contract,
     )
 
     fixture_commit = str(fixture_repository.get("commit", ""))
@@ -102,7 +107,11 @@ def validate_manifest(raw: dict[str, object]) -> BenchmarkManifest:
     )
 
 
-def _arm_definitions(raw_arms: list[dict[str, object]]) -> tuple[ArmDefinition, ...]:
+def _arm_definitions(
+    raw_arms: list[dict[str, object]],
+    *,
+    require_explicit_inspection_paths: bool,
+) -> tuple[ArmDefinition, ...]:
     arms: list[ArmDefinition] = []
     seen_ids: set[str] = set()
     for raw_arm in raw_arms:
@@ -116,7 +125,8 @@ def _arm_definitions(raw_arms: list[dict[str, object]]) -> tuple[ArmDefinition, 
             raise ValueError(f"arm instruction is invalid: {arm_id}")
         skill = raw_arm.get("skill")
         if skill is not None and (
-            not isinstance(skill, str) or not skill.strip()
+            not isinstance(skill, str)
+            or re.fullmatch(IDENTIFIER_PATTERN, skill) is None
         ):
             raise ValueError(f"arm Skill is invalid: {arm_id}")
         version = raw_arm.get("version")
@@ -124,18 +134,107 @@ def _arm_definitions(raw_arms: list[dict[str, object]]) -> tuple[ArmDefinition, 
             not isinstance(version, str) or not version.strip()
         ):
             raise ValueError(f"arm version is invalid: {arm_id}")
+        if skill is None and version is not None:
+            raise ValueError(f"arm without a Skill cannot declare a version: {arm_id}")
+        required_skill_inspection_paths = _arm_inspection_paths(
+            raw_arm,
+            arm_id,
+            skill,
+            require_explicit=require_explicit_inspection_paths,
+        )
         arms.append(
             ArmDefinition(
                 id=arm_id,
                 instruction=instruction,
                 skill=skill,
                 version=version,
+                required_skill_inspection_paths=required_skill_inspection_paths,
             )
         )
         seen_ids.add(arm_id)
     if "control" not in seen_ids:
         raise ValueError("manifest must define a control arm")
     return tuple(arms)
+
+
+def _validate_arm_skill_contract(
+    arms: tuple[ArmDefinition, ...], skill: dict[str, object]
+) -> None:
+    expected_name = skill.get("name")
+    allowed_versions = {
+        value
+        for value in (skill.get("version"), skill.get("tag"))
+        if isinstance(value, str) and value
+    }
+    for arm in arms:
+        if arm.skill is None:
+            continue
+        if arm.version is None:
+            raise ValueError(f"Skill arm must declare a version: {arm.id}")
+        if (
+            isinstance(expected_name, str)
+            and expected_name
+            and arm.skill != expected_name
+        ):
+            raise ValueError(f"arm Skill does not match pinned Skill: {arm.id}")
+        if arm.version not in allowed_versions:
+            raise ValueError(f"arm version does not match pinned Skill: {arm.id}")
+
+
+def _arm_inspection_paths(
+    raw_arm: dict[str, object],
+    arm_id: str,
+    skill: object,
+    *,
+    require_explicit: bool,
+) -> tuple[str, ...]:
+    if "required_skill_inspection_paths" not in raw_arm:
+        if require_explicit:
+            raise ValueError(
+                f"profile arm must declare required Skill inspection paths: {arm_id}"
+            )
+        if isinstance(skill, str):
+            return (f".agents/skills/{skill}/SKILL.md",)
+        return ()
+    raw_paths = raw_arm["required_skill_inspection_paths"]
+    if raw_paths is None:
+        raise ValueError(f"arm inspection paths are invalid: {arm_id}")
+    if not isinstance(raw_paths, list) or not all(
+        isinstance(path, str) and path for path in raw_paths
+    ):
+        raise ValueError(f"arm inspection paths are invalid: {arm_id}")
+    if len(raw_paths) != len(set(raw_paths)):
+        raise ValueError(f"duplicate arm inspection path: {arm_id}")
+    if skill is None:
+        if raw_paths:
+            raise ValueError(f"arm without a Skill cannot inspect Skill files: {arm_id}")
+        return ()
+    if not raw_paths:
+        raise ValueError(f"Skill arm inspection paths must not be empty: {arm_id}")
+
+    skill_root = PurePosixPath(".agents") / "skills" / str(skill)
+    entrypoint = skill_root / "SKILL.md"
+    paths: list[str] = []
+    for value in raw_paths:
+        path = PurePosixPath(value)
+        if (
+            "\\" in value
+            or path.is_absolute()
+            or PureWindowsPath(value).is_absolute()
+            or ".." in path.parts
+            or value != path.as_posix()
+        ):
+            raise ValueError(
+                f"arm inspection path must be a repository-relative POSIX path: {arm_id}"
+            )
+        if path == skill_root or skill_root not in path.parents:
+            raise ValueError(
+                f"arm inspection path must stay inside staged Skill root: {arm_id}"
+            )
+        paths.append(value)
+    if entrypoint.as_posix() not in paths:
+        raise ValueError(f"arm inspection paths must include Skill entrypoint: {arm_id}")
+    return tuple(paths)
 
 
 def _scenario_definitions(
