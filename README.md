@@ -296,7 +296,7 @@ Skill 依下列順序解析：
 <!-- profile-matrix:generated:start -->
 | Profile | Kind | Status | Reference | Benchmark |
 | --- | --- | --- | --- | --- |
-| C# / .NET | language | planned | Not available | not_started |
+| C# / .NET | language | experimental | [Open](clean-code-ai-collaboration/references/language-csharp.md) | not_started |
 | Python | language | planned | Not available | not_started |
 | TypeScript | language | planned | Not available | not_started |
 | React | framework | planned | Not available | not_started |

@@ -35,8 +35,8 @@ Standard output records Profiles Applied and Profile Basis per Changed Module. F
 
 - ID: `csharp`
 - Kind: `language`
-- Status / Availability: `planned` / `unavailable`
-- Reference: Not available
+- Status / Availability: `experimental` / `available`
+- Reference: [language-csharp.md](language-csharp.md)
 - Load Order: `100`
 - Owning Manifests: `*.csproj` (project)
 - Supporting Files: `*.sln`, `*.slnx`, `Directory.Build.props`, `Directory.Build.targets`, `global.json`

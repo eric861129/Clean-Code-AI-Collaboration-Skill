@@ -107,12 +107,21 @@ class ProfileContractTests(unittest.TestCase):
 
         self.assertEqual(PROFILE_IDS, [profile["id"] for profile in profiles])
 
-    def test_initial_registry_is_valid_and_all_profiles_are_planned(self) -> None:
+    def test_registry_has_only_csharp_as_experimental(self) -> None:
         self.assertEqual([], list(validate_repository(ROOT)))
         for profile in load_registry(ROOT):
             with self.subTest(profile=profile["id"]):
-                self.assertEqual("planned", profile["status"])
-                self.assertNotIn("reference", profile)
+                expected_status = (
+                    "experimental" if profile["id"] == "csharp" else "planned"
+                )
+                self.assertEqual(expected_status, profile["status"])
+                if profile["id"] == "csharp":
+                    self.assertEqual(
+                        "clean-code-ai-collaboration/references/language-csharp.md",
+                        profile["reference"],
+                    )
+                else:
+                    self.assertNotIn("reference", profile)
                 self.assertEqual(
                     ["eric861129"],
                     profile["ownership"]["maintainers"],
@@ -121,6 +130,33 @@ class ProfileContractTests(unittest.TestCase):
                     "not_started",
                     profile["evidence"]["benchmark_status"],
                 )
+
+    def test_csharp_profile_has_complete_semantic_contract(self) -> None:
+        content = (
+            ROOT
+            / "clean-code-ai-collaboration"
+            / "references"
+            / "language-csharp.md"
+        ).read_text(encoding="utf-8")
+
+        for heading in REQUIRED_PROFILE_HEADINGS:
+            with self.subTest(heading=heading):
+                self.assertIn(heading, content)
+        for term in {
+            "Nullable",
+            "CancellationToken",
+            "IDisposable",
+            "IAsyncDisposable",
+            "deferred execution",
+            "multiple enumeration",
+            "equality",
+            "DI lifetime",
+            "TargetFramework",
+            "LangVersion",
+        }:
+            with self.subTest(term=term):
+                self.assertIn(term.lower(), content.lower())
+        self.assertNotIn("ASP.NET Core is required", content)
 
     def test_generated_region_rejects_missing_duplicate_and_reordered_markers(
         self,
