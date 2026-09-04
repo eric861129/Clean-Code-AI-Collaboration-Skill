@@ -7,6 +7,7 @@ import tempfile
 import unittest
 
 from evals.v040_strategy_full_run import (
+    _stable_tree_files,
     collect_run,
     build_prompt,
     build_baseline_slots,
@@ -212,6 +213,21 @@ class V040StrategyFullRunTests(unittest.TestCase):
             reference.write_text("second", encoding="utf-8")
 
             self.assertNotEqual(before, tree_sha256(root))
+
+    def test_skill_tree_hash_uses_cross_platform_path_order(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            (root / "SKILL.md").write_text("skill", encoding="utf-8")
+            agents = root / "agents"
+            agents.mkdir()
+            (agents / "openai.yaml").write_text("agent", encoding="utf-8")
+
+            ordered_paths = [
+                path.relative_to(root).as_posix()
+                for path in _stable_tree_files(root)
+            ]
+
+            self.assertEqual(["agents/openai.yaml", "SKILL.md"], ordered_paths)
 
     def test_manifest_and_generated_prompts_are_utf8(self) -> None:
         manifest = load_manifest(MANIFEST_PATH)

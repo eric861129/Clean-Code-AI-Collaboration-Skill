@@ -7,7 +7,7 @@
   "model": "gpt-5.6-sol",
   "reasoning_effort": "high",
   "manifest_sha256": "a7301231a56ce2371f5b9b3a25b4c8e8824af6ea7f74d8a98045e4c0bbe75cb4",
-  "harness_sha256": "b6a86872451db473ad9dfb4b3214dc5d1ac0ed48a291d2b840e56c06bea75514",
+  "harness_sha256": "706c33abf388068fd8acb368dfed1dbae6d23e964170693760ed37241b0fb851",
   "skill_tree_sha256": "4c1d6eaf19f321e6ba2e0360aede7077c6853688f5d4c7f086c0178209b64135",
   "claim_boundary": "This Full Run checks whether controller-dispatched subjects consistently interpret the v0.4.0 strategy contract. Public receipts do not independently attest a fresh Context or provider-side model identity. The run does not measure code quality, compare implementations, establish a causal comparison with v0.3.0, or prove general effectiveness.",
   "baseline_run_count": 9,

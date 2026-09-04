@@ -280,9 +280,20 @@ def file_sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _stable_tree_files(root: Path) -> list[Path]:
+    files = (item for item in root.rglob("*") if item.is_file())
+    return sorted(
+        files,
+        key=lambda path: (
+            path.relative_to(root).as_posix().casefold(),
+            path.relative_to(root).as_posix(),
+        ),
+    )
+
+
 def tree_sha256(root: Path) -> str:
     digest = hashlib.sha256()
-    for path in sorted(item for item in root.rglob("*") if item.is_file()):
+    for path in _stable_tree_files(root):
         relative_path = path.relative_to(root).as_posix()
         digest.update(relative_path.encode("utf-8"))
         digest.update(b"\0")
