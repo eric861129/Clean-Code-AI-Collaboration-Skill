@@ -12,6 +12,7 @@ from jsonschema import Draft202012Validator
 
 import evals.harness.cli as harness_cli
 import evals.harness.fixture_builder as fixture_builder
+import evals.harness.oracle_runner as oracle_runner
 from evals.harness.anonymizer import build_review_packet
 from evals.harness.cli import main as harness_main
 from evals.harness.desktop_subject import (
@@ -23,8 +24,14 @@ from evals.harness.desktop_subject import (
     write_attempt_receipt,
 )
 from evals.harness.fixture_builder import build_workspace
-from evals.harness.manifest import validate_manifest
-from evals.harness.models import HarnessPaths, RunSlot, SubjectDispatch, Workspace
+from evals.harness.manifest import load_manifest, validate_manifest
+from evals.harness.models import (
+    CommandResult,
+    HarnessPaths,
+    RunSlot,
+    SubjectDispatch,
+    Workspace,
+)
 from evals.harness.planner import build_run_slots
 from evals.harness.profile_outcomes import build_profile_outcomes
 from evals.harness.result_builder import (
@@ -210,6 +217,46 @@ PROFILE_PILOT_MATRIX = (
     ),
 )
 
+PROFILE_INCREMENTAL_CRITERIA = {
+    "csharp-overdue-rule": (
+        "DateTimeOffset comparison preserves the exact two-hour UTC boundary",
+        "Completed and Normal Priority branches retain their existing semantics",
+    ),
+    "csharp-cancellation-cleanup": (
+        "Caller CancellationToken reaches provider open and send operations",
+        "OperationCanceledException remains cancellation rather than provider failure",
+        "The asynchronous provider session is disposed exactly once",
+    ),
+    "fastapi-overdue-rule": (
+        "High Priority applies the exact two-hour timezone-aware boundary",
+        "HTTP status, response schema, Completed, and Normal behavior remain unchanged",
+    ),
+    "fastapi-provider-boundary": (
+        "The route reuses NotificationSender through FastAPI dependency injection",
+        "Dependency override replaces the provider without duplicating the domain boundary",
+        "The 202, 404, 502, and 503 failure semantics remain distinct",
+    ),
+    "typescript-overdue-rule": (
+        "High Priority uses the exact two-hour boundary through the existing WorkItem model",
+        "Completed and Normal Priority branches remain typed and unchanged",
+    ),
+    "typescript-runtime-validation": (
+        "The unknown payload is narrowed by runtime guards before WorkItem construction",
+        "The existing WorkItem type is reused without any or unsafe assertion",
+        "Accepted and rejected results use exhaustive discriminated-union handling",
+    ),
+    "react-state-error-retention": (
+        "Still-valid content remains visible while retry is loading",
+        "Earlier success or failure cannot overwrite the latest request state",
+        "Public loading, error, success, and props contracts remain unchanged",
+    ),
+    "react-effect-lifecycle": (
+        "Effect identity follows workItemId rather than callback or presentation props",
+        "An identity change aborts the prior request through AbortSignal",
+        "An aborted request cannot overwrite the current success or error state",
+    ),
+}
+
 
 def _profile_pilot_manifest_raw() -> dict[str, object]:
     arms = [
@@ -321,6 +368,187 @@ def _profile_pilot_manifest_raw() -> dict[str, object]:
 
 
 class ProfilePilotHarnessContractTests(unittest.TestCase):
+    def test_profile_fixture_runtime_supports_typescript_and_csharp(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            runs_root = root / "runs"
+            typescript_root = root / "typescript"
+            typescript_root.mkdir()
+            with patch.object(fixture_builder, "_run_checked") as run_checked:
+                fixture_builder._install_dependencies(
+                    typescript_root,
+                    "typescript",
+                    runs_root,
+                    120,
+                )
+            self.assertEqual("npm", run_checked.call_args.args[0][0])
+
+            csharp_root = root / "csharp"
+            project = csharp_root / "tests" / "PublicTests" / "PublicTests.csproj"
+            project.parent.mkdir(parents=True)
+            project.write_text("<Project />", encoding="utf-8")
+            with (
+                patch.object(fixture_builder.shutil, "which", return_value="dotnet"),
+                patch.object(fixture_builder, "_run_checked") as run_checked,
+            ):
+                fixture_builder._install_dependencies(
+                    csharp_root,
+                    "csharp",
+                    runs_root,
+                    120,
+                )
+            self.assertEqual(
+                [
+                    "dotnet",
+                    "restore",
+                    "tests/PublicTests/PublicTests.csproj",
+                    "--locked-mode",
+                    "--nologo",
+                ],
+                run_checked.call_args.args[0],
+            )
+
+            fixture_builder._write_workspace_gitignore(csharp_root)
+            workspace_ignore = (csharp_root / ".gitignore").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn("bin/", workspace_ignore)
+            self.assertIn("obj/", workspace_ignore)
+
+    def test_profile_oracle_expands_the_dotnet_tool_token(self) -> None:
+        with patch.object(oracle_runner.shutil, "which", return_value="dotnet"):
+            self.assertEqual(
+                ["dotnet", "test", "PublicTests.csproj"],
+                oracle_runner._expand_command(
+                    ["{dotnet}", "test", "PublicTests.csproj"],
+                    Path("workspace"),
+                ),
+            )
+
+    def test_profile_preflight_counts_traditional_chinese_dotnet_failures(
+        self,
+    ) -> None:
+        result = CommandResult(
+            args=("dotnet", "test"),
+            exit_code=1,
+            stdout=(
+                "失敗 CsharpOverdueRule.AcceptanceTests."
+                "HighPriorityItemIsOverdueAtTwoHourBoundary\n"
+                "失敗! - 失敗:     1，通過:     1，略過:     0，總計:     2"
+            ),
+            stderr="",
+            elapsed_seconds=1.0,
+            timed_out=False,
+            classification="nonzero_exit",
+            attempt=1,
+        )
+
+        self.assertTrue(
+            oracle_runner.baseline_acceptance_is_expected(
+                (result,),
+                ("HighPriorityItemIsOverdueAtTwoHourBoundary",),
+                1,
+            )
+        )
+
+    def test_committed_profile_pilot_manifest_freezes_the_real_m2_matrix(
+        self,
+    ) -> None:
+        repository_root = Path(__file__).resolve().parents[1]
+        manifest_path = (
+            repository_root / "evals" / "manifests" / "v0.5.1-profile-pilot.json"
+        )
+        raw = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest = load_manifest(manifest_path)
+
+        self.assertEqual("0.5.1-profile-pilot", manifest.benchmark_version)
+        self.assertEqual("pre_execution", manifest.freeze_policy)
+        self.assertEqual(
+            "https://github.com/eric861129/"
+            "Clean-Code-AI-Collaboration-Benchmark-Fixtures.git",
+            manifest.fixture_url,
+        )
+        self.assertEqual("profile-pilot-v1", manifest.fixture_tag)
+        self.assertEqual(
+            "6ed8712f2b3d4eaf902dbe1470a8740f92700878",
+            manifest.fixture_commit,
+        )
+        self.assertEqual("v0.5.0", manifest.skill_tag)
+        self.assertEqual(
+            "bd895776a80566381003182bfdb24f0f02784731",
+            manifest.skill_commit,
+        )
+        self.assertEqual(1, manifest.repetitions)
+        self.assertEqual("gpt-5.6-sol", manifest.model)
+        self.assertEqual("high", manifest.reasoning_effort)
+        self.assertEqual(480, manifest.subject_timeout_seconds)
+        self.assertEqual(120, manifest.fixture_timeout_seconds)
+        self.assertEqual(120, manifest.oracle_timeout_seconds)
+        self.assertEqual(
+            tuple(ARM_INSPECTION_PATHS), tuple(arm.id for arm in manifest.arms)
+        )
+        self.assertEqual(
+            {
+                "name": SKILL_NAME,
+                "version": "0.5.0",
+                "tag": "v0.5.0",
+                "commit": "bd895776a80566381003182bfdb24f0f02784731",
+            },
+            raw["skill"],
+        )
+
+        slots = build_run_slots(manifest)
+        self.assertEqual(34, len(slots))
+        self.assertEqual(34, len({slot.run_id for slot in slots}))
+        scenarios = {str(item["id"]): item for item in manifest.scenarios}
+        for (
+            scenario_id,
+            language,
+            profile,
+            scenario_type,
+            comparison_arms,
+            direct_comparator,
+            treatment_arm,
+        ) in PROFILE_PILOT_MATRIX:
+            with self.subTest(scenario_id=scenario_id):
+                scenario = scenarios[scenario_id]
+                self.assertEqual(language, scenario["language"])
+                self.assertEqual(profile, scenario["profile_under_test"])
+                self.assertEqual(scenario_type, scenario["scenario_type"])
+                self.assertEqual(comparison_arms, scenario["comparison_arms"])
+                self.assertEqual(direct_comparator, scenario["direct_comparator"])
+                self.assertEqual(treatment_arm, scenario["treatment_arm"])
+                self.assertEqual(
+                    PROFILE_INCREMENTAL_CRITERIA[scenario_id],
+                    tuple(scenario["incremental_criteria"]),
+                )
+                self.assertEqual(
+                    {
+                        f"{scenario_id}--{arm_id}--r01"
+                        for arm_id in comparison_arms
+                    },
+                    {
+                        slot.run_id
+                        for slot in slots
+                        if slot.scenario_id == scenario_id
+                    },
+                )
+
+        rubric = (
+            repository_root / "evals" / "rubrics" / "profile-increment.md"
+        ).read_text(encoding="utf-8")
+        for required_text in (
+            "single candidate",
+            "0",
+            "1",
+            "2",
+            "Diff",
+            "Oracle",
+            "incremental_criteria",
+            "不得比較",
+        ):
+            self.assertIn(required_text, rubric)
+
     def test_profile_pilot_result_schema_requires_complete_public_evidence(
         self,
     ) -> None:

@@ -82,14 +82,15 @@ def baseline_acceptance_is_expected(
         flags=re.IGNORECASE,
     ):
         return False
-    counts = [
-        int(match.group(1))
-        for match in re.finditer(
-            r"(?:\bTests\s+)?\b(\d+)\s+failed\b",
-            output,
-            flags=re.IGNORECASE,
-        )
-    ]
+    counts = []
+    for match in re.finditer(
+        r"(?:\bTests\s+)?\b(\d+)\s+failed\b"
+        r"|(?:失敗|失败)\s*[:：]\s*(\d+)",
+        output,
+        flags=re.IGNORECASE,
+    ):
+        count = match.group(1) or match.group(2)
+        counts.append(int(count))
     return bool(counts) and max(counts) == expected_failure_count
 
 
@@ -116,10 +117,18 @@ def _expand_command(raw_command: object, workspace_root: Path) -> list[str]:
     ):
         raise ValueError("oracle command must be an array of strings")
     python = _workspace_python(workspace_root)
-    return [
-        str(python) if argument == "{python}" else argument
-        for argument in raw_command
-    ]
+    expanded: list[str] = []
+    for argument in raw_command:
+        if argument == "{python}":
+            expanded.append(str(python))
+        elif argument == "{dotnet}":
+            dotnet = shutil.which("dotnet")
+            if dotnet is None:
+                raise ValueError("required .NET SDK executable is unavailable")
+            expanded.append(dotnet)
+        else:
+            expanded.append(argument)
+    return expanded
 
 
 def _workspace_python(workspace_root: Path) -> Path:

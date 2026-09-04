@@ -69,6 +69,14 @@ Micro-eval 的每組對照各執行五個情境；每組完整 Repository Scenar
 
 `v0.3.0` 的跨語言程式碼 Benchmark 是另一條證據線，Full Run 尚未完成，也不納入 v0.4.0 的結果。補齊公開 Result 與收據前，不用本機進度數字替代可稽核的發布證據。
 
+## v0.5.1 Profile Pilot M2
+
+M2 使用 [`v0.5.1-profile-pilot.json`](manifests/v0.5.1-profile-pilot.json) 固定 C#、Python、TypeScript 與 React 的八個 Scenario、34 個單次執行 Slot、`gpt-5.6-sol`／`high`、公開 Fixture `profile-pilot-v1`，以及已發布的 Skill `v0.5.0`。第一個 Subject Stage 前必須先建立 `pre_execution` Freeze；Manifest、Harness、Fixture、Evaluator、Prompt、Skill 或 Rubric 任一 Hash 漂移，都會使既有 Freeze 失效，不能只重跑結果較弱的 Arm。
+
+Language Profile 只比較 `core-only` 與對應的 Core + Language Treatment。React Profile 採階梯式歸因，只比較 `core-plus-typescript` 與 `core-plus-typescript-plus-react`；`control` 與 `generic-clean-code` 不參與成熟度 Outcome。匿名 Reviewer 依 [`profile-increment.md`](rubrics/profile-increment.md) 對單一 Candidate 的固定 Criteria 評分，不得看到 Arm Mapping 或比較其他 Candidate。
+
+四個 Profile Outcome 只能由完整 Terminal State、匿名 Review 與固定直接比較組重算為 `passed`、`failed`、`no_difference` 或 `inconclusive`。Pilot 尚未產生公開 Result 前，這一節只描述事前契約，不代表 Profile 已通過，也不改變 `v0.5.0` 的正式發布狀態。
+
 ## Initial v0.2.0 Results
 
 完整機器可讀結果存放於 [`results/v0.2.0-initial.json`](results/v0.2.0-initial.json)。以下結論刻意區分實際觀察、推論、未知與失敗，避免把單一模型、單一 Repository 的初步結果寫成普遍保證。
