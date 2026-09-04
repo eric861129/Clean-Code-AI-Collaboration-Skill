@@ -1,0 +1,14 @@
+{
+  "changed_files": ["backend/App.cs"],
+  "explicit_profiles": [],
+  "outcome": "selected",
+  "modules": [
+    {
+      "root": "backend",
+      "profiles": ["csharp"],
+      "unavailable_profiles": [],
+      "reason_codes": ["extension-match"],
+      "unknowns": []
+    }
+  ]
+}

@@ -10,6 +10,15 @@ import unittest
 
 import yaml
 
+from scripts.generate_profile_matrix import (
+    README_MARKERS,
+    RUNTIME_MARKERS,
+    main as generator_main,
+    render_profile_matrix,
+    render_runtime_index,
+    replace_generated_region,
+    synchronize_generated_regions,
+)
 from scripts.validate_profiles import load_registry, main, validate_repository
 
 
@@ -68,6 +77,31 @@ class ProfileContractTests(unittest.TestCase):
             for diagnostic in validate_repository(self.fixture_root)
         ]
 
+    def write_generated_documents(self, body: str = "stale") -> None:
+        readme = (
+            "# Before\n\n"
+            f"{README_MARKERS[0]}\n{body}\n{README_MARKERS[1]}\n\n"
+            "After README\n"
+        )
+        runtime = (
+            "# Profile Selection\n\n"
+            f"{RUNTIME_MARKERS[0]}\n{body}\n{RUNTIME_MARKERS[1]}\n\n"
+            "After Runtime Index\n"
+        )
+        (self.fixture_root / "README.md").write_text(
+            readme,
+            encoding="utf-8",
+            newline="\n",
+        )
+        runtime_path = (
+            self.fixture_root
+            / "clean-code-ai-collaboration"
+            / "references"
+            / "profile-selection.md"
+        )
+        runtime_path.parent.mkdir(parents=True)
+        runtime_path.write_text(runtime, encoding="utf-8", newline="\n")
+
     def test_catalog_has_the_fixed_v050_order(self) -> None:
         profiles = load_registry(ROOT)
 
@@ -87,6 +121,103 @@ class ProfileContractTests(unittest.TestCase):
                     "not_started",
                     profile["evidence"]["benchmark_status"],
                 )
+
+    def test_generated_region_rejects_missing_duplicate_and_reordered_markers(
+        self,
+    ) -> None:
+        start, end = README_MARKERS
+        invalid_documents = (
+            "no markers",
+            f"{start}\ncontent",
+            f"{start}\n{start}\n{end}",
+            f"{end}\n{start}",
+        )
+
+        for document in invalid_documents:
+            with self.subTest(document=document):
+                with self.assertRaises(ValueError):
+                    replace_generated_region(document, README_MARKERS, "new")
+
+    def test_generator_only_replaces_the_two_generated_regions(self) -> None:
+        self.write_generated_documents()
+
+        diagnostics = synchronize_generated_regions(self.fixture_root, check=False)
+
+        self.assertEqual([], list(diagnostics))
+        readme = (self.fixture_root / "README.md").read_text(encoding="utf-8")
+        runtime = (
+            self.fixture_root
+            / "clean-code-ai-collaboration"
+            / "references"
+            / "profile-selection.md"
+        ).read_text(encoding="utf-8")
+        self.assertTrue(readme.startswith("# Before\n\n"))
+        self.assertTrue(readme.endswith("\n\nAfter README\n"))
+        self.assertTrue(runtime.startswith("# Profile Selection\n\n"))
+        self.assertTrue(runtime.endswith("\n\nAfter Runtime Index\n"))
+        self.assertNotIn("stale", readme)
+        self.assertNotIn("stale", runtime)
+
+    def test_generator_check_reports_drift_without_writing(self) -> None:
+        self.write_generated_documents()
+        tracked_paths = (
+            self.fixture_root / "README.md",
+            self.fixture_root
+            / "clean-code-ai-collaboration"
+            / "references"
+            / "profile-selection.md",
+        )
+        before = {path: path.read_bytes() for path in tracked_paths}
+
+        diagnostics = synchronize_generated_regions(self.fixture_root, check=True)
+        with redirect_stdout(io.StringIO()) as output:
+            exit_code = generator_main(
+                ["--source-root", str(self.fixture_root), "--check"]
+            )
+
+        self.assertEqual(1, exit_code)
+        self.assertEqual(
+            ["generated-drift", "generated-drift"],
+            [diagnostic.code for diagnostic in diagnostics],
+        )
+        self.assertEqual(before, {path: path.read_bytes() for path in tracked_paths})
+        self.assertNotIn("Traceback", output.getvalue())
+
+    def test_generator_reports_invalid_yaml_without_a_traceback(self) -> None:
+        self.write_generated_documents()
+        (self.fixture_root / "profiles" / "catalog.yaml").write_text(
+            "schema_version: [\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+
+        with redirect_stdout(io.StringIO()) as output:
+            exit_code = generator_main(["--source-root", str(self.fixture_root)])
+
+        self.assertEqual(1, exit_code)
+        self.assertIn("catalog-invalid", output.getvalue())
+        self.assertNotIn("Traceback", output.getvalue())
+
+    def test_profile_matrix_and_runtime_index_preserve_catalog_order_and_roles(
+        self,
+    ) -> None:
+        profiles = load_registry(ROOT)
+
+        matrix = render_profile_matrix(profiles)
+        runtime = render_runtime_index(profiles)
+
+        self.assertIn("| Profile | Kind | Status | Reference | Benchmark |", matrix)
+        self.assertLess(matrix.index("C#"), matrix.index("Python"))
+        self.assertIn("Not available", matrix)
+        self.assertLess(runtime.index("`csharp`"), runtime.index("`python`"))
+        for term in {
+            "Owning Manifests",
+            "Supporting Files",
+            "Candidate Dependencies",
+            "Supporting Dependencies",
+        }:
+            with self.subTest(term=term):
+                self.assertIn(term, runtime)
 
     def test_validator_cli_is_read_only_and_returns_zero(self) -> None:
         before = {

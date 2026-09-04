@@ -1,0 +1,14 @@
+{
+  "changed_files": ["frontend/src/App.tsx"],
+  "explicit_profiles": ["core-only"],
+  "outcome": "core_only",
+  "modules": [
+    {
+      "root": "frontend",
+      "profiles": [],
+      "unavailable_profiles": [],
+      "reason_codes": ["explicit-core-only"],
+      "unknowns": []
+    }
+  ]
+}

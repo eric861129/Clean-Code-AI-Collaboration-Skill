@@ -1,0 +1,14 @@
+{
+  "changed_files": ["frontend/src/App.tsx"],
+  "explicit_profiles": [],
+  "outcome": "selected",
+  "modules": [
+    {
+      "root": "frontend",
+      "profiles": ["typescript", "react"],
+      "unavailable_profiles": [],
+      "reason_codes": ["extension-match", "dependency-match"],
+      "unknowns": []
+    }
+  ]
+}

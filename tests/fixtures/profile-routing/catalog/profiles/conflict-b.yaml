@@ -1,0 +1,17 @@
+schema_version: "1.0"
+id: conflict-b
+kind: language
+display_name: Conflict B
+status: experimental
+suite_version: "0.5.0"
+reference: references/conflict-b.md
+detection:
+  owning_manifests: []
+  supporting_files: []
+  file_extensions: [.conflict]
+  dependency_markers: []
+  supporting_dependencies: []
+routing: {scope: changed-module, load_order: 100}
+composition: {requires: [], recommends: [], conflicts: [conflict-a]}
+ownership: {maintainers: [fixture]}
+evidence: {benchmark_status: not_started, manifests: [], results: []}

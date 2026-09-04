@@ -1,0 +1,14 @@
+{
+  "changed_files": ["frontend/src/App.jsx"],
+  "explicit_profiles": [],
+  "outcome": "selected",
+  "modules": [
+    {
+      "root": "frontend",
+      "profiles": ["react"],
+      "unavailable_profiles": [],
+      "reason_codes": ["dependency-match"],
+      "unknowns": []
+    }
+  ]
+}

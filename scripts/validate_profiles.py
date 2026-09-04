@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass, field as dataclass_field
+from fnmatch import fnmatchcase
 import hashlib
 import json
 from pathlib import Path, PurePosixPath
+import re
 from typing import Any, Mapping, Sequence
 
 from jsonschema import Draft202012Validator
@@ -70,6 +72,426 @@ def load_registry(source_root: Path) -> list[dict[str, Any]]:
             raise ValueError(f"profile must be an object: {path.name}")
         profiles.append(profile)
     return profiles
+
+
+_BOUNDARY_PRIORITY = {"project": 0, "package": 1, "workspace": 2}
+_KIND_PRIORITY = {"language": 0, "framework": 1}
+_DEPENDENCY_FIELDS = (
+    "dependencies",
+    "devDependencies",
+    "peerDependencies",
+    "optionalDependencies",
+)
+
+
+def _normalize_changed_file(repository_root: Path, changed_file: str) -> PurePosixPath:
+    relative = PurePosixPath(changed_file)
+    if (
+        not changed_file
+        or relative.is_absolute()
+        or ".." in relative.parts
+        or "\\" in changed_file
+        or ":" in changed_file
+    ):
+        raise ValueError(
+            f"changed file must be a repository-relative POSIX path: {changed_file}"
+        )
+    resolved_root = repository_root.resolve()
+    resolved_candidate = resolved_root.joinpath(*relative.parts).resolve(strict=False)
+    try:
+        resolved_candidate.relative_to(resolved_root)
+    except ValueError as error:
+        raise ValueError(f"changed file escapes repository root: {changed_file}") from error
+    return relative
+
+
+def _matches(name: str, pattern: str) -> bool:
+    return fnmatchcase(name.casefold(), pattern.casefold())
+
+
+def _ancestor_directories(repository_root: Path, relative: PurePosixPath) -> list[Path]:
+    root = repository_root.resolve()
+    current = root.joinpath(*relative.parent.parts)
+    directories: list[Path] = []
+    while True:
+        directories.append(current)
+        if current == root:
+            return directories
+        current = current.parent
+
+
+def _directory_file_names(directory: Path) -> tuple[str, ...]:
+    try:
+        return tuple(
+            entry.name
+            for entry in directory.iterdir()
+            if entry.is_file() and not entry.is_symlink()
+        )
+    except OSError:
+        return ()
+
+
+def _module_root_for_file(
+    repository_root: Path,
+    relative: PurePosixPath,
+    profiles: Sequence[Mapping[str, Any]],
+) -> PurePosixPath:
+    candidates: list[tuple[int, int, int, int, Path]] = []
+    for distance, directory in enumerate(
+        _ancestor_directories(repository_root, relative)
+    ):
+        names = _directory_file_names(directory)
+        if not names:
+            continue
+        for profile_index, profile in enumerate(profiles):
+            manifests = profile["detection"]["owning_manifests"]
+            for manifest_index, manifest in enumerate(manifests):
+                if any(_matches(name, manifest["pattern"]) for name in names):
+                    candidates.append(
+                        (
+                            distance,
+                            _BOUNDARY_PRIORITY[manifest["boundary"]],
+                            profile_index,
+                            manifest_index,
+                            directory,
+                        )
+                    )
+    if not candidates:
+        return PurePosixPath(".")
+    owner_directory = min(candidates)[4]
+    relative_owner = owner_directory.relative_to(repository_root.resolve())
+    return PurePosixPath(relative_owner.as_posix() or ".")
+
+
+def _changed_manifest_matches(
+    changed_file: PurePosixPath,
+    profile: Mapping[str, Any],
+) -> list[Mapping[str, Any]]:
+    return [
+        manifest
+        for manifest in profile["detection"]["owning_manifests"]
+        if _matches(changed_file.name, manifest["pattern"])
+    ]
+
+
+def _has_nearby_language_file(
+    repository_root: Path,
+    module_root: PurePosixPath,
+    extensions: set[str],
+) -> bool:
+    root = repository_root.resolve().joinpath(*module_root.parts)
+    if not root.is_dir():
+        return False
+    ignored = {".git", ".venv", "dist", "build", "node_modules", "vendor"}
+    try:
+        for candidate in root.rglob("*"):
+            if any(part.casefold() in ignored for part in candidate.parts):
+                continue
+            if candidate.is_file() and candidate.suffix.casefold() in extensions:
+                return True
+    except OSError:
+        return False
+    return False
+
+
+def _language_candidate(
+    repository_root: Path,
+    module_root: PurePosixPath,
+    changed_files: Sequence[PurePosixPath],
+    profile: Mapping[str, Any],
+) -> tuple[bool, str | None]:
+    extensions = {
+        extension.casefold() for extension in profile["detection"]["file_extensions"]
+    }
+    if any(changed_file.suffix.casefold() in extensions for changed_file in changed_files):
+        return True, "extension-match"
+
+    for changed_file in changed_files:
+        manifests = _changed_manifest_matches(changed_file, profile)
+        if not manifests:
+            continue
+        if any(manifest["boundary"] == "project" for manifest in manifests):
+            return True, "manifest-match"
+        if _has_nearby_language_file(repository_root, module_root, extensions):
+            return True, "manifest-match"
+    return False, None
+
+
+def _nearest_package_manifest(
+    repository_root: Path,
+    changed_files: Sequence[PurePosixPath],
+) -> Path | None:
+    candidates: list[tuple[int, str, Path]] = []
+    root = repository_root.resolve()
+    for changed_file in changed_files:
+        for distance, directory in enumerate(
+            _ancestor_directories(repository_root, changed_file)
+        ):
+            package_path = directory / "package.json"
+            if package_path.is_file() and not package_path.is_symlink():
+                relative = package_path.relative_to(root).as_posix()
+                candidates.append((distance, relative.casefold(), package_path))
+                break
+    return min(candidates)[2] if candidates else None
+
+
+def _package_dependencies(package_path: Path | None) -> set[str]:
+    if package_path is None:
+        return set()
+    try:
+        package = json.loads(package_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return set()
+    if not isinstance(package, Mapping):
+        return set()
+    dependencies: set[str] = set()
+    for field in _DEPENDENCY_FIELDS:
+        values = package.get(field, {})
+        if isinstance(values, Mapping):
+            dependencies.update(
+                str(name).casefold() for name in values if isinstance(name, str)
+            )
+    return dependencies
+
+
+def _imports_dependency(path: Path, markers: set[str]) -> bool:
+    if not path.is_file() or path.is_symlink():
+        return False
+    try:
+        content = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return False
+    for marker in markers:
+        escaped = re.escape(marker)
+        if re.search(
+            rf"(?:from\s+|import\s*\(|require\s*\()\s*['\"]{escaped}(?:/[^'\"]*)?['\"]",
+            content,
+        ):
+            return True
+    return False
+
+
+def _framework_candidate(
+    repository_root: Path,
+    changed_files: Sequence[PurePosixPath],
+    profile: Mapping[str, Any],
+) -> tuple[bool, str | None]:
+    markers = {
+        marker.casefold() for marker in profile["detection"]["dependency_markers"]
+    }
+    if not markers:
+        return False, None
+    package_path = _nearest_package_manifest(repository_root, changed_files)
+    if not markers.intersection(_package_dependencies(package_path)):
+        return False, None
+
+    relevant_extensions = {
+        extension.casefold() for extension in profile["detection"]["file_extensions"]
+    }
+    manifest_changed = any(
+        changed_file.name.casefold() == "package.json" for changed_file in changed_files
+    )
+    extension_relevant = any(
+        changed_file.suffix.casefold() in relevant_extensions
+        for changed_file in changed_files
+    )
+    import_relevant = any(
+        _imports_dependency(
+            repository_root.resolve().joinpath(*changed_file.parts), markers
+        )
+        for changed_file in changed_files
+    )
+    return (
+        (True, "dependency-match")
+        if manifest_changed or extension_relevant or import_relevant
+        else (False, None)
+    )
+
+
+def _profile_sort_key(profile: Mapping[str, Any]) -> tuple[int, int, str]:
+    return (
+        profile["routing"]["load_order"],
+        _KIND_PRIORITY[profile["kind"]],
+        profile["id"],
+    )
+
+
+def _append_once(values: list[str], value: str) -> None:
+    if value not in values:
+        values.append(value)
+
+
+def _route_module(
+    repository_root: Path,
+    module_root: PurePosixPath,
+    changed_files: Sequence[PurePosixPath],
+    profiles: Sequence[Mapping[str, Any]],
+    explicit_profiles: Sequence[str],
+) -> dict[str, Any]:
+    root_label = module_root.as_posix()
+    if "core-only" in {profile_id.casefold() for profile_id in explicit_profiles}:
+        return {
+            "root": root_label,
+            "profiles": [],
+            "unavailable_profiles": [],
+            "reason_codes": ["explicit-core-only"],
+            "unknowns": [],
+        }
+
+    profiles_by_id = {profile["id"]: profile for profile in profiles}
+    explicit = {profile_id.casefold() for profile_id in explicit_profiles}
+    candidates: dict[str, Mapping[str, Any]] = {}
+    unavailable: list[str] = []
+    reason_codes: list[str] = []
+    unknowns: list[str] = []
+
+    for profile in profiles:
+        if profile["kind"] == "language":
+            applicable, reason = _language_candidate(
+                repository_root, module_root, changed_files, profile
+            )
+        else:
+            applicable, reason = _framework_candidate(
+                repository_root, changed_files, profile
+            )
+        profile_id = profile["id"]
+        if not applicable:
+            continue
+        if profile["status"] == "planned":
+            unavailable.append(profile_id)
+            _append_once(reason_codes, "planned-profile")
+            continue
+        if profile["status"] == "deprecated":
+            unavailable.append(profile_id)
+            _append_once(reason_codes, "deprecated-profile")
+            continue
+        if not profile.get("reference"):
+            unavailable.append(profile_id)
+            _append_once(reason_codes, "missing-reference")
+            continue
+        candidates[profile_id] = profile
+        if reason is not None:
+            _append_once(reason_codes, reason)
+
+    for explicit_id in explicit:
+        if explicit_id == "core-only":
+            continue
+        if explicit_id not in profiles_by_id:
+            unknowns.append(f"unknown explicit profile: {explicit_id}")
+        elif explicit_id not in candidates and explicit_id not in unavailable:
+            unknowns.append(f"explicit profile is not applicable: {explicit_id}")
+
+    resolved_requirements: dict[str, frozenset[str]] = {}
+
+    def resolve_requirements(
+        profile_id: str,
+        active: frozenset[str] = frozenset(),
+    ) -> frozenset[str] | None:
+        if profile_id in resolved_requirements:
+            return resolved_requirements[profile_id]
+        if profile_id in active:
+            _append_once(reason_codes, "profile-requires-unavailable")
+            unknowns.append(f"requires cycle reached {profile_id}")
+            return None
+        profile = profiles_by_id.get(profile_id)
+        if (
+            profile is None
+            or profile["status"] in {"planned", "deprecated"}
+            or not profile.get("reference")
+        ):
+            return None
+
+        closure = {profile_id}
+        for required_id in profile["composition"]["requires"]:
+            required_closure = resolve_requirements(
+                required_id,
+                active | {profile_id},
+            )
+            if required_closure is None:
+                _append_once(reason_codes, "profile-requires-unavailable")
+                unknowns.append(f"{profile_id} requires unavailable {required_id}")
+                return None
+            closure.update(required_closure)
+        result = frozenset(closure)
+        resolved_requirements[profile_id] = result
+        return result
+
+    selected_ids: set[str] = set()
+    for candidate_id in candidates:
+        closure = resolve_requirements(candidate_id)
+        if closure is not None:
+            selected_ids.update(closure)
+    selected = {
+        profile_id: profiles_by_id[profile_id] for profile_id in selected_ids
+    }
+
+    ordered_candidates = sorted(selected.values(), key=_profile_sort_key)
+
+    conflict_pairs: set[tuple[str, str]] = set()
+    for profile_id, profile in selected.items():
+        for conflict_id in profile["composition"]["conflicts"]:
+            if conflict_id in selected_ids:
+                conflict_pairs.add(tuple(sorted((profile_id, conflict_id))))
+    if conflict_pairs:
+        _append_once(reason_codes, "profile-conflict")
+        unknowns.extend(
+            f"{left} conflicts with {right}" for left, right in sorted(conflict_pairs)
+        )
+        selected_profiles: list[str] = []
+    else:
+        selected_profiles = [profile["id"] for profile in ordered_candidates]
+
+    if (
+        not selected_profiles
+        and not conflict_pairs
+        and not unavailable
+        and not candidates
+    ):
+        _append_once(reason_codes, "no-profile-match")
+
+    return {
+        "root": root_label,
+        "profiles": selected_profiles,
+        "unavailable_profiles": unavailable,
+        "reason_codes": reason_codes,
+        "unknowns": unknowns,
+    }
+
+
+def route_changed_files(
+    repository_root: Path,
+    profiles: Sequence[Mapping[str, Any]],
+    changed_files: Sequence[str],
+    explicit_profiles: Sequence[str] = (),
+) -> dict[str, Any]:
+    """Return a deterministic test oracle for changed-module profile routing."""
+
+    root = repository_root.resolve()
+    normalized_files = [
+        _normalize_changed_file(root, changed_file) for changed_file in changed_files
+    ]
+    modules: dict[PurePosixPath, list[PurePosixPath]] = {}
+    for changed_file in normalized_files:
+        module_root = _module_root_for_file(root, changed_file, profiles)
+        modules.setdefault(module_root, []).append(changed_file)
+
+    routed_modules = [
+        _route_module(
+            root,
+            module_root,
+            module_files,
+            profiles,
+            explicit_profiles,
+        )
+        for module_root, module_files in modules.items()
+    ]
+    if any("profile-conflict" in module["reason_codes"] for module in routed_modules):
+        outcome = "blocked"
+    elif any(module["profiles"] for module in routed_modules):
+        outcome = "selected"
+    else:
+        outcome = "core_only"
+    return {"outcome": outcome, "modules": routed_modules}
 
 
 def _field_path(parts: Sequence[Any]) -> str:

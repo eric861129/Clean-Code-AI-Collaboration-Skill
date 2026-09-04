@@ -1,0 +1,9 @@
+schema_version: "1.0"
+profiles:
+  - csharp.yaml
+  - python.yaml
+  - typescript.yaml
+  - react.yaml
+  - vue.yaml
+  - conflict-a.yaml
+  - conflict-b.yaml

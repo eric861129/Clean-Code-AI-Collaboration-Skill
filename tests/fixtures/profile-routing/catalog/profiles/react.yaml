@@ -1,0 +1,17 @@
+schema_version: "1.0"
+id: react
+kind: framework
+display_name: React
+status: experimental
+suite_version: "0.5.0"
+reference: references/react.md
+detection:
+  owning_manifests: [{pattern: package.json, boundary: package}]
+  supporting_files: []
+  file_extensions: [.jsx, .tsx]
+  dependency_markers: [react]
+  supporting_dependencies: [react-dom, react-native]
+routing: {scope: changed-module, load_order: 200}
+composition: {requires: [], recommends: [typescript], conflicts: []}
+ownership: {maintainers: [fixture]}
+evidence: {benchmark_status: not_started, manifests: [], results: []}

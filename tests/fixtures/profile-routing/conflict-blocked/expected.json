@@ -1,0 +1,14 @@
+{
+  "changed_files": ["src/behavior.conflict"],
+  "explicit_profiles": [],
+  "outcome": "blocked",
+  "modules": [
+    {
+      "root": ".",
+      "profiles": [],
+      "unavailable_profiles": [],
+      "reason_codes": ["extension-match", "profile-conflict"],
+      "unknowns": ["conflict-a conflicts with conflict-b"]
+    }
+  ]
+}

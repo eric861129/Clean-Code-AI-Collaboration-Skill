@@ -1,0 +1,20 @@
+schema_version: "1.0"
+id: python
+kind: language
+display_name: Python
+status: experimental
+suite_version: "0.5.0"
+reference: references/python.md
+detection:
+  owning_manifests:
+    - {pattern: pyproject.toml, boundary: project}
+    - {pattern: setup.py, boundary: project}
+    - {pattern: setup.cfg, boundary: project}
+  supporting_files: ["requirements*.txt"]
+  file_extensions: [.py, .pyi]
+  dependency_markers: []
+  supporting_dependencies: []
+routing: {scope: changed-module, load_order: 100}
+composition: {requires: [], recommends: [], conflicts: []}
+ownership: {maintainers: [fixture]}
+evidence: {benchmark_status: not_started, manifests: [], results: []}

@@ -1,0 +1,14 @@
+{
+  "changed_files": ["frontend/src/tool.ts", "frontend/package.json"],
+  "explicit_profiles": [],
+  "outcome": "selected",
+  "modules": [
+    {
+      "root": "frontend",
+      "profiles": ["typescript"],
+      "unavailable_profiles": ["vue"],
+      "reason_codes": ["extension-match", "planned-profile"],
+      "unknowns": []
+    }
+  ]
+}

@@ -287,6 +287,25 @@ Skill 依下列順序解析：
 
 常見原因包括測試回饋太慢、測試 Oracle 不可靠、工作樹沒有隔離，或尚未授權 Commit／Revert。Skill 會列出缺少的前提與替代方案，再由使用者決定是否調整節奏。
 
+## 可組合的 Language／Framework Profiles
+
+預設呼叫方式仍是 `$clean-code-ai-collaboration`。Repository Code Change 會以本次 Changed Module 為單位，依可驗證的檔案、最近 Owning Manifest 與 Dependency Marker，選擇可用的 Language／Framework Profile；找不到適用 Profile 時，Core Only 也是有效結果。明確指定 Profile 仍不能繞過可用性、適用性、相依、衝突、風險或授權 Gate。
+
+目前 Profile 狀態由下列 Generated Matrix 呈現；Generated Region 只能由 Repository Script 更新。
+
+<!-- profile-matrix:generated:start -->
+| Profile | Kind | Status | Reference | Benchmark |
+| --- | --- | --- | --- | --- |
+| C# / .NET | language | planned | Not available | not_started |
+| Python | language | planned | Not available | not_started |
+| TypeScript | language | planned | Not available | not_started |
+| React | framework | planned | Not available | not_started |
+| Go | language | planned | Not available | not_started |
+| Rust | language | planned | Not available | not_started |
+| Java | language | planned | Not available | not_started |
+| Vue | framework | planned | Not available | not_started |
+<!-- profile-matrix:generated:end -->
+
 ## 安裝
 
 先取得 Repository：

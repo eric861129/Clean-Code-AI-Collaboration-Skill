@@ -5,7 +5,7 @@ license: MIT
 compatibility: Agent Skills-compatible coding agents.
 metadata:
   author: eric861129
-  version: "0.4.0"
+  version: "0.5.0"
 ---
 
 # Clean Code AI Collaboration
@@ -44,8 +44,10 @@ Priority: User prompt, Repository Policy, then `auto`. Preferences cannot waive 
 
 ## Reference Routing
 
-Read [clean-code-for-agent-legibility.md](references/clean-code-for-agent-legibility.md) when judging Agent legibility. Load others only when relevant:
+Read only relevant references:
 
+- Profile selection for repository code changes: [profile-selection.md](references/profile-selection.md)
+- Agent legibility: [clean-code-for-agent-legibility.md](references/clean-code-for-agent-legibility.md)
 - Code structure or naming: [code-readability.md](references/code-readability.md)
 - Tests, defects, refactoring, or risky behavior: [testing-and-change-safety.md](references/testing-and-change-safety.md)
 - Abstractions, providers, components, concurrency, or architecture: [design-and-dependency-boundaries.md](references/design-and-dependency-boundaries.md)

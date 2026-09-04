@@ -1,0 +1,14 @@
+{
+  "changed_files": ["automation/job.py"],
+  "explicit_profiles": [],
+  "outcome": "selected",
+  "modules": [
+    {
+      "root": "automation",
+      "profiles": ["python"],
+      "unavailable_profiles": [],
+      "reason_codes": ["extension-match"],
+      "unknowns": []
+    }
+  ]
+}

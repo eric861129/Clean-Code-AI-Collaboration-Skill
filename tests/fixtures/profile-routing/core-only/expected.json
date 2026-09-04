@@ -1,0 +1,14 @@
+{
+  "changed_files": ["docs/note.md"],
+  "explicit_profiles": [],
+  "outcome": "core_only",
+  "modules": [
+    {
+      "root": ".",
+      "profiles": [],
+      "unavailable_profiles": [],
+      "reason_codes": ["no-profile-match"],
+      "unknowns": []
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+schema_version: "1.0"
+id: typescript
+kind: language
+display_name: TypeScript
+status: experimental
+suite_version: "0.5.0"
+reference: references/typescript.md
+detection:
+  owning_manifests:
+    - {pattern: package.json, boundary: package}
+    - {pattern: tsconfig.json, boundary: project}
+    - {pattern: "tsconfig.*.json", boundary: project}
+  supporting_files: []
+  file_extensions: [.ts, .tsx, .mts, .cts]
+  dependency_markers: []
+  supporting_dependencies: []
+routing: {scope: changed-module, load_order: 100}
+composition: {requires: [], recommends: [], conflicts: []}
+ownership: {maintainers: [fixture]}
+evidence: {benchmark_status: not_started, manifests: [], results: []}

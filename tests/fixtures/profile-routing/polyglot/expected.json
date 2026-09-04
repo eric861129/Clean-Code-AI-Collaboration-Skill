@@ -1,0 +1,32 @@
+{
+  "changed_files": [
+    "backend/Service.cs",
+    "frontend/src/App.tsx",
+    "automation/job.py"
+  ],
+  "explicit_profiles": [],
+  "outcome": "selected",
+  "modules": [
+    {
+      "root": "backend",
+      "profiles": ["csharp"],
+      "unavailable_profiles": [],
+      "reason_codes": ["extension-match"],
+      "unknowns": []
+    },
+    {
+      "root": "frontend",
+      "profiles": ["typescript", "react"],
+      "unavailable_profiles": [],
+      "reason_codes": ["extension-match", "dependency-match"],
+      "unknowns": []
+    },
+    {
+      "root": "automation",
+      "profiles": ["python"],
+      "unavailable_profiles": [],
+      "reason_codes": ["extension-match"],
+      "unknowns": []
+    }
+  ]
+}

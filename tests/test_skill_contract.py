@@ -2,11 +2,13 @@ from pathlib import Path
 import re
 import unittest
 
+from scripts.validate_profiles import load_registry
+
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 SKILL_ROOT = REPOSITORY_ROOT / "clean-code-ai-collaboration"
 SKILL_PATH = SKILL_ROOT / "SKILL.md"
-REFERENCE_NAMES = {
+CORE_REFERENCE_NAMES = {
     "code-readability.md",
     "testing-and-change-safety.md",
     "design-and-dependency-boundaries.md",
@@ -14,7 +16,17 @@ REFERENCE_NAMES = {
     "clean-code-for-agent-legibility.md",
     "repository-context-template.md",
     "review-output-contract.md",
+    "profile-selection.md",
 }
+
+
+def profile_reference_names() -> set[str]:
+    return {
+        Path(profile["reference"]).name
+        for profile in load_registry(REPOSITORY_ROOT)
+        if profile["status"] not in {"planned", "deprecated"}
+        and profile.get("reference")
+    }
 
 
 class SkillContractTests(unittest.TestCase):
@@ -30,15 +42,44 @@ class SkillContractTests(unittest.TestCase):
     def test_skill_entrypoint_routes_to_every_reference(self) -> None:
         content = SKILL_PATH.read_text(encoding="utf-8")
 
-        for reference_name in REFERENCE_NAMES:
+        for reference_name in CORE_REFERENCE_NAMES:
             with self.subTest(reference_name=reference_name):
                 self.assertIn(f"references/{reference_name}", content)
+
+        runtime_index = (
+            SKILL_ROOT / "references" / "profile-selection.md"
+        ).read_text(encoding="utf-8")
+        for reference_name in profile_reference_names():
+            with self.subTest(profile_reference_name=reference_name):
+                self.assertIn(f"]({reference_name})", runtime_index)
+
+    def test_profile_selection_keeps_runtime_routing_contract(self) -> None:
+        content = (
+            SKILL_ROOT / "references" / "profile-selection.md"
+        ).read_text(encoding="utf-8")
+        required_headings = {
+            "## Use This Reference When",
+            "## Changed Module Discovery",
+            "## Candidate Detection",
+            "## Availability and Composition",
+            "## Explicit Selection",
+            "## Stage Evidence",
+            "## Output Additions",
+            "## Runtime Profile Index",
+        }
+
+        for heading in required_headings:
+            with self.subTest(heading=heading):
+                self.assertIn(heading, content)
+        self.assertIn("<!-- runtime-profile-index:generated:start -->", content)
+        self.assertIn("<!-- runtime-profile-index:generated:end -->", content)
 
     def test_all_references_exist_and_scaffold_placeholders_are_removed(self) -> None:
         references = SKILL_ROOT / "references"
         actual_names = {path.name for path in references.glob("*.md")}
+        expected_names = CORE_REFERENCE_NAMES | profile_reference_names()
 
-        self.assertEqual(REFERENCE_NAMES, actual_names)
+        self.assertEqual(expected_names, actual_names)
         for path in [SKILL_PATH, *references.glob("*.md")]:
             with self.subTest(path=path):
                 content = path.read_text(encoding="utf-8")
@@ -514,7 +555,7 @@ class SkillContractTests(unittest.TestCase):
         required = {
             "license: MIT",
             "compatibility:",
-            'version: "0.4.0"',
+            'version: "0.5.0"',
             "C — Context-Aware Code",
             "L — Localized Change",
             "E — Explicit Intent and Boundaries",
