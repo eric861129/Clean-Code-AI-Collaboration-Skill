@@ -1,0 +1,27 @@
+schema_version: "1.0"
+id: rust
+kind: language
+display_name: Rust
+status: planned
+suite_version: "0.5.0"
+detection:
+  owning_manifests:
+    - pattern: Cargo.toml
+      boundary: project
+  supporting_files: [Cargo.lock]
+  file_extensions: [.rs]
+  dependency_markers: []
+  supporting_dependencies: []
+routing:
+  scope: changed-module
+  load_order: 100
+composition:
+  requires: []
+  recommends: []
+  conflicts: []
+ownership:
+  maintainers: [eric861129]
+evidence:
+  benchmark_status: not_started
+  manifests: []
+  results: []

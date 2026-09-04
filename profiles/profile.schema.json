@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/eric861129/Clean-Code-AI-Collaboration-Skill/profiles/profile.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "kind",
+    "display_name",
+    "status",
+    "suite_version",
+    "detection",
+    "routing",
+    "composition",
+    "ownership",
+    "evidence"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+    "kind": { "enum": ["language", "framework"] },
+    "display_name": { "type": "string", "minLength": 1 },
+    "status": {
+      "enum": ["planned", "experimental", "beta", "stable", "deprecated"]
+    },
+    "suite_version": { "const": "0.5.0" },
+    "reference": { "$ref": "#/$defs/relativeMarkdownPath" },
+    "detection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owning_manifests",
+        "supporting_files",
+        "file_extensions",
+        "dependency_markers",
+        "supporting_dependencies"
+      ],
+      "properties": {
+        "owning_manifests": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/owningManifest" }
+        },
+        "supporting_files": { "$ref": "#/$defs/uniqueStrings" },
+        "file_extensions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^\\.[A-Za-z0-9]+$" }
+        },
+        "dependency_markers": { "$ref": "#/$defs/uniqueStrings" },
+        "supporting_dependencies": { "$ref": "#/$defs/uniqueStrings" }
+      }
+    },
+    "routing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scope", "load_order"],
+      "properties": {
+        "scope": { "const": "changed-module" },
+        "load_order": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "composition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requires", "recommends", "conflicts"],
+      "properties": {
+        "requires": { "$ref": "#/$defs/profileIds" },
+        "recommends": { "$ref": "#/$defs/profileIds" },
+        "conflicts": { "$ref": "#/$defs/profileIds" }
+      }
+    },
+    "ownership": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maintainers"],
+      "properties": {
+        "maintainers": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" }
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["benchmark_status", "manifests", "results"],
+      "properties": {
+        "benchmark_status": {
+          "enum": ["not_started", "pilot_recorded", "full_run_recorded"]
+        },
+        "manifests": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/relativePath" }
+        },
+        "results": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidenceResult" }
+        }
+      }
+    },
+    "deprecation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason"],
+      "properties": {
+        "reason": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
+        "replacement": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "removal_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" }
+      }
+    }
+  },
+  "$defs": {
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+    },
+    "relativeMarkdownPath": {
+      "allOf": [
+        { "$ref": "#/$defs/relativePath" },
+        { "pattern": "\\.md$" }
+      ]
+    },
+    "uniqueStrings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "profileIds": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" }
+    },
+    "owningManifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pattern", "boundary"],
+      "properties": {
+        "pattern": { "type": "string", "minLength": 1 },
+        "boundary": { "enum": ["project", "package", "workspace"] }
+      }
+    },
+    "evidenceResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage", "outcome", "path", "sha256", "public"],
+      "properties": {
+        "stage": { "enum": ["pilot", "full_run"] },
+        "outcome": { "enum": ["passed", "failed", "no_difference", "inconclusive"] },
+        "path": { "$ref": "#/$defs/relativePath" },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "public": { "type": "boolean" }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "planned" } }, "required": ["status"] },
+      "then": { "not": { "required": ["reference"] } },
+      "else": { "required": ["reference"] }
+    },
+    {
+      "if": { "properties": { "status": { "const": "deprecated" } }, "required": ["status"] },
+      "then": { "required": ["deprecation"] },
+      "else": { "not": { "required": ["deprecation"] } }
+    }
+  ]
+}

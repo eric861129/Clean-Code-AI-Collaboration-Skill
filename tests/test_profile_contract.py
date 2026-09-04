@@ -1,0 +1,413 @@
+from __future__ import annotations
+
+from contextlib import redirect_stderr, redirect_stdout
+import hashlib
+import io
+from pathlib import Path
+import shutil
+import tempfile
+import unittest
+
+import yaml
+
+from scripts.validate_profiles import load_registry, main, validate_repository
+
+
+ROOT = Path(__file__).resolve().parents[1]
+PROFILE_IDS = [
+    "csharp",
+    "python",
+    "typescript",
+    "react",
+    "go",
+    "rust",
+    "java",
+    "vue",
+]
+REQUIRED_PROFILE_HEADINGS = (
+    "## Use This Profile When",
+    "## Repository Facts to Inspect",
+    "## Version-Sensitive Facts",
+    "## Language or Framework Semantic Risks",
+    "## Clean Code Misapplications",
+    "## Behavior and Boundary Contracts",
+    "## Repository-Native Gate Discovery",
+    "## When Another Option Fits Better",
+    "## Common Agent Failure Modes",
+    "## Stop and Escalation Conditions",
+    "## Output Additions",
+    "## Evidence Status",
+)
+
+
+class ProfileContractTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary_directory = tempfile.TemporaryDirectory()
+        self.fixture_root = Path(self.temporary_directory.name)
+        shutil.copytree(ROOT / "profiles", self.fixture_root / "profiles")
+
+    def tearDown(self) -> None:
+        self.temporary_directory.cleanup()
+
+    def profile_path(self, profile_id: str) -> Path:
+        return self.fixture_root / "profiles" / f"{profile_id}.yaml"
+
+    def update_profile(self, profile_id: str, update) -> None:
+        path = self.profile_path(profile_id)
+        profile = yaml.safe_load(path.read_text(encoding="utf-8"))
+        update(profile)
+        path.write_text(
+            yaml.safe_dump(profile, sort_keys=False, allow_unicode=True),
+            encoding="utf-8",
+            newline="\n",
+        )
+
+    def diagnostic_codes(self) -> list[str]:
+        return [
+            diagnostic.code
+            for diagnostic in validate_repository(self.fixture_root)
+        ]
+
+    def test_catalog_has_the_fixed_v050_order(self) -> None:
+        profiles = load_registry(ROOT)
+
+        self.assertEqual(PROFILE_IDS, [profile["id"] for profile in profiles])
+
+    def test_initial_registry_is_valid_and_all_profiles_are_planned(self) -> None:
+        self.assertEqual([], list(validate_repository(ROOT)))
+        for profile in load_registry(ROOT):
+            with self.subTest(profile=profile["id"]):
+                self.assertEqual("planned", profile["status"])
+                self.assertNotIn("reference", profile)
+                self.assertEqual(
+                    ["eric861129"],
+                    profile["ownership"]["maintainers"],
+                )
+                self.assertEqual(
+                    "not_started",
+                    profile["evidence"]["benchmark_status"],
+                )
+
+    def test_validator_cli_is_read_only_and_returns_zero(self) -> None:
+        before = {
+            path.relative_to(ROOT).as_posix(): path.read_bytes()
+            for path in (ROOT / "profiles").rglob("*")
+            if path.is_file()
+        }
+
+        exit_code = main(["--source-root", str(ROOT)])
+
+        after = {
+            path.relative_to(ROOT).as_posix(): path.read_bytes()
+            for path in (ROOT / "profiles").rglob("*")
+            if path.is_file()
+        }
+        self.assertEqual(0, exit_code)
+        self.assertEqual(before, after)
+
+    def test_schema_failures_are_sorted_and_cli_returns_one(self) -> None:
+        self.update_profile(
+            "csharp",
+            lambda profile: profile.update({"unknown_field": True}),
+        )
+        self.update_profile(
+            "python",
+            lambda profile: profile["ownership"].update({"maintainers": []}),
+        )
+        diagnostics = validate_repository(self.fixture_root)
+
+        with redirect_stdout(io.StringIO()) as output:
+            exit_code = main(["--source-root", str(self.fixture_root)])
+
+        self.assertEqual(1, exit_code)
+        self.assertEqual(list(diagnostics), sorted(diagnostics))
+        self.assertEqual(
+            ["schema-invalid", "schema-invalid"],
+            [diagnostic.code for diagnostic in diagnostics],
+        )
+        self.assertNotIn("Traceback", output.getvalue())
+
+    def test_composition_rejects_unknown_self_cycle_and_asymmetric_conflict(self) -> None:
+        cases = {
+            "composition-unknown": lambda: self.update_profile(
+                "csharp",
+                lambda profile: profile["composition"]["requires"].append("ghost"),
+            ),
+            "composition-self": lambda: self.update_profile(
+                "csharp",
+                lambda profile: profile["composition"]["requires"].append("csharp"),
+            ),
+            "composition-cycle": self._create_requires_cycle,
+            "conflict-asymmetric": lambda: self.update_profile(
+                "csharp",
+                lambda profile: profile["composition"]["conflicts"].append("python"),
+            ),
+        }
+
+        for expected_code, mutate in cases.items():
+            with self.subTest(code=expected_code):
+                shutil.copytree(
+                    ROOT / "profiles",
+                    self.fixture_root / "profiles",
+                    dirs_exist_ok=True,
+                )
+                mutate()
+
+                self.assertIn(expected_code, self.diagnostic_codes())
+
+    def _create_requires_cycle(self) -> None:
+        self.update_profile(
+            "csharp",
+            lambda profile: profile["composition"]["requires"].append("python"),
+        )
+        self.update_profile(
+            "python",
+            lambda profile: profile["composition"]["requires"].append("csharp"),
+        )
+
+    def test_dependency_candidate_and_supporting_roles_cannot_overlap(self) -> None:
+        self.update_profile(
+            "react",
+            lambda profile: profile["detection"]["supporting_dependencies"].append(
+                "react"
+            ),
+        )
+
+        self.assertIn("dependency-role-overlap", self.diagnostic_codes())
+
+    def test_registry_rejects_case_insensitive_ids_and_references(self) -> None:
+        self.update_profile(
+            "python",
+            lambda profile: profile.update({"id": "csharp"}),
+        )
+
+        self.assertIn("profile-id-duplicate", self.diagnostic_codes())
+
+        shutil.copytree(
+            ROOT / "profiles",
+            self.fixture_root / "profiles",
+            dirs_exist_ok=True,
+        )
+        reference = self.fixture_root / "evidence" / "profile.md"
+        reference.parent.mkdir(exist_ok=True)
+        reference.write_text("# Profile\n", encoding="utf-8")
+        for profile_id in ("csharp", "python"):
+            self.update_profile(
+                profile_id,
+                lambda profile: profile.update(
+                    {
+                        "status": "experimental",
+                        "reference": "evidence/profile.md",
+                    }
+                ),
+            )
+
+        self.assertIn("reference-duplicate", self.diagnostic_codes())
+
+    def test_catalog_rejects_duplicate_and_escaped_metadata_paths(self) -> None:
+        catalog_path = self.fixture_root / "profiles" / "catalog.yaml"
+        invalid_entries = (
+            ["csharp.yaml", "CSHARP.yaml"],
+            ["../outside.yaml"],
+        )
+        for entries in invalid_entries:
+            with self.subTest(entries=entries):
+                catalog_path.write_text(
+                    yaml.safe_dump(
+                        {"schema_version": "1.0", "profiles": entries},
+                        sort_keys=False,
+                    ),
+                    encoding="utf-8",
+                    newline="\n",
+                )
+
+                diagnostics = validate_repository(self.fixture_root)
+
+                self.assertEqual("catalog-invalid", diagnostics[0].code)
+
+    def test_missing_reference_and_unknown_deprecation_replacement_fail(self) -> None:
+        self.update_profile(
+            "csharp",
+            lambda profile: profile.update(
+                {
+                    "status": "deprecated",
+                    "reference": "missing/profile.md",
+                    "deprecation": {
+                        "reason": "Superseded",
+                        "replacement": "ghost",
+                    },
+                }
+            ),
+        )
+
+        codes = self.diagnostic_codes()
+
+        self.assertIn("reference-invalid", codes)
+        self.assertIn("replacement-unknown", codes)
+
+    def test_benchmark_status_cannot_claim_an_unrecorded_stage(self) -> None:
+        self.update_profile(
+            "csharp",
+            lambda profile: profile["evidence"].update(
+                {"benchmark_status": "pilot_recorded"}
+            ),
+        )
+
+        self.assertIn("evidence-status-mismatch", self.diagnostic_codes())
+
+    def test_full_run_result_requires_full_run_recorded_status(self) -> None:
+        evidence_path = self.fixture_root / "evidence" / "result.json"
+        evidence_path.parent.mkdir()
+        evidence_path.write_text('{"status":"passed"}\n', encoding="utf-8")
+        digest = hashlib.sha256(evidence_path.read_bytes()).hexdigest()
+        reference = self.fixture_root / "evidence" / "profile.md"
+        reference.write_text("# Profile\n", encoding="utf-8")
+        self._set_evidence_profile(
+            status="stable",
+            benchmark_status="pilot_recorded",
+            stage="full_run",
+            outcome="passed",
+            digest=digest,
+            public=True,
+        )
+        self.update_profile(
+            "csharp",
+            lambda profile: profile["evidence"]["results"].append(
+                {
+                    "stage": "pilot",
+                    "outcome": "passed",
+                    "path": "evidence/result.json",
+                    "sha256": digest,
+                    "public": True,
+                }
+            ),
+        )
+
+        self.assertIn("evidence-status-mismatch", self.diagnostic_codes())
+
+    def test_invalid_profile_schema_fails_closed(self) -> None:
+        schema_path = self.fixture_root / "profiles" / "profile.schema.json"
+        schema_path.write_text('{"type": 123}\n', encoding="utf-8")
+
+        diagnostics = validate_repository(self.fixture_root)
+
+        self.assertEqual("schema-invalid", diagnostics[0].code)
+
+    def test_validator_main_returns_two_for_usage_errors(self) -> None:
+        with redirect_stderr(io.StringIO()) as error_output:
+            exit_code = main([])
+
+        self.assertEqual(2, exit_code)
+        self.assertIn("--source-root", error_output.getvalue())
+
+    def test_evidence_hash_and_benchmark_status_are_recomputed(self) -> None:
+        evidence_path = self.fixture_root / "evidence" / "pilot.json"
+        evidence_path.parent.mkdir()
+        evidence_path.write_text('{"status":"passed"}\n', encoding="utf-8")
+        self.update_profile(
+            "csharp",
+            lambda profile: profile.update(
+                {
+                    "status": "beta",
+                    "reference": "evidence/pilot.json.md",
+                    "evidence": {
+                        "benchmark_status": "pilot_recorded",
+                        "manifests": [],
+                        "results": [
+                            {
+                                "stage": "pilot",
+                                "outcome": "passed",
+                                "path": "evidence/pilot.json",
+                                "sha256": "0" * 64,
+                                "public": True,
+                            }
+                        ],
+                    },
+                }
+            ),
+        )
+        reference = self.fixture_root / "evidence" / "pilot.json.md"
+        reference.write_text("# Evidence\n", encoding="utf-8")
+
+        self.assertIn("evidence-hash-mismatch", self.diagnostic_codes())
+
+    def test_beta_and_stable_require_public_passed_stage_evidence(self) -> None:
+        evidence_path = self.fixture_root / "evidence" / "result.json"
+        evidence_path.parent.mkdir()
+        evidence_path.write_text('{"status":"passed"}\n', encoding="utf-8")
+        digest = hashlib.sha256(evidence_path.read_bytes()).hexdigest()
+        reference = self.fixture_root / "evidence" / "profile.md"
+        reference.write_text("# Profile\n", encoding="utf-8")
+
+        valid_cases = (
+            ("beta", "pilot_recorded", "pilot"),
+            ("stable", "full_run_recorded", "full_run"),
+        )
+        for status, benchmark_status, stage in valid_cases:
+            with self.subTest(status=status):
+                shutil.copytree(
+                    ROOT / "profiles",
+                    self.fixture_root / "profiles",
+                    dirs_exist_ok=True,
+                )
+                self._set_evidence_profile(
+                    status=status,
+                    benchmark_status=benchmark_status,
+                    stage=stage,
+                    outcome="passed",
+                    digest=digest,
+                    public=True,
+                )
+
+                self.assertEqual([], self.diagnostic_codes())
+
+        for outcome in ("failed", "no_difference", "inconclusive"):
+            with self.subTest(outcome=outcome):
+                shutil.copytree(
+                    ROOT / "profiles",
+                    self.fixture_root / "profiles",
+                    dirs_exist_ok=True,
+                )
+                self._set_evidence_profile(
+                    status="beta",
+                    benchmark_status="pilot_recorded",
+                    stage="pilot",
+                    outcome=outcome,
+                    digest=digest,
+                    public=True,
+                )
+
+                self.assertIn("maturity-evidence-missing", self.diagnostic_codes())
+
+    def _set_evidence_profile(
+        self,
+        *,
+        status: str,
+        benchmark_status: str,
+        stage: str,
+        outcome: str,
+        digest: str,
+        public: bool,
+    ) -> None:
+        def update(profile) -> None:
+            profile["status"] = status
+            profile["reference"] = "evidence/profile.md"
+            profile["evidence"] = {
+                "benchmark_status": benchmark_status,
+                "manifests": [],
+                "results": [
+                    {
+                        "stage": stage,
+                        "outcome": outcome,
+                        "path": "evidence/result.json",
+                        "sha256": digest,
+                        "public": public,
+                    }
+                ],
+            }
+
+        self.update_profile("csharp", update)
+
+
+if __name__ == "__main__":
+    unittest.main()

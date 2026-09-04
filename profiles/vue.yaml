@@ -1,0 +1,27 @@
+schema_version: "1.0"
+id: vue
+kind: framework
+display_name: Vue
+status: planned
+suite_version: "0.5.0"
+detection:
+  owning_manifests:
+    - pattern: package.json
+      boundary: package
+  supporting_files: []
+  file_extensions: [.vue]
+  dependency_markers: [vue]
+  supporting_dependencies: []
+routing:
+  scope: changed-module
+  load_order: 200
+composition:
+  requires: []
+  recommends: []
+  conflicts: []
+ownership:
+  maintainers: [eric861129]
+evidence:
+  benchmark_status: not_started
+  manifests: []
+  results: []

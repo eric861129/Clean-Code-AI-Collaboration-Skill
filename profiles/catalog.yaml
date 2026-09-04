@@ -1,0 +1,10 @@
+schema_version: "1.0"
+profiles:
+  - csharp.yaml
+  - python.yaml
+  - typescript.yaml
+  - react.yaml
+  - go.yaml
+  - rust.yaml
+  - java.yaml
+  - vue.yaml
