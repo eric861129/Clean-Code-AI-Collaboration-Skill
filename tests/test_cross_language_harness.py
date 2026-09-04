@@ -113,6 +113,20 @@ class CrossLanguageHarnessTests(unittest.TestCase):
         manifest = load_manifest(MANIFEST_PATH)
         slots = build_run_slots(manifest)
 
+        self.assertEqual("post_pilot", manifest.freeze_policy)
+        self.assertEqual(
+            tuple(arm.id for arm in manifest.arms),
+            ("control", "generic-clean-code", "skill-v0.3.0"),
+        )
+        self.assertEqual(
+            {
+                ("control", "generic-clean-code", "skill-v0.3.0")
+            },
+            {
+                tuple(scenario["comparison_arms"])
+                for scenario in manifest.scenarios
+            },
+        )
         self.assertEqual(36, len(slots))
         self.assertEqual(36, len({slot.run_id for slot in slots}))
         self.assertEqual(12, len(pilot_slots(slots)))
@@ -128,10 +142,10 @@ class CrossLanguageHarnessTests(unittest.TestCase):
         self.assertEqual({1}, {slot.repetition for slot in pilot_slots(first)})
         self.assertEqual({2, 3}, {slot.repetition for slot in full_slots(first)})
 
-    def test_manifest_rejects_unknown_arm_and_missing_fixture_sha(self) -> None:
+    def test_manifest_rejects_missing_control_arm_and_missing_fixture_sha(self) -> None:
         raw = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
         raw["arms"][0]["id"] = "unknown"
-        with self.assertRaisesRegex(ValueError, "unknown arm"):
+        with self.assertRaisesRegex(ValueError, "control arm"):
             validate_manifest(raw)
 
         raw = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
@@ -406,11 +420,16 @@ class CrossLanguageHarnessTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             runs_root = root / ".benchmark-runs"
+            paths = HarnessPaths(
+                repository_root=root,
+                runs_root=runs_root,
+                fixture_clone=runs_root / "sources" / "fixtures",
+                skill_repository=root,
+            )
             physical_run_id = "run-aabbccddeeff0011"
-            workspace_root = runs_root / "workspaces" / physical_run_id
-            artifact_dir = runs_root / "artifacts" / physical_run_id
-            controller_dispatch_root = runs_root / "desktop-controller-dispatches"
-            dispatch_index_root = runs_root / "desktop-dispatches"
+            workspace_root = paths.workspaces_root / physical_run_id
+            artifact_dir = paths.artifacts_root / physical_run_id
+            controller_dispatch_root = paths.controller_dispatch_root
             workspace_root.mkdir(parents=True)
             artifact_dir.mkdir(parents=True)
             (workspace_root / ".gitignore").write_text(
@@ -443,51 +462,42 @@ class CrossLanguageHarnessTests(unittest.TestCase):
                 controller_dispatch_root=controller_dispatch_root,
             )
 
-            with (
-                patch.object(harness_cli, "RUNS_ROOT", runs_root),
-                patch.object(harness_cli, "DISPATCH_ROOT", dispatch_index_root),
-                patch.object(
-                    harness_cli,
-                    "CONTROLLER_DISPATCH_ROOT",
-                    controller_dispatch_root,
+            index_path = harness_cli._write_dispatch_index(dispatch, paths)
+            index = json.loads(index_path.read_text(encoding="utf-8"))
+            self.assertEqual("desktop-dispatch-index/v2", index["schema_version"])
+            self.assertEqual(
+                (
+                    "desktop-controller-dispatches/"
+                    f"{dispatch.dispatch_id}.json"
                 ),
-            ):
-                index_path = harness_cli._write_dispatch_index(dispatch)
-                index = json.loads(index_path.read_text(encoding="utf-8"))
-                self.assertEqual("desktop-dispatch-index/v2", index["schema_version"])
-                self.assertEqual(
-                    (
-                        "desktop-controller-dispatches/"
-                        f"{dispatch.dispatch_id}.json"
-                    ),
-                    index["dispatch_path"],
-                )
-                self.assertEqual(
-                    dispatch,
-                    harness_cli._load_dispatch_by_id(dispatch.dispatch_id),
-                )
+                index["dispatch_path"],
+            )
+            self.assertEqual(
+                dispatch,
+                harness_cli._load_dispatch_by_id(dispatch.dispatch_id, paths),
+            )
 
-                index["schema_version"] = "desktop-dispatch-index/v1"
-                index_path.write_text(
-                    json.dumps(index, ensure_ascii=False), encoding="utf-8"
-                )
-                with self.assertRaisesRegex(ValueError, "v2"):
-                    harness_cli._load_dispatch_by_id(dispatch.dispatch_id)
-                index["schema_version"] = "desktop-dispatch-index/v2"
+            index["schema_version"] = "desktop-dispatch-index/v1"
+            index_path.write_text(
+                json.dumps(index, ensure_ascii=False), encoding="utf-8"
+            )
+            with self.assertRaisesRegex(ValueError, "v2"):
+                harness_cli._load_dispatch_by_id(dispatch.dispatch_id, paths)
+            index["schema_version"] = "desktop-dispatch-index/v2"
 
-                staged_dispatch_path = artifact_dir / "desktop-dispatch.json"
-                staged_dispatch_path.write_text(
-                    dispatch.dispatch_path.read_text(encoding="utf-8"),
-                    encoding="utf-8",
-                )
-                index["dispatch_path"] = (
-                    f"artifacts/{physical_run_id}/desktop-dispatch.json"
-                )
-                index_path.write_text(
-                    json.dumps(index, ensure_ascii=False), encoding="utf-8"
-                )
-                with self.assertRaisesRegex(ValueError, "private controller"):
-                    harness_cli._load_dispatch_by_id(dispatch.dispatch_id)
+            staged_dispatch_path = artifact_dir / "desktop-dispatch.json"
+            staged_dispatch_path.write_text(
+                dispatch.dispatch_path.read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            index["dispatch_path"] = (
+                f"artifacts/{physical_run_id}/desktop-dispatch.json"
+            )
+            index_path.write_text(
+                json.dumps(index, ensure_ascii=False), encoding="utf-8"
+            )
+            with self.assertRaisesRegex(ValueError, "private controller"):
+                harness_cli._load_dispatch_by_id(dispatch.dispatch_id, paths)
 
     def test_legacy_inspector_accepts_only_the_known_windows_newline_defect(
         self,
@@ -702,37 +712,6 @@ class CrossLanguageHarnessTests(unittest.TestCase):
             current_contract = {"schema_version": "test-contract"}
 
             with (
-                patch.object(harness_cli, "RUNS_ROOT", runs_root),
-                patch.object(
-                    harness_cli,
-                    "DISPATCH_ROOT",
-                    runs_root / "desktop-dispatches",
-                ),
-                patch.object(
-                    harness_cli,
-                    "ATTEMPT_RECEIPTS_ROOT",
-                    runs_root / "desktop-attempt-receipts",
-                ),
-                patch.object(
-                    harness_cli,
-                    "RUN_DOCUMENTS",
-                    runs_root / "run-documents",
-                ),
-                patch.object(
-                    harness_cli,
-                    "INVALIDATIONS_ROOT",
-                    runs_root / "invalidations",
-                ),
-                patch.object(
-                    harness_cli,
-                    "CAMPAIGN_STATE_PATH",
-                    campaign_state,
-                ),
-                patch.object(
-                    harness_cli,
-                    "FREEZE_ROOT",
-                    runs_root / "contract-freezes",
-                ),
                 patch.object(
                     harness_cli,
                     "_freeze_document",
@@ -934,15 +913,6 @@ class CrossLanguageHarnessTests(unittest.TestCase):
                 skill_repository=root,
             )
             with (
-                patch.object(harness_cli, "RUNS_ROOT", runs_root),
-                patch.object(harness_cli, "RUN_DOCUMENTS", run_documents),
-                patch.object(harness_cli, "INVALIDATIONS_ROOT", invalidations),
-                patch.object(harness_cli, "CAMPAIGN_STATE_PATH", campaign_state),
-                patch.object(
-                    harness_cli,
-                    "FREEZE_ROOT",
-                    runs_root / "contract-freezes",
-                ),
                 patch.object(
                     harness_cli,
                     "_freeze_document",
@@ -952,10 +922,6 @@ class CrossLanguageHarnessTests(unittest.TestCase):
                     harness_cli,
                     "_scenario_contract_sha256",
                     return_value=replacement_scenario_contract_sha256,
-                ),
-                patch.object(
-                    harness_cli,
-                    "_require_no_inflight_desktop_attempts",
                 ),
             ):
                 _invalidate_pilot(
@@ -1338,7 +1304,13 @@ class CrossLanguageHarnessTests(unittest.TestCase):
                 scenario_contract_sha256="a" * 64,
                 controller_dispatch_root=controller_dispatch_root,
             )
-            receipt_root = root / "attempts"
+            paths = HarnessPaths(
+                repository_root=root,
+                runs_root=root / ".benchmark-runs",
+                fixture_clone=root / "fixture",
+                skill_repository=root,
+            )
+            receipt_root = paths.attempt_receipts_root
             receipt = write_attempt_receipt(
                 dispatch,
                 receipt_root,
@@ -1349,7 +1321,7 @@ class CrossLanguageHarnessTests(unittest.TestCase):
             )
 
             self.assertTrue(receipt.is_file())
-            self.assertEqual(2, _next_desktop_attempt(slot, 3, receipt_root))
+            self.assertEqual(2, _next_desktop_attempt(slot, 3, paths))
             with self.assertRaises(FileExistsError):
                 write_attempt_receipt(
                     dispatch,
@@ -1373,10 +1345,15 @@ class CrossLanguageHarnessTests(unittest.TestCase):
         )
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            dispatch_root = root / "dispatches"
-            receipts_root = root / "receipts"
-            run_documents_root = root / "run-documents"
-            dispatch_root.mkdir()
+            paths = HarnessPaths(
+                repository_root=root,
+                runs_root=root / ".benchmark-runs",
+                fixture_clone=root / "fixture",
+                skill_repository=root,
+            )
+            dispatch_root = paths.desktop_dispatch_root
+            receipts_root = paths.attempt_receipts_root
+            dispatch_root.mkdir(parents=True)
             pending = dispatch_root / (
                 "desktop-dispatch-react-overdue-rule--control--r01"
                 "--g03--a01.json"
@@ -1387,9 +1364,7 @@ class CrossLanguageHarnessTests(unittest.TestCase):
                 _require_no_inflight_desktop_attempts(
                     slot,
                     3,
-                    dispatch_root,
-                    receipts_root,
-                    run_documents_root,
+                    paths,
                 )
 
             receipt = receipts_root / slot.run_id / "g03--a01.json"
@@ -1408,9 +1383,7 @@ class CrossLanguageHarnessTests(unittest.TestCase):
                 _require_no_inflight_desktop_attempts(
                     slot,
                     3,
-                    dispatch_root,
-                    receipts_root,
-                    run_documents_root,
+                    paths,
                 )
 
     def test_stub_subject_records_jsonl_last_message_diff_and_terminal_state(
@@ -1629,10 +1602,16 @@ class CrossLanguageHarnessTests(unittest.TestCase):
             repetition=1,
             order_index=0,
         )
+        paths = HarnessPaths(
+            repository_root=ROOT,
+            runs_root=ROOT / ".benchmark-runs",
+            fixture_clone=ROOT / ".benchmark-runs" / "sources" / "fixtures",
+            skill_repository=ROOT,
+        )
 
         self.assertNotEqual(
-            _run_document_path(slot, 1),
-            _run_document_path(slot, 2),
+            _run_document_path(slot, 1, paths),
+            _run_document_path(slot, 2, paths),
         )
 
     def test_physical_run_id_is_short_and_attempt_specific(self) -> None:
@@ -1798,10 +1777,17 @@ class CrossLanguageHarnessTests(unittest.TestCase):
         )
 
     def test_persisted_command_replaces_windows_workspace_path(self) -> None:
+        repository_root = Path("D:/repo")
+        paths = HarnessPaths(
+            repository_root=repository_root,
+            runs_root=repository_root / ".benchmark-runs",
+            fixture_clone=repository_root / ".benchmark-runs" / "sources" / "fixtures",
+            skill_repository=repository_root,
+        )
         workspace = Path("D:/repo/.benchmark-runs/workspaces/candidate")
         value = "D:/repo/.benchmark-runs/workspaces/candidate/.venv/python.exe"
 
-        sanitized = _sanitize_persisted_text(value, workspace)
+        sanitized = _sanitize_persisted_text(value, workspace, paths)
 
         self.assertEqual("{workspace}/.venv/python.exe", sanitized)
 

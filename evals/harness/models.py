@@ -1,5 +1,41 @@
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from pathlib import Path
+
+
+@dataclass(frozen=True)
+class ArmDefinition(Mapping[str, object]):
+    """Manifest 宣告的一個可重用評測 Arm。"""
+
+    id: str
+    instruction: str
+    skill: str | None = None
+    version: str | None = None
+
+    def __getitem__(self, key: str) -> object:
+        values: dict[str, object] = {
+            "id": self.id,
+            "instruction": self.instruction,
+        }
+        if self.skill is not None:
+            values["skill"] = self.skill
+        if self.version is not None:
+            values["version"] = self.version
+        return values[key]
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._keys())
+
+    def __len__(self) -> int:
+        return len(self._keys())
+
+    def _keys(self) -> tuple[str, ...]:
+        keys = ["id", "instruction"]
+        if self.skill is not None:
+            keys.append("skill")
+        if self.version is not None:
+            keys.append("version")
+        return tuple(keys)
 
 
 @dataclass(frozen=True)
@@ -30,8 +66,9 @@ class BenchmarkManifest:
     oracle_timeout_seconds: int
     repetitions: int
     random_seed: int
+    freeze_policy: str
     scenarios: tuple[dict[str, object], ...]
-    arms: tuple[dict[str, object], ...]
+    arms: tuple[ArmDefinition, ...]
 
 
 @dataclass(frozen=True)
@@ -79,10 +116,69 @@ class SubjectDispatch:
 
 @dataclass(frozen=True)
 class HarnessPaths:
+    """單一 Benchmark Campaign 的所有受管私有路徑。"""
+
     repository_root: Path
     runs_root: Path
     fixture_clone: Path
     skill_repository: Path
+    manifest_path: Path | None = None
+
+    @property
+    def workspaces_root(self) -> Path:
+        return self.runs_root / "workspaces"
+
+    @property
+    def artifacts_root(self) -> Path:
+        return self.runs_root / "artifacts"
+
+    @property
+    def run_documents_root(self) -> Path:
+        return self.runs_root / "run-documents"
+
+    @property
+    def preflights_root(self) -> Path:
+        return self.runs_root / "preflights"
+
+    @property
+    def contract_freezes_root(self) -> Path:
+        return self.runs_root / "contract-freezes"
+
+    @property
+    def campaign_state_path(self) -> Path:
+        return self.runs_root / "campaign-state.json"
+
+    @property
+    def invalidations_root(self) -> Path:
+        return self.runs_root / "invalidations"
+
+    @property
+    def timeout_adjudications_root(self) -> Path:
+        return self.runs_root / "timeout-adjudications"
+
+    @property
+    def desktop_dispatch_root(self) -> Path:
+        return self.runs_root / "desktop-dispatches"
+
+    @property
+    def controller_dispatch_root(self) -> Path:
+        return self.runs_root / "desktop-controller-dispatches"
+
+    @property
+    def attempt_receipts_root(self) -> Path:
+        return self.runs_root / "desktop-attempt-receipts"
+
+    @property
+    def review_key_path(self) -> Path:
+        return self.runs_root / "review-key.json"
+
+    @property
+    def review_packets_root(self) -> Path:
+        return self.runs_root / "review-packets"
+
+    @property
+    def reviews_root(self) -> Path:
+        return self.runs_root / "reviews"
 
 
 @dataclass(frozen=True)
