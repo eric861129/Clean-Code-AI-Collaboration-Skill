@@ -1,0 +1,14 @@
+{
+  "changed_files": ["frontend/tools/check.ts"],
+  "explicit_profiles": [],
+  "outcome": "selected",
+  "modules": [
+    {
+      "root": "frontend",
+      "profiles": ["typescript"],
+      "unavailable_profiles": [],
+      "reason_codes": ["extension-match"],
+      "unknowns": []
+    }
+  ]
+}

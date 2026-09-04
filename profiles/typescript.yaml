@@ -2,8 +2,9 @@ schema_version: "1.0"
 id: typescript
 kind: language
 display_name: TypeScript
-status: planned
+status: experimental
 suite_version: "0.5.0"
+reference: clean-code-ai-collaboration/references/language-typescript.md
 detection:
   owning_manifests:
     - pattern: package.json

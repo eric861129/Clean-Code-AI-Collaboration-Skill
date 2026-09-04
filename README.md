@@ -298,8 +298,8 @@ Skill 依下列順序解析：
 | --- | --- | --- | --- | --- |
 | C# / .NET | language | experimental | [Open](clean-code-ai-collaboration/references/language-csharp.md) | not_started |
 | Python | language | experimental | [Open](clean-code-ai-collaboration/references/language-python.md) | not_started |
-| TypeScript | language | planned | Not available | not_started |
-| React | framework | planned | Not available | not_started |
+| TypeScript | language | experimental | [Open](clean-code-ai-collaboration/references/language-typescript.md) | not_started |
+| React | framework | experimental | [Open](clean-code-ai-collaboration/references/framework-react.md) | not_started |
 | Go | language | planned | Not available | not_started |
 | Rust | language | planned | Not available | not_started |
 | Java | language | planned | Not available | not_started |

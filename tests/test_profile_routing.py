@@ -76,6 +76,46 @@ class ProfileRoutingTests(unittest.TestCase):
 
         self.assertEqual(["react"], result["modules"][0]["profiles"])
 
+    def test_react_dom_without_react_does_not_select_react(self) -> None:
+        result = self.route_case("react-dom-only")
+
+        self.assertEqual("core_only", result["outcome"])
+        self.assertEqual([], result["modules"][0]["profiles"])
+
+    def test_non_react_typescript_tool_does_not_select_react(self) -> None:
+        result = self.route_case("typescript-tool-react")
+
+        self.assertEqual(["typescript"], result["modules"][0]["profiles"])
+
+    def test_react_native_selects_only_the_renderer_neutral_react_profile(self) -> None:
+        result = self.route_case("react-native")
+
+        self.assertEqual(["react"], result["modules"][0]["profiles"])
+
+    def test_real_registry_composes_typescript_and_react_but_not_javascript(
+        self,
+    ) -> None:
+        profiles = load_registry(ROOT)
+        typescript_react = route_changed_files(
+            FIXTURES / "typescript-react",
+            profiles,
+            ["frontend/src/App.tsx"],
+        )
+        javascript_react = route_changed_files(
+            FIXTURES / "javascript-react",
+            profiles,
+            ["frontend/src/App.jsx"],
+        )
+
+        self.assertEqual(
+            ["typescript", "react"],
+            typescript_react["modules"][0]["profiles"],
+        )
+        self.assertEqual(
+            ["react"],
+            javascript_react["modules"][0]["profiles"],
+        )
+
     def test_planned_vue_is_reported_but_not_selected(self) -> None:
         result = self.route_case("typescript-vue-planned")
 

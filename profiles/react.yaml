@@ -2,8 +2,9 @@ schema_version: "1.0"
 id: react
 kind: framework
 display_name: React
-status: planned
+status: experimental
 suite_version: "0.5.0"
+reference: clean-code-ai-collaboration/references/framework-react.md
 detection:
   owning_manifests:
     - pattern: package.json

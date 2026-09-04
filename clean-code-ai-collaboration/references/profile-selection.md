@@ -69,8 +69,8 @@ Standard output records Profiles Applied and Profile Basis per Changed Module. F
 
 - ID: `typescript`
 - Kind: `language`
-- Status / Availability: `planned` / `unavailable`
-- Reference: Not available
+- Status / Availability: `experimental` / `available`
+- Reference: [language-typescript.md](language-typescript.md)
 - Load Order: `100`
 - Owning Manifests: `package.json` (package), `tsconfig.json` (project), `tsconfig.*.json` (project)
 - Supporting Files: none
@@ -86,8 +86,8 @@ Standard output records Profiles Applied and Profile Basis per Changed Module. F
 
 - ID: `react`
 - Kind: `framework`
-- Status / Availability: `planned` / `unavailable`
-- Reference: Not available
+- Status / Availability: `experimental` / `available`
+- Reference: [framework-react.md](framework-react.md)
 - Load Order: `200`
 - Owning Manifests: `package.json` (package)
 - Supporting Files: none

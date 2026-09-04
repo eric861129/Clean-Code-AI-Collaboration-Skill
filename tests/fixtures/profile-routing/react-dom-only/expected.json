@@ -1,0 +1,14 @@
+{
+  "changed_files": ["frontend/src/App.jsx"],
+  "explicit_profiles": [],
+  "outcome": "core_only",
+  "modules": [
+    {
+      "root": "frontend",
+      "profiles": [],
+      "unavailable_profiles": [],
+      "reason_codes": ["no-profile-match"],
+      "unknowns": []
+    }
+  ]
+}

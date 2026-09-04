@@ -111,20 +111,26 @@ class ProfileContractTests(unittest.TestCase):
 
         self.assertEqual(PROFILE_IDS, [profile["id"] for profile in profiles])
 
-    def test_registry_has_csharp_and_python_as_experimental(self) -> None:
+    def test_registry_has_four_experimental_profiles(self) -> None:
         self.assertEqual([], list(validate_repository(ROOT)))
+        expected_references = {
+            "csharp": "language-csharp.md",
+            "python": "language-python.md",
+            "typescript": "language-typescript.md",
+            "react": "framework-react.md",
+        }
         for profile in load_registry(ROOT):
             with self.subTest(profile=profile["id"]):
                 expected_status = (
                     "experimental"
-                    if profile["id"] in {"csharp", "python"}
+                    if profile["id"] in expected_references
                     else "planned"
                 )
                 self.assertEqual(expected_status, profile["status"])
-                if profile["id"] in {"csharp", "python"}:
+                if profile["id"] in expected_references:
                     self.assertEqual(
                         "clean-code-ai-collaboration/references/"
-                        + f"language-{profile['id']}.md",
+                        + expected_references[profile["id"]],
                         profile["reference"],
                     )
                 else:
@@ -199,6 +205,70 @@ class ProfileContractTests(unittest.TestCase):
         }:
             with self.subTest(statement=statement):
                 self.assertNotIn(statement, content)
+
+    def test_typescript_profile_has_complete_semantic_contract(self) -> None:
+        content = (
+            ROOT
+            / "clean-code-ai-collaboration"
+            / "references"
+            / "language-typescript.md"
+        ).read_text(encoding="utf-8")
+
+        for heading in REQUIRED_PROFILE_HEADINGS:
+            with self.subTest(heading=heading):
+                self.assertIn(heading, content)
+        for term in {
+            "strict",
+            "exactOptionalPropertyTypes",
+            "noUncheckedIndexedAccess",
+            "structural typing",
+            "union",
+            "narrowing",
+            "Promise",
+            "moduleResolution",
+            "target",
+            "runtime validation",
+        }:
+            with self.subTest(term=term):
+                self.assertIn(term.lower(), content.lower())
+        for statement in {
+            "React is required",
+            "Vue is required",
+            "Zod is required",
+            "ESLint is required",
+            "Vite is required",
+        }:
+            with self.subTest(statement=statement):
+                self.assertNotIn(statement, content)
+
+    def test_react_profile_has_complete_renderer_neutral_contract(self) -> None:
+        content = (
+            ROOT
+            / "clean-code-ai-collaboration"
+            / "references"
+            / "framework-react.md"
+        ).read_text(encoding="utf-8")
+
+        for heading in REQUIRED_PROFILE_HEADINGS:
+            with self.subTest(heading=heading):
+                self.assertIn(heading, content)
+        for term in {
+            "Hooks",
+            "stale closure",
+            "Effect cleanup",
+            "state identity",
+            "controlled",
+            "key",
+            "error",
+            "loading",
+            "react-dom",
+            "renderer",
+        }:
+            with self.subTest(term=term):
+                self.assertIn(term.lower(), content.lower())
+        self.assertIn("react-native", content.lower())
+        self.assertIn("platform APIs are out of scope", content)
+        self.assertIn("renderer-neutral", content.lower())
 
     def test_generated_region_rejects_missing_duplicate_and_reordered_markers(
         self,

@@ -1,0 +1,14 @@
+{
+  "changed_files": ["mobile/src/App.jsx"],
+  "explicit_profiles": [],
+  "outcome": "selected",
+  "modules": [
+    {
+      "root": "mobile",
+      "profiles": ["react"],
+      "unavailable_profiles": [],
+      "reason_codes": ["dependency-match"],
+      "unknowns": []
+    }
+  ]
+}
