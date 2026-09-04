@@ -18,14 +18,22 @@ if __package__:
         render_runtime_index,
         replace_generated_region,
     )
-    from .validate_profiles import profile_is_available, validate_loaded_profiles
+    from .validate_profiles import (
+        profile_is_available,
+        profile_sort_key,
+        validate_loaded_profiles,
+    )
 else:
     from generate_profile_matrix import (
         RUNTIME_MARKERS,
         render_runtime_index,
         replace_generated_region,
     )
-    from validate_profiles import profile_is_available, validate_loaded_profiles
+    from validate_profiles import (
+        profile_is_available,
+        profile_sort_key,
+        validate_loaded_profiles,
+    )
 
 
 MANIFEST_SCHEMA_VERSION = "1.0"
@@ -167,7 +175,12 @@ def compose_profiles(
             for left, right in sorted(conflicts)
         )
         raise PackagingError("profile-conflict", details)
-    return tuple(sorted(resolved))
+    return tuple(
+        sorted(
+            resolved,
+            key=lambda profile_id: profile_sort_key(profiles_by_id[profile_id]),
+        )
+    )
 
 
 def _validate_relative_path(relative_path: str) -> PurePosixPath:

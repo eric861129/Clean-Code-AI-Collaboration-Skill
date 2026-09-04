@@ -2,7 +2,7 @@ from pathlib import Path
 import re
 import unittest
 
-from scripts.validate_profiles import load_registry
+from scripts.validate_profiles import load_registry, profile_is_available
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -24,8 +24,7 @@ def profile_reference_names() -> set[str]:
     return {
         Path(profile["reference"]).name
         for profile in load_registry(REPOSITORY_ROOT)
-        if profile["status"] not in {"planned", "deprecated"}
-        and profile.get("reference")
+        if profile_is_available(profile) and profile.get("reference")
     }
 
 

@@ -318,7 +318,7 @@ def _framework_candidate(
     )
 
 
-def _profile_sort_key(profile: Mapping[str, Any]) -> tuple[int, int, str]:
+def profile_sort_key(profile: Mapping[str, Any]) -> tuple[int, int, str]:
     return (
         profile["routing"]["load_order"],
         _KIND_PRIORITY[profile["kind"]],
@@ -449,7 +449,7 @@ def _route_module(
         profile_id: profiles_by_id[profile_id] for profile_id in selected_ids
     }
 
-    ordered_candidates = sorted(selected.values(), key=_profile_sort_key)
+    ordered_candidates = sorted(selected.values(), key=profile_sort_key)
 
     conflict_pairs: set[tuple[str, str]] = set()
     for profile_id, profile in selected.items():

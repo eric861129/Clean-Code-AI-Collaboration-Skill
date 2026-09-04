@@ -83,6 +83,17 @@ class ProfilePackagingTests(unittest.TestCase):
 
         self.assertEqual(["react"], manifest["profile_ids"])
 
+    def test_selected_profiles_render_in_load_order(self) -> None:
+        self.build_worktree_package("react", "typescript")
+        selection = (
+            self.output / "references" / "profile-selection.md"
+        ).read_text(encoding="utf-8")
+
+        self.assertLess(
+            selection.index("- ID: `typescript`"),
+            selection.index("- ID: `react`"),
+        )
+
     def test_generated_skill_keeps_bundled_profiles_conditional(self) -> None:
         self.build_worktree_package("csharp")
         skill = (self.output / "SKILL.md").read_text(encoding="utf-8")
