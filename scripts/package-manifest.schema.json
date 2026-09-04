@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/eric861129/Clean-Code-AI-Collaboration-Skill/scripts/package-manifest.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_commit",
+    "source_mode",
+    "suite_version",
+    "packager_version",
+    "profile_ids",
+    "inputs",
+    "files",
+    "overall_digest"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "source_commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "source_mode": { "enum": ["release", "worktree"] },
+    "suite_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "packager_version": { "const": "1.0" },
+    "profile_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" }
+    },
+    "inputs": { "$ref": "#/$defs/digests" },
+    "files": { "$ref": "#/$defs/digests" },
+    "overall_digest": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*\\\\)(?!.*:)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "digest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "$ref": "#/$defs/relativePath" },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "digests": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/digest" }
+    }
+  }
+}

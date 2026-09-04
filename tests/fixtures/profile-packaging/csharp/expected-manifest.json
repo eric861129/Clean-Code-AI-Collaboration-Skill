@@ -1,0 +1,43 @@
+{
+  "schema_version": "1.0",
+  "source_commit": "0123456789abcdef0123456789abcdef01234567",
+  "source_mode": "worktree",
+  "suite_version": "0.5.0",
+  "packager_version": "1.0",
+  "profile_ids": [
+    "csharp"
+  ],
+  "inputs": [
+    {
+      "path": "LICENSE",
+      "sha256": "a7c6bf8df7d8fb707af606599f275e0eb192cd28492c95593b0608ca966c8df1"
+    },
+    {
+      "path": "profiles/csharp.yaml",
+      "sha256": "d5e12e5c725d1189d361bf0b27ce1437600713a96bd736f1e839b11e008df2df"
+    },
+    {
+      "path": "references/language-csharp.md",
+      "sha256": "24812bd68fb96c7f4b95fc1f32cb2e536aae2201b45000e03c6f71fe091df8e2"
+    },
+    {
+      "path": "SKILL.md",
+      "sha256": "c2efc0f3a7d0c6c0f5e57ab3a6abf32aa861eea82a8b909c84bcbf6965fa1fc3"
+    }
+  ],
+  "files": [
+    {
+      "path": "LICENSE",
+      "sha256": "a7c6bf8df7d8fb707af606599f275e0eb192cd28492c95593b0608ca966c8df1"
+    },
+    {
+      "path": "references/language-csharp.md",
+      "sha256": "24812bd68fb96c7f4b95fc1f32cb2e536aae2201b45000e03c6f71fe091df8e2"
+    },
+    {
+      "path": "SKILL.md",
+      "sha256": "c2efc0f3a7d0c6c0f5e57ab3a6abf32aa861eea82a8b909c84bcbf6965fa1fc3"
+    }
+  ],
+  "overall_digest": "553fad240a20a0851aacd66edc54b91610b9de270a44bc75a4197cbc00b8e7fb"
+}
