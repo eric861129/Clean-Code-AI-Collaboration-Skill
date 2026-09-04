@@ -56,6 +56,8 @@ Detection 必須區分能界定模組邊界的 Owner 與只能補強判斷的 Su
 
 Evidence Result 的四種 Outcome 必須全部保留：`passed`、`failed`、`no_difference`、`inconclusive`。不得移除不利結果、把 Infrastructure 或觀察限制改寫成成功，也不得用另一個 Profile 或舊版本結果代替本 Profile 的 Pilot／Full Run。`benchmark_status` 只能反映已有 Manifest、Result、SHA-256 與公開狀態支持的階段。
 
+每筆 Metadata Evidence 都必須指向通過 Public Result Schema 驗證的公開結果，保存正確的 `stage`、`outcome`、Repository-relative Path、實際檔案 SHA-256 與 `public` 狀態。Validator 必須用 Public Result 的 `profile_id`、`stage` 與 `outcome` 反向核對 Metadata，不能只相信 YAML 宣告。`pilot_recorded` 表示 Pilot 證據已完整保存，不等於 Outcome 為 `passed`，也不必然等於 `beta`；只有實際 Outcome `passed` 才能把 Experimental Profile 升為 Beta。
+
 ## Suite SemVer and Profile Maturity
 
 **Suite SemVer** 與 Profile Maturity 分開管理：

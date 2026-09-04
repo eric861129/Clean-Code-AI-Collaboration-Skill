@@ -3,7 +3,7 @@ id: typescript
 kind: language
 display_name: TypeScript
 status: experimental
-suite_version: "0.5.0"
+suite_version: "0.5.1"
 reference: references/typescript.md
 detection:
   owning_manifests:

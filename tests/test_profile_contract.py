@@ -54,6 +54,13 @@ class ProfileContractTests(unittest.TestCase):
         self.temporary_directory = tempfile.TemporaryDirectory()
         self.fixture_root = Path(self.temporary_directory.name)
         shutil.copytree(ROOT / "profiles", self.fixture_root / "profiles")
+        for relative_path in (
+            Path("evals/manifests/v0.5.1-profile-pilot.json"),
+            Path("evals/results/v0.5.1-profile-pilot.json"),
+        ):
+            target = self.fixture_root / relative_path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ROOT / relative_path, target)
         shutil.copytree(
             ROOT / "clean-code-ai-collaboration" / "references",
             self.fixture_root / "clean-code-ai-collaboration" / "references",
@@ -106,13 +113,15 @@ class ProfileContractTests(unittest.TestCase):
         runtime_path.parent.mkdir(parents=True, exist_ok=True)
         runtime_path.write_text(runtime, encoding="utf-8", newline="\n")
 
-    def test_catalog_has_the_fixed_v050_order(self) -> None:
+    def test_catalog_has_the_fixed_v051_order(self) -> None:
         profiles = load_registry(ROOT)
 
         self.assertEqual(PROFILE_IDS, [profile["id"] for profile in profiles])
 
-    def test_registry_has_four_experimental_profiles(self) -> None:
+    def test_registry_records_the_v051_profile_pilot_without_promotion(self) -> None:
         self.assertEqual([], list(validate_repository(ROOT)))
+        result_path = ROOT / "evals" / "results" / "v0.5.1-profile-pilot.json"
+        result_digest = hashlib.sha256(result_path.read_bytes()).hexdigest()
         expected_references = {
             "csharp": "language-csharp.md",
             "python": "language-python.md",
@@ -121,6 +130,7 @@ class ProfileContractTests(unittest.TestCase):
         }
         for profile in load_registry(ROOT):
             with self.subTest(profile=profile["id"]):
+                self.assertEqual("0.5.1", profile["suite_version"])
                 expected_status = (
                     "experimental"
                     if profile["id"] in expected_references
@@ -140,9 +150,33 @@ class ProfileContractTests(unittest.TestCase):
                     profile["ownership"]["maintainers"],
                 )
                 self.assertEqual(
-                    "not_started",
+                    (
+                        "pilot_recorded"
+                        if profile["id"] in expected_references
+                        else "not_started"
+                    ),
                     profile["evidence"]["benchmark_status"],
                 )
+                if profile["id"] in expected_references:
+                    self.assertEqual(
+                        ["evals/manifests/v0.5.1-profile-pilot.json"],
+                        profile["evidence"]["manifests"],
+                    )
+                    self.assertEqual(
+                        [
+                            {
+                                "stage": "pilot",
+                                "outcome": "inconclusive",
+                                "path": "evals/results/v0.5.1-profile-pilot.json",
+                                "sha256": result_digest,
+                                "public": True,
+                            }
+                        ],
+                        profile["evidence"]["results"],
+                    )
+                else:
+                    self.assertEqual([], profile["evidence"]["manifests"])
+                    self.assertEqual([], profile["evidence"]["results"])
 
     def test_profile_authoring_guide_defines_the_complete_lifecycle(self) -> None:
         guide = (ROOT / "docs" / "profile-authoring.md").read_text(
@@ -162,6 +196,9 @@ class ProfileContractTests(unittest.TestCase):
             "failed",
             "inconclusive",
             "no_difference",
+            "pilot_recorded",
+            "Public Result",
+            "SHA-256",
             "Suite SemVer",
             "Originality",
             "Attribution",
@@ -584,7 +621,7 @@ class ProfileContractTests(unittest.TestCase):
         self.update_profile(
             "csharp",
             lambda profile: profile["evidence"].update(
-                {"benchmark_status": "pilot_recorded"}
+                {"benchmark_status": "full_run_recorded"}
             ),
         )
 

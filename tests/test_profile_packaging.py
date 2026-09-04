@@ -60,10 +60,18 @@ class ProfilePackagingTests(unittest.TestCase):
             source / "clean-code-ai-collaboration",
         )
         shutil.copy2(ROOT / "LICENSE", source / "LICENSE")
+        shutil.copy2(ROOT / ".gitattributes", source / ".gitattributes")
         shutil.copy2(
             ROOT / "scripts" / "package-manifest.schema.json",
             source / "scripts" / "package-manifest.schema.json",
         )
+        for relative_path in (
+            Path("evals/manifests/v0.5.1-profile-pilot.json"),
+            Path("evals/results/v0.5.1-profile-pilot.json"),
+        ):
+            target = source / relative_path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ROOT / relative_path, target)
         subprocess.run(["git", "init", "-q", str(source)], check=True)
         subprocess.run(
             ["git", "-C", str(source), "config", "user.email", "fixture@example.test"],

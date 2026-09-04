@@ -46,7 +46,7 @@ Standard output records Profiles Applied and Profile Basis per Changed Module. F
 - Requires: none
 - Recommends: none
 - Conflicts: none
-- Evidence Status: `not_started`
+- Evidence Status: `pilot_recorded`
 
 ### Python
 
@@ -63,7 +63,7 @@ Standard output records Profiles Applied and Profile Basis per Changed Module. F
 - Requires: none
 - Recommends: none
 - Conflicts: none
-- Evidence Status: `not_started`
+- Evidence Status: `pilot_recorded`
 
 ### TypeScript
 
@@ -80,7 +80,7 @@ Standard output records Profiles Applied and Profile Basis per Changed Module. F
 - Requires: none
 - Recommends: none
 - Conflicts: none
-- Evidence Status: `not_started`
+- Evidence Status: `pilot_recorded`
 
 ### React
 
@@ -97,7 +97,7 @@ Standard output records Profiles Applied and Profile Basis per Changed Module. F
 - Requires: none
 - Recommends: `typescript`
 - Conflicts: none
-- Evidence Status: `not_started`
+- Evidence Status: `pilot_recorded`
 
 ### Go
 

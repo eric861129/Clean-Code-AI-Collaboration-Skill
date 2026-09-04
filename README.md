@@ -291,17 +291,17 @@ Skill 依下列順序解析：
 
 預設呼叫方式仍是 `$clean-code-ai-collaboration`。Repository Code Change 會以本次 Changed Module 為單位，依可驗證的檔案、最近 Owning Manifest 與 Dependency Marker，組合適用且可用的 Language／Framework Profile；找不到適用 Profile 時，Core Only 也是有效結果。Explicit Profile（明確指定 Profile）仍不能繞過 Availability、Applicability、相依、衝突、Repository Gate、風險或授權邊界。
 
-目前 C#、Python、TypeScript 與 React 是 Experimental：只有 Reference、Routing／Semantic Contract Tests 與產生後索引，尚未完成 M2 Pilot，不能解讀為效果已獲證明。Go、Rust、Java 與 Vue 仍是 Planned 不可用，不能 Routing 或 Packaging。
+目前 C#、Python、TypeScript 與 React 是 Experimental，已完成單次 M2 Pilot 並保存 `pilot_recorded` 公開證據；四者 Outcome 都是 `inconclusive`，因此不能解讀為效果已獲證明，也不升為 Beta。Go、Rust、Java 與 Vue 仍是 Planned 不可用，不能 Routing 或 Packaging。
 
 目前 Profile 狀態由下列 Generated Matrix 呈現；Generated Region 只能由 Repository Script 更新。
 
 <!-- profile-matrix:generated:start -->
 | Profile | Kind | Status | Reference | Benchmark |
 | --- | --- | --- | --- | --- |
-| C# / .NET | language | experimental | [Open](clean-code-ai-collaboration/references/language-csharp.md) | not_started |
-| Python | language | experimental | [Open](clean-code-ai-collaboration/references/language-python.md) | not_started |
-| TypeScript | language | experimental | [Open](clean-code-ai-collaboration/references/language-typescript.md) | not_started |
-| React | framework | experimental | [Open](clean-code-ai-collaboration/references/framework-react.md) | not_started |
+| C# / .NET | language | experimental | [Open](clean-code-ai-collaboration/references/language-csharp.md) | pilot_recorded |
+| Python | language | experimental | [Open](clean-code-ai-collaboration/references/language-python.md) | pilot_recorded |
+| TypeScript | language | experimental | [Open](clean-code-ai-collaboration/references/language-typescript.md) | pilot_recorded |
+| React | framework | experimental | [Open](clean-code-ai-collaboration/references/framework-react.md) | pilot_recorded |
 | Go | language | planned | Not available | not_started |
 | Rust | language | planned | Not available | not_started |
 | Java | language | planned | Not available | not_started |
@@ -323,6 +323,8 @@ Profile 貢獻入口只有 [Profile Authoring Guide](docs/profile-authoring.md)�
 
 ## 安裝
 
+目前開發分支內容為 `0.5.1` Candidate；最新正式安裝 Tag 仍為 `v0.5.0`。在正式建立 `v0.5.1` Tag 前，固定版本安裝與下列版本檢查都應以 `v0.5.0` 為準，不能把開發分支版本當成已發布版本。
+
 先取得 Repository：
 
 ```powershell
@@ -337,7 +339,7 @@ git clone https://github.com/eric861129/Clean-Code-AI-Collaboration-Skill.git
 cd Clean-Code-AI-Collaboration-Skill
 ```
 
-正式發布後，如果要安裝固定的 `v0.5.0`，請先切換到對應 Tag，避免日後 `main` 更新時安裝到不同版本：
+如果要安裝目前最新正式版本 `v0.5.0`，請先切換到對應 Tag，避免日後 `main` 更新時安裝到不同版本：
 
 ```shell
 git fetch --tags

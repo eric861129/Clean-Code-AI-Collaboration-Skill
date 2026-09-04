@@ -24,7 +24,7 @@
     "status": {
       "enum": ["planned", "experimental", "beta", "stable", "deprecated"]
     },
-    "suite_version": { "const": "0.5.0" },
+    "suite_version": { "const": "0.5.1" },
     "reference": { "$ref": "#/$defs/relativeMarkdownPath" },
     "detection": {
       "type": "object",

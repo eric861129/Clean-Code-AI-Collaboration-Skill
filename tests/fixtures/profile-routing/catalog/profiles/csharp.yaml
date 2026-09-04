@@ -3,7 +3,7 @@ id: csharp
 kind: language
 display_name: C#
 status: experimental
-suite_version: "0.5.0"
+suite_version: "0.5.1"
 reference: references/csharp.md
 detection:
   owning_manifests: [{pattern: "*.csproj", boundary: project}]

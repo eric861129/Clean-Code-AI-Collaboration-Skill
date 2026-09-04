@@ -3,7 +3,7 @@ id: react
 kind: framework
 display_name: React
 status: experimental
-suite_version: "0.5.0"
+suite_version: "0.5.1"
 reference: clean-code-ai-collaboration/references/framework-react.md
 detection:
   owning_manifests:
@@ -23,6 +23,12 @@ composition:
 ownership:
   maintainers: [eric861129]
 evidence:
-  benchmark_status: not_started
-  manifests: []
-  results: []
+  benchmark_status: pilot_recorded
+  manifests:
+    - evals/manifests/v0.5.1-profile-pilot.json
+  results:
+    - stage: pilot
+      outcome: inconclusive
+      path: evals/results/v0.5.1-profile-pilot.json
+      sha256: 12637bf780a156fb3589c810d0c6deeae8ce3abba9d2a54b8a5a06f5aeecadc9
+      public: true

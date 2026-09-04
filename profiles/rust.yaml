@@ -3,7 +3,7 @@ id: rust
 kind: language
 display_name: Rust
 status: planned
-suite_version: "0.5.0"
+suite_version: "0.5.1"
 detection:
   owning_manifests:
     - pattern: Cargo.toml
