@@ -7,7 +7,11 @@ on:
 jobs:
   test:
     name: Open Standard and Repository Contracts
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -19,7 +23,15 @@ jobs:
         run: python -m pip install -r requirements-dev.txt
       - name: Run repository contract tests
         run: python -m unittest discover -s tests -v
-      - name: Compile benchmark harness
-        run: python -m compileall -q evals/harness
-      - name: Validate Agent Skills open standard
+      - name: Compile Python sources
+        run: python -m compileall -q evals/harness evals/v040_strategy_full_run.py scripts
+      - name: Validate profile registry
+        run: python scripts/validate_profiles.py --source-root .
+      - name: Check generated profile documentation
+        run: python scripts/generate_profile_matrix.py --source-root . --check
+      - name: Build release-mode C# sample package
+        run: python scripts/build_skill_package.py --source-root . --output dist/clean-code-ai-csharp --source-mode release --profile csharp
+      - name: Validate core Agent Skill open standard
         run: agentskills validate clean-code-ai-collaboration
+      - name: Validate C# sample Agent Skill open standard
+        run: agentskills validate dist/clean-code-ai-csharp

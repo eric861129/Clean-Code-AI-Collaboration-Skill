@@ -144,6 +144,62 @@ class ProfileContractTests(unittest.TestCase):
                     profile["evidence"]["benchmark_status"],
                 )
 
+    def test_profile_authoring_guide_defines_the_complete_lifecycle(self) -> None:
+        guide = (ROOT / "docs" / "profile-authoring.md").read_text(
+            encoding="utf-8"
+        )
+
+        required_terms = {
+            *REQUIRED_PROFILE_HEADINGS,
+            "Planned Metadata",
+            "Experimental",
+            "Owning Manifests",
+            "Supporting Files",
+            "Candidate Dependencies",
+            "Supporting Dependencies",
+            "Maintainer",
+            "passed",
+            "failed",
+            "inconclusive",
+            "no_difference",
+            "Suite SemVer",
+            "Originality",
+            "Attribution",
+            "scripts/validate_profiles.py --source-root .",
+            "scripts/generate_profile_matrix.py --source-root . --check",
+            "scripts/build_skill_package.py",
+            "Reviewer Checklist",
+            "CONTEXT.md",
+            "2026-09-04-composable-language-framework-profile-architecture-design.md",
+        }
+        for term in required_terms:
+            with self.subTest(term=term):
+                self.assertIn(term, guide)
+        self.assertLess(guide.index("Planned Metadata"), guide.index("Experimental"))
+        self.assertIn("Package／Push／Release", guide)
+        self.assertIn("額外授權", guide)
+
+    def test_readme_explains_profile_runtime_and_unpublished_packages(self) -> None:
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+        for term in {
+            "$clean-code-ai-collaboration",
+            "Changed Module",
+            "Core Only",
+            "Language／Framework",
+            "Explicit Profile",
+            "M2 Pilot",
+            "Planned 不可用",
+            "dist/clean-code-ai-csharp/",
+            "Git ignored",
+            "沒有 ZIP",
+            "未發布",
+            "docs/profile-authoring.md",
+        }:
+            with self.subTest(term=term):
+                self.assertIn(term, readme)
+        self.assertIn("不能從 Package 名稱推論", readme)
+
     def test_csharp_profile_has_complete_semantic_contract(self) -> None:
         content = (
             ROOT

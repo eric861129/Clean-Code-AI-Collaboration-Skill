@@ -364,6 +364,24 @@ class ProfilePackagingTests(unittest.TestCase):
         self.assertIn("profile-unavailable", output.getvalue())
         self.assertNotIn("Traceback", output.getvalue())
 
+    def test_ci_runs_packaging_contract_on_ubuntu_and_windows(self) -> None:
+        workflow = (
+            ROOT / ".github" / "workflows" / "validate.yml"
+        ).read_text(encoding="utf-8")
+
+        for term in {
+            "ubuntu-latest",
+            "windows-latest",
+            'python-version: "3.12"',
+            "scripts/validate_profiles.py --source-root .",
+            "scripts/generate_profile_matrix.py --source-root . --check",
+            "scripts/build_skill_package.py",
+            "agentskills validate clean-code-ai-collaboration",
+            "agentskills validate dist/clean-code-ai-csharp",
+        }:
+            with self.subTest(term=term):
+                self.assertIn(term, workflow)
+
 
 if __name__ == "__main__":
     unittest.main()

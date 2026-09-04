@@ -289,7 +289,9 @@ Skill 依下列順序解析：
 
 ## 可組合的 Language／Framework Profiles
 
-預設呼叫方式仍是 `$clean-code-ai-collaboration`。Repository Code Change 會以本次 Changed Module 為單位，依可驗證的檔案、最近 Owning Manifest 與 Dependency Marker，選擇可用的 Language／Framework Profile；找不到適用 Profile 時，Core Only 也是有效結果。明確指定 Profile 仍不能繞過可用性、適用性、相依、衝突、風險或授權 Gate。
+預設呼叫方式仍是 `$clean-code-ai-collaboration`。Repository Code Change 會以本次 Changed Module 為單位，依可驗證的檔案、最近 Owning Manifest 與 Dependency Marker，組合適用且可用的 Language／Framework Profile；找不到適用 Profile 時，Core Only 也是有效結果。Explicit Profile（明確指定 Profile）仍不能繞過 Availability、Applicability、相依、衝突、Repository Gate、風險或授權邊界。
+
+目前 C#、Python、TypeScript 與 React 是 Experimental：只有 Reference、Routing／Semantic Contract Tests 與產生後索引，尚未完成 M2 Pilot，不能解讀為效果已獲證明。Go、Rust、Java 與 Vue 仍是 Planned 不可用，不能 Routing 或 Packaging。
 
 目前 Profile 狀態由下列 Generated Matrix 呈現；Generated Region 只能由 Repository Script 更新。
 
@@ -305,6 +307,19 @@ Skill 依下列順序解析：
 | Java | language | planned | Not available | not_started |
 | Vue | framework | planned | Not available | not_started |
 <!-- profile-matrix:generated:end -->
+
+### 本機 Specialist Package
+
+下列命令會從乾淨的目前 Commit，建立只 Bundled C# Profile 的本機 Sample Package：
+
+```powershell
+.\.venv\Scripts\python.exe scripts\build_skill_package.py --source-root . --output dist/clean-code-ai-csharp --source-mode release --profile csharp
+.\.venv\Scripts\agentskills.exe validate dist/clean-code-ai-csharp
+```
+
+`dist/clean-code-ai-csharp/` 是 Git ignored 的本機產物；目前沒有 ZIP、未發布，也不能從 Package 名稱推論每個任務都套用 C#。Bundled Profile 仍要依 Changed Module 判斷，Core Only 仍是有效結果。
+
+Profile 貢獻入口只有 [Profile Authoring Guide](docs/profile-authoring.md)；該文件定義生命週期、Reference、Evidence、驗證與發布邊界。
 
 ## 安裝
 

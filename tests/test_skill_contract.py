@@ -519,6 +519,23 @@ class SkillContractTests(unittest.TestCase):
         )
         self.assertIn("[LICENSE](LICENSE)", readme)
 
+    def test_validation_workflow_uses_the_same_full_gate_on_both_platforms(
+        self,
+    ) -> None:
+        workflow = (
+            REPOSITORY_ROOT / ".github" / "workflows" / "validate.yml"
+        ).read_text(encoding="utf-8")
+
+        for term in {
+            "fail-fast: false",
+            "os: [ubuntu-latest, windows-latest]",
+            "runs-on: ${{ matrix.os }}",
+            "python -m unittest discover -s tests -v",
+            "python -m compileall -q evals/harness evals/v040_strategy_full_run.py scripts",
+        }:
+            with self.subTest(term=term):
+                self.assertIn(term, workflow)
+
     def test_ui_prompt_explicitly_names_the_skill(self) -> None:
         content = (SKILL_ROOT / "agents" / "openai.yaml").read_text(encoding="utf-8")
 
