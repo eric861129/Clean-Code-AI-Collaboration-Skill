@@ -7,7 +7,7 @@ import hashlib
 import json
 from pathlib import Path, PurePosixPath
 import re
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
@@ -106,7 +106,17 @@ def _normalize_changed_file(repository_root: Path, changed_file: str) -> PurePos
 
 
 def _matches(name: str, pattern: str) -> bool:
-    return fnmatchcase(name.casefold(), pattern.casefold())
+    return fnmatchcase(name, pattern)
+
+
+def profile_is_available(profile: Mapping[str, Any] | None) -> bool:
+    """Return whether a profile may participate in routing or packaging."""
+
+    return bool(
+        profile
+        and profile.get("status") not in {"planned", "deprecated"}
+        and profile.get("reference")
+    )
 
 
 def _ancestor_directories(repository_root: Path, relative: PurePosixPath) -> list[Path]:
@@ -339,7 +349,8 @@ def _route_module(
         }
 
     profiles_by_id = {profile["id"]: profile for profile in profiles}
-    explicit = {profile_id.casefold() for profile_id in explicit_profiles}
+    explicit = sorted({profile_id.casefold() for profile_id in explicit_profiles})
+    applicable_profiles: dict[str, Mapping[str, Any]] = {}
     candidates: dict[str, Mapping[str, Any]] = {}
     unavailable: list[str] = []
     reason_codes: list[str] = []
@@ -357,6 +368,7 @@ def _route_module(
         profile_id = profile["id"]
         if not applicable:
             continue
+        applicable_profiles[profile_id] = profile
         if profile["status"] == "planned":
             unavailable.append(profile_id)
             _append_once(reason_codes, "planned-profile")
@@ -378,7 +390,10 @@ def _route_module(
             continue
         if explicit_id not in profiles_by_id:
             unknowns.append(f"unknown explicit profile: {explicit_id}")
-        elif explicit_id not in candidates and explicit_id not in unavailable:
+        elif not profile_is_available(profiles_by_id[explicit_id]):
+            _append_once(unavailable, explicit_id)
+            _append_once(reason_codes, "explicit-profile-unavailable")
+        elif explicit_id not in candidates:
             unknowns.append(f"explicit profile is not applicable: {explicit_id}")
 
     resolved_requirements: dict[str, frozenset[str]] = {}
@@ -386,6 +401,7 @@ def _route_module(
     def resolve_requirements(
         profile_id: str,
         active: frozenset[str] = frozenset(),
+        required_by: str | None = None,
     ) -> frozenset[str] | None:
         if profile_id in resolved_requirements:
             return resolved_requirements[profile_id]
@@ -394,11 +410,15 @@ def _route_module(
             unknowns.append(f"requires cycle reached {profile_id}")
             return None
         profile = profiles_by_id.get(profile_id)
-        if (
-            profile is None
-            or profile["status"] in {"planned", "deprecated"}
-            or not profile.get("reference")
-        ):
+        if not profile_is_available(profile):
+            _append_once(reason_codes, "profile-requires-unavailable")
+            if required_by is not None:
+                unknowns.append(f"{required_by} requires unavailable {profile_id}")
+            return None
+        if profile_id not in applicable_profiles:
+            _append_once(reason_codes, "profile-requires-inapplicable")
+            if required_by is not None:
+                unknowns.append(f"{required_by} requires inapplicable {profile_id}")
             return None
 
         closure = {profile_id}
@@ -406,10 +426,9 @@ def _route_module(
             required_closure = resolve_requirements(
                 required_id,
                 active | {profile_id},
+                profile_id,
             )
             if required_closure is None:
-                _append_once(reason_codes, "profile-requires-unavailable")
-                unknowns.append(f"{profile_id} requires unavailable {required_id}")
                 return None
             closure.update(required_closure)
         result = frozenset(closure)
@@ -417,7 +436,12 @@ def _route_module(
         return result
 
     selected_ids: set[str] = set()
-    for candidate_id in candidates:
+    seed_ids = (
+        [profile_id for profile_id in explicit if profile_id in candidates]
+        if explicit
+        else list(candidates)
+    )
+    for candidate_id in seed_ids:
         closure = resolve_requirements(candidate_id)
         if closure is not None:
             selected_ids.update(closure)
@@ -520,8 +544,53 @@ def _repository_file(source_root: Path, relative_path: str) -> tuple[Path | None
     return resolved, ""
 
 
+def _read_repository_file(source_root: Path, relative_path: str) -> bytes:
+    path, error = _repository_file(source_root, relative_path)
+    if error or path is None:
+        raise ValueError(error or "path does not resolve to a repository file")
+    return path.read_bytes()
+
+
+def _duplicate_registry_diagnostics(
+    profile_entries: Sequence[tuple[str, Mapping[str, Any]]],
+) -> list[Diagnostic]:
+    diagnostics: list[Diagnostic] = []
+    ids: dict[str, list[str]] = {}
+    references: dict[str, list[str]] = {}
+    for path, profile in profile_entries:
+        profile_id = profile.get("id")
+        if isinstance(profile_id, str):
+            ids.setdefault(profile_id.casefold(), []).append(path)
+        reference = profile.get("reference")
+        if isinstance(reference, str):
+            references.setdefault(reference.casefold(), []).append(path)
+    for duplicate_paths in ids.values():
+        if len(duplicate_paths) > 1:
+            for path in duplicate_paths:
+                diagnostics.append(
+                    Diagnostic(
+                        path,
+                        "id",
+                        "profile-id-duplicate",
+                        "profile ids must be case-insensitively unique",
+                    )
+                )
+    for duplicate_paths in references.values():
+        if len(duplicate_paths) > 1:
+            for path in duplicate_paths:
+                diagnostics.append(
+                    Diagnostic(
+                        path,
+                        "reference",
+                        "reference-duplicate",
+                        "profile references must be case-insensitively unique",
+                    )
+                )
+    return diagnostics
+
+
 def _cross_file_diagnostics(
-    source_root: Path,
+    read_repository_file: Callable[[str], bytes],
     profile_entries: Sequence[tuple[str, Mapping[str, Any]]],
 ) -> list[Diagnostic]:
     diagnostics: list[Diagnostic] = []
@@ -543,14 +612,15 @@ def _cross_file_diagnostics(
 
         reference = profile.get("reference")
         if isinstance(reference, str):
-            _, error = _repository_file(source_root, reference)
-            if error:
+            try:
+                read_repository_file(reference)
+            except (OSError, ValueError) as error:
                 diagnostics.append(
                     Diagnostic(
                         profile_path,
                         "reference",
                         "reference-invalid",
-                        error,
+                        str(error),
                     )
                 )
 
@@ -620,36 +690,40 @@ def _cross_file_diagnostics(
 
         evidence = profile["evidence"]
         for index, manifest_path in enumerate(evidence["manifests"]):
-            _, error = _repository_file(source_root, manifest_path)
-            if error:
+            try:
+                read_repository_file(manifest_path)
+            except (OSError, ValueError) as error:
                 diagnostics.append(
                     Diagnostic(
                         profile_path,
                         f"evidence.manifests.{index}",
                         "evidence-path-invalid",
-                        error,
+                        str(error),
                     )
                 )
         for index, result in enumerate(evidence["results"]):
-            result_path, error = _repository_file(source_root, result["path"])
-            if error:
+            try:
+                result_bytes = read_repository_file(result["path"])
+            except (OSError, ValueError) as error:
                 diagnostics.append(
                     Diagnostic(
                         profile_path,
                         f"evidence.results.{index}.path",
                         "evidence-path-invalid",
-                        error,
+                        str(error),
                     )
                 )
-            elif hashlib.sha256(result_path.read_bytes()).hexdigest() != result["sha256"]:
-                diagnostics.append(
-                    Diagnostic(
-                        profile_path,
-                        f"evidence.results.{index}.sha256",
-                        "evidence-hash-mismatch",
-                        "evidence sha256 does not match the repository file",
+            else:
+                actual_digest = hashlib.sha256(result_bytes).hexdigest()
+                if actual_digest != result["sha256"]:
+                    diagnostics.append(
+                        Diagnostic(
+                            profile_path,
+                            f"evidence.results.{index}.sha256",
+                            "evidence-hash-mismatch",
+                            "evidence sha256 does not match the repository file",
+                        )
                     )
-                )
 
         stages = {result["stage"] for result in evidence["results"]}
         benchmark_status = evidence["benchmark_status"]
@@ -722,6 +796,19 @@ def _cross_file_diagnostics(
     return diagnostics
 
 
+def validate_loaded_profiles(
+    profile_entries: Sequence[tuple[str, Mapping[str, Any]]],
+    read_repository_file: Callable[[str], bytes],
+) -> tuple[Diagnostic, ...]:
+    """Validate cross-file contracts using bytes supplied by the caller."""
+
+    diagnostics = _duplicate_registry_diagnostics(profile_entries)
+    diagnostics.extend(
+        _cross_file_diagnostics(read_repository_file, profile_entries)
+    )
+    return tuple(sorted(diagnostics))
+
+
 def validate_repository(source_root: Path) -> tuple[Diagnostic, ...]:
     schema_path = source_root / SCHEMA_PATH
     diagnostics: list[Diagnostic] = []
@@ -783,38 +870,16 @@ def validate_repository(source_root: Path) -> tuple[Diagnostic, ...]:
         if isinstance(profile, Mapping) and not errors:
             valid_entries.append((relative_path, profile))
 
-    ids: dict[str, list[str]] = {}
-    references: dict[str, list[str]] = {}
-    for path, profile in raw_entries:
-        profile_id = profile.get("id")
-        if isinstance(profile_id, str):
-            ids.setdefault(profile_id.casefold(), []).append(path)
-        reference = profile.get("reference")
-        if isinstance(reference, str):
-            references.setdefault(reference.casefold(), []).append(path)
-    for duplicate_paths in ids.values():
-        if len(duplicate_paths) > 1:
-            for path in duplicate_paths:
-                diagnostics.append(
-                    Diagnostic(
-                        path,
-                        "id",
-                        "profile-id-duplicate",
-                        "profile ids must be case-insensitively unique",
-                    )
-                )
-    for duplicate_paths in references.values():
-        if len(duplicate_paths) > 1:
-            for path in duplicate_paths:
-                diagnostics.append(
-                    Diagnostic(
-                        path,
-                        "reference",
-                        "reference-duplicate",
-                        "profile references must be case-insensitively unique",
-                    )
-                )
-    diagnostics.extend(_cross_file_diagnostics(source_root, valid_entries))
+    diagnostics.extend(_duplicate_registry_diagnostics(raw_entries))
+    diagnostics.extend(
+        _cross_file_diagnostics(
+            lambda relative_path: _read_repository_file(
+                source_root,
+                relative_path,
+            ),
+            valid_entries,
+        )
+    )
     return tuple(sorted(diagnostics))
 
 

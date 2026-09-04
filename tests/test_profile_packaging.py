@@ -132,6 +132,39 @@ class ProfilePackagingTests(unittest.TestCase):
 
         self.assertEqual("keep", sentinel.read_text(encoding="utf-8"))
 
+    def test_output_directory_race_fails_without_mutating_competing_content(
+        self,
+    ) -> None:
+        real_validate = packager._validate_manifest
+
+        def create_competing_output(*args, **kwargs) -> None:
+            real_validate(*args, **kwargs)
+            self.output.mkdir()
+            (self.output / "sentinel.txt").write_text(
+                "keep",
+                encoding="utf-8",
+            )
+
+        with patch.object(
+            packager,
+            "_validate_manifest",
+            side_effect=create_competing_output,
+        ):
+            with self.assertRaisesRegex(
+                FileExistsError,
+                "output directory already exists",
+            ):
+                self.build_worktree_package("csharp")
+
+        self.assertEqual(
+            "keep",
+            (self.output / "sentinel.txt").read_text(encoding="utf-8"),
+        )
+        self.assertEqual(
+            ["sentinel.txt"],
+            [path.name for path in self.output.iterdir()],
+        )
+
     def test_missing_output_parent_is_created_for_dist_layout(self) -> None:
         output = (
             self.temporary_root
@@ -265,6 +298,74 @@ class ProfilePackagingTests(unittest.TestCase):
         ).stdout.strip()
         self.assertEqual("release", manifest["source_mode"])
         self.assertEqual(expected_commit, manifest["source_commit"])
+
+    def test_release_mode_uses_git_blobs_for_validation_and_inputs(self) -> None:
+        source = self.create_git_source()
+        profile_path = source / "profiles" / "csharp.yaml"
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(source),
+                "update-index",
+                "--assume-unchanged",
+                "profiles/csharp.yaml",
+            ],
+            check=True,
+        )
+        profile_path.write_text("invalid: checkout-only\n", encoding="utf-8")
+        output = self.temporary_root / "release-from-blobs"
+
+        manifest = packager.build_package(
+            source,
+            output,
+            "release",
+            ["csharp"],
+        )
+
+        committed = subprocess.run(
+            ["git", "-C", str(source), "show", "HEAD:profiles/csharp.yaml"],
+            capture_output=True,
+            check=True,
+        ).stdout
+        input_hashes = {
+            entry["path"]: entry["sha256"] for entry in manifest["inputs"]
+        }
+        self.assertEqual(
+            hashlib.sha256(committed).hexdigest(),
+            input_hashes["profiles/csharp.yaml"],
+        )
+
+    def test_same_release_commit_produces_byte_identical_packages(self) -> None:
+        source = self.create_git_source()
+        first = self.temporary_root / "first" / "clean-code-ai-csharp"
+        second = self.temporary_root / "second" / "clean-code-ai-csharp"
+
+        first_manifest = packager.build_package(
+            source,
+            first,
+            "release",
+            ["csharp"],
+        )
+        second_manifest = packager.build_package(
+            source,
+            second,
+            "release",
+            ["csharp"],
+        )
+
+        first_files = {
+            path.relative_to(first).as_posix(): path.read_bytes()
+            for path in first.rglob("*")
+            if path.is_file()
+        }
+        second_files = {
+            path.relative_to(second).as_posix(): path.read_bytes()
+            for path in second.rglob("*")
+            if path.is_file()
+        }
+        self.assertEqual(first_manifest, second_manifest)
+        self.assertEqual(first_files, second_files)
 
     def test_external_source_symlink_fails_before_output_creation(self) -> None:
         source = self.create_git_source()

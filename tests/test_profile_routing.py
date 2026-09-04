@@ -5,7 +5,7 @@ from copy import deepcopy
 from pathlib import Path
 import unittest
 
-from scripts.validate_profiles import load_registry, route_changed_files
+from scripts.validate_profiles import _matches, load_registry, route_changed_files
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -69,6 +69,33 @@ class ProfileRoutingTests(unittest.TestCase):
         self.assertEqual(
             ["typescript", "react"],
             result["modules"][0]["profiles"],
+        )
+
+    def test_explicit_profile_takes_priority_over_other_automatic_matches(
+        self,
+    ) -> None:
+        result = route_changed_files(
+            FIXTURES / "typescript-react",
+            self.profiles,
+            ["frontend/src/App.tsx"],
+            ["react"],
+        )
+
+        self.assertEqual(["react"], result["modules"][0]["profiles"])
+
+    def test_inapplicable_explicit_profile_does_not_fall_back_to_auto(self) -> None:
+        result = route_changed_files(
+            FIXTURES / "typescript-react",
+            self.profiles,
+            ["frontend/src/App.tsx"],
+            ["python"],
+        )
+
+        self.assertEqual("core_only", result["outcome"])
+        self.assertEqual([], result["modules"][0]["profiles"])
+        self.assertIn(
+            "explicit profile is not applicable: python",
+            result["modules"][0]["unknowns"],
         )
 
     def test_javascript_react_does_not_invent_typescript(self) -> None:
@@ -171,6 +198,28 @@ class ProfileRoutingTests(unittest.TestCase):
             "profile-requires-unavailable",
             result["modules"][0]["reason_codes"],
         )
+
+    def test_profile_with_an_inapplicable_requirement_is_not_selected(self) -> None:
+        profiles = deepcopy(self.profiles)
+        next(profile for profile in profiles if profile["id"] == "react")[
+            "composition"
+        ]["requires"] = ["python"]
+
+        result = route_changed_files(
+            FIXTURES / "typescript-react",
+            profiles,
+            ["frontend/src/App.tsx"],
+        )
+
+        self.assertEqual(["typescript"], result["modules"][0]["profiles"])
+        self.assertIn(
+            "profile-requires-inapplicable",
+            result["modules"][0]["reason_codes"],
+        )
+
+    def test_metadata_patterns_are_case_sensitive(self) -> None:
+        self.assertTrue(_matches("App.csproj", "*.csproj"))
+        self.assertFalse(_matches("APP.CSPROJ", "*.csproj"))
 
 
 if __name__ == "__main__":

@@ -7,9 +7,13 @@ from typing import Any, Mapping, Sequence
 import yaml
 
 if __package__:
-    from .validate_profiles import Diagnostic, load_registry
+    from .validate_profiles import (
+        Diagnostic,
+        load_registry,
+        profile_is_available,
+    )
 else:
-    from validate_profiles import Diagnostic, load_registry
+    from validate_profiles import Diagnostic, load_registry, profile_is_available
 
 
 README_PATH = Path("README.md")
@@ -74,7 +78,7 @@ def render_profile_matrix(profiles: Sequence[Mapping[str, Any]]) -> str:
         reference = profile.get("reference")
         reference_cell = (
             f"[Open]({reference})"
-            if reference and status not in {"planned", "deprecated"}
+            if profile_is_available(profile)
             else "Not available"
         )
         lines.append(
@@ -98,9 +102,7 @@ def render_runtime_index(profiles: Sequence[Mapping[str, Any]]) -> str:
     for profile in profiles:
         status = profile["status"]
         availability = (
-            "available"
-            if status not in {"planned", "deprecated"} and profile.get("reference")
-            else "unavailable"
+            "available" if profile_is_available(profile) else "unavailable"
         )
         reference = profile.get("reference")
         reference_value = (

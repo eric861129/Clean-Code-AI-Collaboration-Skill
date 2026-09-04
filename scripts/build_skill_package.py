@@ -18,14 +18,14 @@ if __package__:
         render_runtime_index,
         replace_generated_region,
     )
-    from .validate_profiles import validate_repository
+    from .validate_profiles import profile_is_available, validate_loaded_profiles
 else:
     from generate_profile_matrix import (
         RUNTIME_MARKERS,
         render_runtime_index,
         replace_generated_region,
     )
-    from validate_profiles import validate_repository
+    from validate_profiles import profile_is_available, validate_loaded_profiles
 
 
 MANIFEST_SCHEMA_VERSION = "1.0"
@@ -102,14 +102,6 @@ def build_manifest(
     return {**manifest_without_digest, "overall_digest": overall_digest}
 
 
-def _profile_available(profile: Mapping[str, Any] | None) -> bool:
-    return bool(
-        profile
-        and profile.get("status") not in {"planned", "deprecated"}
-        and profile.get("reference")
-    )
-
-
 def compose_profiles(
     profiles_by_id: Mapping[str, Mapping[str, Any]],
     selected_ids: Sequence[str],
@@ -131,7 +123,7 @@ def compose_profiles(
                     f"{required_by} requires unknown profile {profile_id}",
                 )
             raise PackagingError("profile-unknown", f"unknown profile: {profile_id}")
-        if not _profile_available(profile):
+        if not profile_is_available(profile):
             status = profile.get("status", "unknown")
             if required_by:
                 raise PackagingError(
@@ -322,6 +314,16 @@ def _load_registry(
         reader.read(PROFILE_CATALOG_PATH),
         PROFILE_CATALOG_PATH,
     )
+    if set(catalog) != {"schema_version", "profiles"}:
+        raise PackagingError(
+            "profile-catalog-invalid",
+            "catalog has unknown or missing fields",
+        )
+    if catalog["schema_version"] != "1.0":
+        raise PackagingError(
+            "profile-catalog-invalid",
+            "catalog schema_version must be 1.0",
+        )
     entries = catalog.get("profiles")
     if not isinstance(entries, list) or not all(
         isinstance(item, str) for item in entries
@@ -329,6 +331,11 @@ def _load_registry(
         raise PackagingError(
             "profile-catalog-invalid",
             "catalog profiles must be paths",
+        )
+    if len({entry.casefold() for entry in entries}) != len(entries):
+        raise PackagingError(
+            "profile-catalog-invalid",
+            "catalog profile paths must be case-insensitively unique",
         )
 
     profiles: list[Mapping[str, Any]] = []
@@ -574,6 +581,10 @@ def _create_output_directories(
             )
         current = parent
 
+    if current == output:
+        raise FileExistsError(
+            f"output directory already exists: {output}"
+        )
     if current.is_symlink() or not current.is_dir():
         raise FileExistsError(
             f"output ancestor is not a physical directory: {current}"
@@ -649,14 +660,17 @@ def build_package(
         )
 
     reader = _SourceReader(source_root, source_mode)
-    repository_diagnostics = validate_repository(reader.root)
+    profiles, metadata_paths = _load_registry(reader)
+    repository_diagnostics = validate_loaded_profiles(
+        list(zip(metadata_paths, profiles, strict=True)),
+        reader.read,
+    )
     if repository_diagnostics:
         first = repository_diagnostics[0]
         raise PackagingError(
             "profile-registry-invalid",
             f"{first.path}:{first.field}:{first.code}: {first.message}",
         )
-    profiles, metadata_paths = _load_registry(reader)
     profiles_by_id = {profile["id"]: profile for profile in profiles}
     composed_ids = compose_profiles(profiles_by_id, profile_ids)
     selected_profiles = [
