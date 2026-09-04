@@ -588,6 +588,16 @@ class SkillContractTests(unittest.TestCase):
             with self.subTest(term=term):
                 self.assertIn(term, content)
 
+    def test_readme_installation_uses_current_skill_version(self) -> None:
+        skill = SKILL_PATH.read_text(encoding="utf-8")
+        readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
+        version = re.search(
+            r'^  version: "([^"]+)"$', skill, re.MULTILINE
+        ).group(1)
+
+        self.assertIn(f"git checkout v{version}", readme)
+        self.assertIn(f"version: \"{version}\"", readme)
+
     def test_v040_readme_documents_strategy_configuration(self) -> None:
         readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
 
@@ -612,7 +622,6 @@ class SkillContractTests(unittest.TestCase):
             "常見任務可以怎麼搭配",
             "一定要選 TDD 或 TCR 嗎？",
             "目前沒有另外執行設定檔解析器",
-            "git checkout v0.4.0",
             "v0.4.0 Strategy Decision-Conformance Full Run",
             "v0.3.0 Cross-language Full Run",
             "evals/manifests/v0.4.0-strategy-full-run.json",

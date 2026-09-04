@@ -337,11 +337,11 @@ git clone https://github.com/eric861129/Clean-Code-AI-Collaboration-Skill.git
 cd Clean-Code-AI-Collaboration-Skill
 ```
 
-正式發布後，如果要安裝固定的 `v0.4.0`，請先切換到對應 Tag，避免日後 `main` 更新時安裝到不同版本：
+正式發布後，如果要安裝固定的 `v0.5.0`，請先切換到對應 Tag，避免日後 `main` 更新時安裝到不同版本：
 
 ```shell
 git fetch --tags
-git checkout v0.4.0
+git checkout v0.5.0
 ```
 
 接著確認 Skill Frontmatter 的版本：
@@ -349,13 +349,13 @@ git checkout v0.4.0
 Windows PowerShell：
 
 ```powershell
-Select-String -LiteralPath ".\clean-code-ai-collaboration\SKILL.md" -Pattern 'version: "0.4.0"'
+Select-String -LiteralPath ".\clean-code-ai-collaboration\SKILL.md" -Pattern 'version: "0.5.0"'
 ```
 
 macOS／Linux：
 
 ```bash
-grep 'version: "0.4.0"' ./clean-code-ai-collaboration/SKILL.md
+grep 'version: "0.5.0"' ./clean-code-ai-collaboration/SKILL.md
 ```
 
 真正需要安裝的只有 `clean-code-ai-collaboration` 資料夾；`evals`、`tests`、`docs` 與 `.github` 是評測、驗證與維護資料。
