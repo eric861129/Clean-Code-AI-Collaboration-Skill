@@ -4,10 +4,11 @@ import argparse
 from datetime import datetime, timezone
 import hashlib
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import random
 import re
 import shutil
+import subprocess
 from typing import Any
 
 
@@ -298,6 +299,76 @@ def tree_sha256(root: Path) -> str:
         digest.update(relative_path.encode("utf-8"))
         digest.update(b"\0")
         digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def _git_bytes(repository_root: Path, arguments: list[str]) -> bytes:
+    completed = subprocess.run(
+        ["git", *arguments],
+        cwd=repository_root,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if completed.returncode != 0:
+        message = completed.stderr.decode("utf-8", errors="replace").strip()
+        raise ValueError(f"git command failed: {message}")
+    return completed.stdout
+
+
+def resolve_version_revision(repository_root: Path, skill_version: str) -> str:
+    if not re.fullmatch(r"\d+\.\d+\.\d+", skill_version):
+        raise ValueError("skill version must be a semantic version")
+    revision = _git_bytes(
+        repository_root,
+        ["rev-parse", "--verify", f"refs/tags/v{skill_version}^{{}}"],
+    ).decode("ascii").strip()
+    if not re.fullmatch(r"[0-9a-f]{40}", revision):
+        raise ValueError("skill version tag did not resolve to a commit")
+    return revision
+
+
+def git_blob_bytes(
+    repository_root: Path,
+    revision: str,
+    relative_path: str,
+) -> bytes:
+    if not re.fullmatch(r"[0-9a-f]{40}", revision):
+        raise ValueError("revision must be a full lowercase commit SHA")
+    normalized = PurePosixPath(relative_path)
+    if normalized.is_absolute() or not normalized.parts or ".." in normalized.parts:
+        raise ValueError("git blob path must be repository-relative")
+    return _git_bytes(repository_root, ["show", f"{revision}:{normalized.as_posix()}"])
+
+
+def git_tree_sha256(
+    repository_root: Path,
+    revision: str,
+    relative_root: str,
+) -> str:
+    if not re.fullmatch(r"[0-9a-f]{40}", revision):
+        raise ValueError("revision must be a full lowercase commit SHA")
+    normalized_root = PurePosixPath(relative_root)
+    if (
+        normalized_root.is_absolute()
+        or not normalized_root.parts
+        or ".." in normalized_root.parts
+    ):
+        raise ValueError("git tree path must be repository-relative")
+    root = normalized_root.as_posix().rstrip("/")
+    raw_paths = _git_bytes(
+        repository_root,
+        ["ls-tree", "-r", "--name-only", "-z", revision, "--", root],
+    )
+    paths = [value.decode("utf-8") for value in raw_paths.split(b"\0") if value]
+    paths.sort(key=lambda value: (value.casefold(), value))
+    digest = hashlib.sha256()
+    for path in paths:
+        relative_path = path.removeprefix(f"{root}/")
+        digest.update(relative_path.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(git_blob_bytes(repository_root, revision, path))
         digest.update(b"\0")
     return digest.hexdigest()
 
@@ -689,6 +760,42 @@ def verify_public_result(
     result = json.loads(result_path.read_text(encoding="utf-8"))
     if not isinstance(result, dict):
         return {"status": "failed", "failures": ["published result must be an object"]}
+    skill_version = result.get("skill_version")
+    if not isinstance(skill_version, str):
+        return {"status": "failed", "failures": ["skill_version is missing"]}
+    try:
+        historical_revision = resolve_version_revision(ROOT, skill_version)
+    except ValueError:
+        return {
+            "status": "failed",
+            "failures": ["skill_version does not resolve to a published tag"],
+        }
+    historical_skill_file_sha256 = hashlib.sha256(
+        git_blob_bytes(
+            ROOT,
+            historical_revision,
+            "clean-code-ai-collaboration/SKILL.md",
+        )
+    ).hexdigest()
+    historical_skill_tree_sha256 = git_tree_sha256(
+        ROOT,
+        historical_revision,
+        "clean-code-ai-collaboration",
+    )
+    historical_manifest_sha256 = hashlib.sha256(
+        git_blob_bytes(
+            ROOT,
+            historical_revision,
+            "evals/manifests/v0.4.0-strategy-full-run.json",
+        )
+    ).hexdigest()
+    historical_harness_sha256 = hashlib.sha256(
+        git_blob_bytes(
+            ROOT,
+            historical_revision,
+            "evals/v040_strategy_full_run.py",
+        )
+    ).hexdigest()
     failures: list[str] = []
     expected_root_metadata = {
         "schema_version": "1.0",
@@ -697,7 +804,7 @@ def verify_public_result(
         "status": "complete",
         "model": manifest["model"],
         "reasoning_effort": manifest["reasoning_effort"],
-        "skill_tree_sha256": tree_sha256(SKILL_SOURCE),
+        "skill_tree_sha256": historical_skill_tree_sha256,
         "claim_boundary": manifest["claim_boundary"],
         "scenario_count": len(manifest["scenarios"]),
         "repetitions": manifest["repetitions"],
@@ -705,9 +812,9 @@ def verify_public_result(
     for field, expected in expected_root_metadata.items():
         if result.get(field) != expected:
             failures.append(f"{field} does not match the fixed benchmark contract")
-    if result.get("manifest_sha256") != file_sha256(MANIFEST_PATH):
+    if result.get("manifest_sha256") != historical_manifest_sha256:
         failures.append("manifest hash does not match the published result")
-    if result.get("harness_sha256") != file_sha256(Path(__file__)):
+    if result.get("harness_sha256") != historical_harness_sha256:
         failures.append("harness hash does not match the published result")
 
     slots = (*build_baseline_slots(manifest), *build_slots(manifest))
@@ -754,12 +861,12 @@ def verify_public_result(
             scenario=scenario,
             prompt=expected_prompt,
             skill_file_sha256=(
-                file_sha256(SKILL_SOURCE / "SKILL.md")
+                historical_skill_file_sha256
                 if slot["arm"] == "skill-v0.4.0"
                 else None
             ),
             skill_tree_sha256=(
-                tree_sha256(SKILL_SOURCE)
+                historical_skill_tree_sha256
                 if slot["arm"] == "skill-v0.4.0"
                 else None
             ),

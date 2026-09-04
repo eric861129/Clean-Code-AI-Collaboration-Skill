@@ -5,6 +5,7 @@ import hashlib
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
 
 from evals.v040_strategy_full_run import (
     _stable_tree_files,
@@ -13,7 +14,10 @@ from evals.v040_strategy_full_run import (
     build_baseline_slots,
     build_slots,
     evaluate_subject_result,
+    git_blob_bytes,
+    git_tree_sha256,
     load_manifest,
+    resolve_version_revision,
     stage_run,
     tree_sha256,
     verify_public_result,
@@ -26,6 +30,53 @@ MANIFEST_PATH = ROOT / "evals" / "manifests" / "v0.4.0-strategy-full-run.json"
 
 
 class V040StrategyFullRunTests(unittest.TestCase):
+    def test_v040_git_blob_hash_reconstructs_published_skill_tree(self) -> None:
+        revision = resolve_version_revision(ROOT, "0.4.0")
+
+        self.assertEqual(
+            "d0b5282362c136d09311c2fedc5a5692aa99ea90",
+            revision,
+        )
+        self.assertEqual(
+            "4c1d6eaf19f321e6ba2e0360aede7077c6853688f5d4c7f086c0178209b64135",
+            git_tree_sha256(ROOT, revision, "clean-code-ai-collaboration"),
+        )
+
+    def test_v040_historical_replay_ignores_skill_source_worktree(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            unrelated_skill = Path(temporary_directory) / "skill"
+            unrelated_skill.mkdir()
+            (unrelated_skill / "SKILL.md").write_text("changed", encoding="utf-8")
+            with mock.patch(
+                "evals.v040_strategy_full_run.SKILL_SOURCE",
+                unrelated_skill,
+            ):
+                verification = verify_public_result(
+                    ROOT / "evals" / "results" / "v0.4.0-strategy-full-run.json"
+                )
+
+        self.assertEqual({"status": "passed", "failures": []}, verification)
+
+    def test_v040_git_reader_rejects_unsafe_revision_and_paths(self) -> None:
+        revision = resolve_version_revision(ROOT, "0.4.0")
+        for unsafe_revision in ("--help", "deadbeef"):
+            with self.subTest(revision=unsafe_revision):
+                with self.assertRaisesRegex(
+                    ValueError,
+                    "full lowercase commit SHA",
+                ):
+                    git_blob_bytes(
+                        ROOT,
+                        unsafe_revision,
+                        "clean-code-ai-collaboration/SKILL.md",
+                    )
+        for unsafe_path in ("/absolute/SKILL.md", "../SKILL.md"):
+            with self.subTest(path=unsafe_path):
+                with self.assertRaisesRegex(ValueError, "repository-relative"):
+                    git_blob_bytes(ROOT, revision, unsafe_path)
+                with self.assertRaisesRegex(ValueError, "repository-relative"):
+                    git_tree_sha256(ROOT, revision, unsafe_path)
+
     def test_manifest_covers_the_complete_strategy_matrix(self) -> None:
         manifest = load_manifest(MANIFEST_PATH)
 
@@ -380,6 +431,31 @@ class V040StrategyFullRunTests(unittest.TestCase):
 
                 self.assertEqual("failed", verification["status"])
                 self.assertTrue(verification["failures"])
+
+    def test_published_result_rejects_missing_or_unknown_skill_version(self) -> None:
+        published = json.loads(
+            (ROOT / "evals" / "results" / "v0.4.0-strategy-full-run.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        tampered_results = (
+            {key: value for key, value in published.items() if key != "skill_version"},
+            {**published, "skill_version": "9.9.9"},
+        )
+
+        for tampered in tampered_results:
+            with self.subTest(skill_version=tampered.get("skill_version")):
+                with tempfile.TemporaryDirectory() as directory:
+                    result_path = Path(directory) / "result.json"
+                    result_path.write_text(
+                        json.dumps(tampered, ensure_ascii=False),
+                        encoding="utf-8",
+                    )
+
+                    verification = verify_public_result(result_path)
+
+                self.assertEqual("failed", verification["status"])
+                self.assertIn("skill_version", verification["failures"][0])
 
 
 if __name__ == "__main__":
