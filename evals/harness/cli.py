@@ -43,6 +43,8 @@ from evals.harness.result_builder import (
     validate_profile_pilot_result,
 )
 from evals.harness.subject_runner import build_prompt, run_subject
+from evals.harness.skill_inspection import inspect_skill
+from evals.harness.protocol_canary import validate_protocol_canary
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_MANIFEST_RELATIVE_PATH = Path("evals/manifests/v0.3.0-cross-language.json")
@@ -57,6 +59,10 @@ DISPATCH_INDEX_SCHEMA_VERSION = "desktop-dispatch-index/v2"
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
+    if args.command == "inspect-skill":
+        dispatch = load_desktop_dispatch(Path(args.dispatch))
+        print(_console_json({"files": inspect_skill(dispatch, args.path)}))
+        return 0
     manifest_path = _resolve_manifest_path(args.manifest)
     runs_root = _resolve_runs_root(args.runs_root)
     manifest = load_manifest(manifest_path)
@@ -78,6 +84,7 @@ def main(argv: list[str] | None = None) -> int:
         "adjudicate-timeout",
         "review-packets",
         "build-result",
+        "verify-canary",
     }:
         _claim_campaign_state_file(manifest, paths)
     if command == "prepare":
@@ -126,6 +133,17 @@ def main(argv: list[str] | None = None) -> int:
         _verify_freeze(manifest, paths)
     elif command == "verify-reviews":
         _verify_reviews(manifest, paths)
+    elif command == "verify-canary":
+        if manifest.benchmark_version != "0.5.2-profile-protocol-canary":
+            raise ValueError("verify-canary requires the separate protocol canary manifest")
+        _verify_freeze(manifest, paths)
+        documents = [_read_run_document(slot, paths) for slot in build_run_slots(manifest)]
+        receipt = validate_protocol_canary(documents)
+        receipt["contract_sha256"] = _canonical_sha256(_freeze_document(manifest, paths))
+        _write_json(paths.runs_root / "protocol-canary-receipt.json", receipt)
+        print(_console_json(receipt))
+        if receipt["status"] != "passed":
+            raise ValueError("protocol canary failed; formal pilot must not start")
     else:  # pragma: no cover - argparse prevents this branch
         parser.error(f"unknown command: {command}")
     return 0
@@ -142,6 +160,9 @@ def _build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_RUNS_ROOT_RELATIVE_PATH.as_posix(),
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
+    inspection = subparsers.add_parser("inspect-skill", help="Read explicitly requested allowed Skill files without changing evidence")
+    inspection.add_argument("--dispatch", required=True)
+    inspection.add_argument("--path", action="append", required=True)
     subparsers.add_parser("prepare")
     subparsers.add_parser("pilot")
     stage = subparsers.add_parser("stage")
@@ -187,6 +208,7 @@ def _build_parser() -> argparse.ArgumentParser:
     verify.add_argument("--phase", choices=("pilot", "all"), default="all")
     subparsers.add_parser("verify-freeze")
     subparsers.add_parser("verify-reviews")
+    subparsers.add_parser("verify-canary")
     return parser
 
 
@@ -544,6 +566,7 @@ def _collect_desktop_dispatch(
     if effective_outcome == "timeout":
         effective_reason = "timeout"
     candidate_failure_reason: str | None = None
+    candidate_diagnostics: list[dict[str, str]] = []
     try:
         observation = build_desktop_observation(
             dispatch,
@@ -553,6 +576,7 @@ def _collect_desktop_dispatch(
         )
     except DesktopSubjectValidationError as error:
         candidate_failure_reason = error.reason
+        candidate_diagnostics = error.diagnostics
         observation = build_desktop_observation(
             dispatch,
             outcome="candidate_failure",
@@ -597,6 +621,7 @@ def _collect_desktop_dispatch(
             artifact_directory,
             subject_evidence_name,
             diff,
+            diagnostics=candidate_diagnostics,
         )
         return
     try:
@@ -800,6 +825,7 @@ def _finalize_desktop_candidate_failure(
     artifact_directory: str,
     subject_evidence: str,
     diff: Any,
+    diagnostics: list[dict[str, str]] | None = None,
 ) -> None:
     """不可變 Subject 契約被違反時，直接留下不可重跑的失敗證據。"""
 
@@ -833,6 +859,9 @@ def _finalize_desktop_candidate_failure(
         oracle_results=[],
         telemetry="not_available",
     )
+    if manifest.subject_executor.get("protocol_version") == "desktop-subject-v5":
+        document["inspection_diagnostics"] = diagnostics or []
+        document["oracle_skipped_reason"] = "not_run_due_to_evidence_gate"
     _write_json(_run_document_path(slot, generation, paths), document)
     print(
         _console_json(
@@ -1290,6 +1319,8 @@ def _run_document(
         ],
         "outside_boundary": list(diff.outside_boundary),
         "oracle_results": oracle_results,
+        **({"inspection_diagnostics": [], "oracle_skipped_reason": "not_applicable" if oracle_results else "not_run_due_to_execution_failure"}
+           if manifest.subject_executor.get("protocol_version") == "desktop-subject-v5" else {}),
         "telemetry": telemetry,
         "blind_spots": [
             "小型 Fixture 不能代表所有真實 Repository。",

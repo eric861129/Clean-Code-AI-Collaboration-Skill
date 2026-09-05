@@ -30,6 +30,16 @@ def build_prompt(
         raise ValueError(f"unknown arm: {arm_id}") from error
     task = _normalize_lf(str(scenario["task"])) + IMPLEMENTATION_AUTHORIZATION
     instruction = _normalize_lf(arm.instruction)
+    if manifest.subject_executor.get("protocol_version") == "desktop-subject-v5":
+        instruction += (
+            "\n\n本次 Benchmark 使用固定的比較組設定，不執行自動 Profile 套用。"
+            f"\nApplied Profiles: {json.dumps(list(arm.applied_profiles))}"
+            "\n未列出的 Profile 不得套用、查閱或宣稱使用；Package 隨附不代表已套用。"
+            "\n允許查閱清單不代表必須全部讀取，僅依任務需要讀取；"
+            "所有實際查閱的 Skill 檔案都必須如實列入 files_inspected 與 skill_inspection_claims，不得省略額外查閱。"
+            "\n必讀清單：\n" + "\n".join(arm.required_skill_inspection_paths)
+            + "\n允許查閱清單：\n" + "\n".join(arm.allowed_skill_inspection_paths)
+        )
     return task if not instruction else task + f"\n\n{instruction}"
 
 
