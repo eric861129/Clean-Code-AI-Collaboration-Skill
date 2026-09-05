@@ -19,6 +19,7 @@ if __package__:
         replace_generated_region,
     )
     from .validate_profiles import (
+        EVIDENCE_SCHEMA_PATH,
         profile_is_available,
         profile_sort_key,
         validate_loaded_profiles,
@@ -30,6 +31,7 @@ else:
         replace_generated_region,
     )
     from validate_profiles import (
+        EVIDENCE_SCHEMA_PATH,
         profile_is_available,
         profile_sort_key,
         validate_loaded_profiles,
@@ -406,6 +408,7 @@ def _input_paths(
             paths.add(manifest)
         for result in profile["evidence"]["results"]:
             paths.add(result["path"])
+            paths.add(EVIDENCE_SCHEMA_PATH)
     return _sort_paths(list(paths))
 
 

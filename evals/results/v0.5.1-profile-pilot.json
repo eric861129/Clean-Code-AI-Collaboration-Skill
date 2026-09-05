@@ -1,0 +1,3551 @@
+{
+  "schema_version": "profile-pilot-result/v1",
+  "benchmark_version": "0.5.1-profile-pilot",
+  "status": "complete",
+  "execution_limitations": [
+    "Desktop collaboration telemetry is not available and is not inferred.",
+    "Desktop network enforcement is not available from this harness."
+  ],
+  "runs": [
+    {
+      "run_id": "csharp-cancellation-cleanup--generic-clean-code--r01",
+      "scenario_id": "csharp-cancellation-cleanup",
+      "language": "csharp",
+      "arm_id": "generic-clean-code",
+      "repetition": 1,
+      "order_index": 0,
+      "terminal_state": "passed",
+      "contract_sha256": "fb1a68264c0f28cc36804ea63cff9d30a6d8903299b11dc3c2a87e8c68577dd0",
+      "scenario_contract_sha256": "0438b7f59ad59073a44711dab5a68c87d54eed081b92f7b68aea8aba14f81c71",
+      "prompt_sha256": "4dcd762d3cf6b7d4d001060e9e2025e1cb092b9cf6facfc9b2ae1233106e24ec",
+      "automatic_failure_reasons": [],
+      "diff_sha256": "c9f9e052e72071cee538f834835adb5e2c158d4aa0a33d5fe01bc51b2b05133a",
+      "oracle_results": [
+        {
+          "group": "public",
+          "commands": [
+            {
+              "args": [
+                "dotnet.EXE",
+                "test",
+                "tests/CsharpCancellationCleanup.PublicTests/CsharpCancellationCleanup.PublicTests.csproj",
+                "--nologo"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 2.891725600002246,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "24da80b8cbdcb3f442639df562f4e8bdd4025f888f519e51a159bb885fe24358",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "args": [
+                "dotnet.EXE",
+                "format",
+                "tests/CsharpCancellationCleanup.PublicTests/CsharpCancellationCleanup.PublicTests.csproj",
+                "--verify-no-changes",
+                "--no-restore"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 5.2987668000023405,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "group": "preservation",
+          "commands": [
+            {
+              "args": [
+                "dotnet.EXE",
+                "test",
+                ".benchmark-oracle/CsharpCancellationCleanup.PreservationTests/CsharpCancellationCleanup.PreservationTests.csproj",
+                "--nologo"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 3.8954561999998987,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "807f7fd096ac112885e54a424ac0e74724105b73444931c1b5ca5a121e296411",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "group": "acceptance",
+          "commands": [
+            {
+              "args": [
+                "dotnet.EXE",
+                "test",
+                ".benchmark-oracle/CsharpCancellationCleanup.AcceptanceTests/CsharpCancellationCleanup.AcceptanceTests.csproj",
+                "--nologo"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 3.893855300000723,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "fc90616dab484f14d5fdebc082297a95a953813ea74b6650b2a8e875a977e656",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        }
+      ],
+      "telemetry": "not_available",
+      "review": {
+        "rubrics": {
+          "context-and-locality": {
+            "score": 2,
+            "reason": "Diff 僅修改 NotificationDispatchService 的取消傳遞與例外篩選，並在同一功能的 PublicTests 新增對應測試；未見與此行為無關的產品路徑變更。"
+          },
+          "behavior-and-validation": {
+            "score": 2,
+            "reason": "Diff 將呼叫端 Token 傳給開啟與傳送作業，保留 OperationCanceledException 向外傳遞，並以 await using 管理 Session；public、preservation、acceptance 三組 Oracle 均以 exit code 0 通過。"
+          },
+          "decision-and-escalation": {
+            "score": 0,
+            "reason": "Packet 的 Diff、Oracle 與 Blind Spots 未記錄 Repository Facts、Assumptions、Unknowns、替代方案、停止條件或需人工決定事項。"
+          }
+        },
+        "incremental_criteria": [
+          {
+            "criterion": "Caller CancellationToken reaches provider open and send operations",
+            "score": 2,
+            "reason": "Diff 將 cancellationToken 傳入 OpenSessionAsync 與 SendAsync；新增 RecordingProvider 和 RecordingSession 測試斷言兩者收到相同 Token，且 public Oracle 通過。"
+          },
+          {
+            "criterion": "OperationCanceledException remains cancellation rather than provider failure",
+            "score": 2,
+            "reason": "Diff 將 catch 改為排除 OperationCanceledException，新增 CancelingSession 測試預期該例外向外傳遞，且 acceptance Oracle 通過。"
+          },
+          {
+            "criterion": "The asynchronous provider session is disposed exactly once",
+            "score": 2,
+            "reason": "Diff 保留 await using，新增成功、取消與非取消失敗三種測試皆斷言 DisposeCount 為 1，且 public 與 acceptance Oracle 通過。"
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "fastapi-overdue-rule--core-plus-python--r01",
+      "scenario_id": "fastapi-overdue-rule",
+      "language": "python-fastapi",
+      "arm_id": "core-plus-python",
+      "repetition": 1,
+      "order_index": 1,
+      "terminal_state": "automatic_failure",
+      "contract_sha256": "fb1a68264c0f28cc36804ea63cff9d30a6d8903299b11dc3c2a87e8c68577dd0",
+      "scenario_contract_sha256": "e4725643d9d7056cf94cc4aed26068df7b0ec07183536beb3edd412be6f3a4c3",
+      "prompt_sha256": "7a1c93cd96bba538a6ef63d144c41d615fac06299b2f6c858e7e24e8e7f1962a",
+      "automatic_failure_reasons": [
+        "invalid_claim"
+      ],
+      "diff_sha256": "84adc49b98ee2ea37ab37a15764dd6cef2b9544259ce1521000b79f03f4a5326",
+      "oracle_results": [],
+      "telemetry": "not_available",
+      "review": {
+        "rubrics": {
+          "context-and-locality": {
+            "score": 1,
+            "reason": "Diff 只修改 app/overdue.py 的逾期判定與 tests/test_public_api.py 的相對應案例，表面上符合任務範圍；但 Packet 未提供 fixed revision、allowed diff provenance 或 Gold Files／查閱紀錄。"
+          },
+          "behavior-and-validation": {
+            "score": 1,
+            "reason": "Diff 與新增測試覆蓋 High 寬限期間、剛好邊界及 Completed High，且每個案例斷言 HTTP 200 與 overdue_ids；然而 oracle_results 為空，未見 Repository Gate、Normal 或 preservation 的執行證據，並記錄了 Automatic Failure：invalid_claim。"
+          },
+          "decision-and-escalation": {
+            "score": 0,
+            "reason": "Packet 未呈現 Repository facts、假設、未知、替代方案、授權界線或停止／升級條件；所列 Blind Spots 不構成這些決策證據。"
+          }
+        },
+        "incremental_criteria": [
+          {
+            "criterion": "High Priority applies the exact two-hour timezone-aware boundary",
+            "score": 1,
+            "reason": "Diff 以 HIGH_PRIORITY_GRACE_PERIOD = timedelta(hours=2) 僅處理 High，並用 <= 使邊界納入；Z 時間戳 API 測試驗證 11:59:59 不納入與 12:00:00 納入，但沒有 Oracle 結果可獨立驗證。"
+          },
+          {
+            "criterion": "HTTP status, response schema, Completed, and Normal behavior remain unchanged",
+            "score": 1,
+            "reason": "Diff 保留 Completed 排除與非 High 的原始 due_at_utc <= now 路徑，新增案例斷言 HTTP 200、overdue_ids 並檢查 Completed High；但缺乏 Normal、完整 schema 與 preservation Gate 的 Oracle 證據，且 Automatic Failure 為 invalid_claim。"
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "react-effect-lifecycle--control--r01",
+      "scenario_id": "react-effect-lifecycle",
+      "language": "typescript-react",
+      "arm_id": "control",
+      "repetition": 1,
+      "order_index": 2,
+      "terminal_state": "passed",
+      "contract_sha256": "fb1a68264c0f28cc36804ea63cff9d30a6d8903299b11dc3c2a87e8c68577dd0",
+      "scenario_contract_sha256": "9b321658f4fc6fbf52c4431babf892daf93d6067317345ff597bf69d2e95c433",
+      "prompt_sha256": "61748cfa0aad971701827d2b233b57616f6bdb0b0eca7fa2b06875a503e9f949",
+      "automatic_failure_reasons": [],
+      "diff_sha256": "a012db47744fc547963d23bb09396b416abf11c3855f9d353ef7e2c255205acc",
+      "oracle_results": [
+        {
+          "group": "public",
+          "commands": [
+            {
+              "args": [
+                "npm",
+                "test",
+                "--",
+                "src/WorkItemPreview.public.test.tsx"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 10.810627200000454,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "27f83654737e341f567ab4ebbf14bec4f506d7fa6ac050ea59563cdd36c68848",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "args": [
+                "npm",
+                "run",
+                "typecheck"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 2.582613400001719,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "44f7e09adbec1042ab84fc4007ecf88115d594495f45fa0e0798451d0b52a41e",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "args": [
+                "npm",
+                "run",
+                "lint"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 7.691268400001718,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "d1b757faba4a8b2893ddedda6793dd63bb0c311d97f726fea6fa484163da94d5",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "group": "preservation",
+          "commands": [
+            {
+              "args": [
+                "npm",
+                "test",
+                "--",
+                ".benchmark-oracle/preservation.test.tsx"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 9.238312900000892,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "6f5db0201255f793bff9be1f3d64588f5d68da7d04cf23fa3a535334f30214fd",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "group": "acceptance",
+          "commands": [
+            {
+              "args": [
+                "npm",
+                "test",
+                "--",
+                "--reporter=verbose",
+                ".benchmark-oracle/acceptance.test.tsx"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 3.030335899999045,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "a1321f636f9bebb095b8fc8627b9f72d967bb75e8783dc7815c34906ad01fce8",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        }
+      ],
+      "telemetry": "not_available",
+      "review": {
+        "rubrics": {
+          "context-and-locality": {
+            "score": 1,
+            "reason": "Diff 只變更 src/WorkItemPreview.tsx 內的 effect 與 stale-result guard，沒有可見的 Props 或 API contract 變更；但 Diff 與 Oracle 未記錄固定 revision、Gold Files 或 allowed-diff provenance，情境定位證據仍不完整。"
+          },
+          "behavior-and-validation": {
+            "score": 2,
+            "reason": "Diff 以 [workItemId] 限定 request identity、cleanup abort 舊 controller，且在 then 與 catch 均略過 aborted request；public 3 tests、preservation 2 tests、acceptance 2 tests、typecheck 與 lint 的 Oracle 全部 exit code 0。"
+          },
+          "decision-and-escalation": {
+            "score": 0,
+            "reason": "Diff 與通過的 Oracle 僅記錄程式及驗證結果，未提供可追溯的 Repository facts、假設、替代方案、Human Decisions Required 或升級停止條件。"
+          }
+        },
+        "incremental_criteria": [
+          {
+            "criterion": "Effect identity follows workItemId rather than callback or presentation props",
+            "score": 2,
+            "reason": "Diff 將 dependency 由 density、loadPreview、workItemId 改為僅 [workItemId]；acceptance Oracle 的 ordinary rerender test 與 public test 都通過。"
+          },
+          {
+            "criterion": "An identity change aborts the prior request through AbortSignal",
+            "score": 2,
+            "reason": "Diff 保留 effect cleanup 的 controller.abort() 並只在 workItemId 改變時執行；acceptance Oracle 的 aborted request overwrite 情境與 public、preservation Oracle 都 exit code 0。"
+          },
+          {
+            "criterion": "An aborted request cannot overwrite the current success or error state",
+            "score": 2,
+            "reason": "Diff 在 then 與 catch 都以 !controller.signal.aborted 阻止 state 寫入；acceptance Oracle 的 aborted request overwrite test 及 preservation Oracle 通過。"
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "typescript-overdue-rule--generic-clean-code--r01",
+      "scenario_id": "typescript-overdue-rule",
+      "language": "typescript",
+      "arm_id": "generic-clean-code",
+      "repetition": 1,
+      "order_index": 3,
+      "terminal_state": "passed",
+      "contract_sha256": "fb1a68264c0f28cc36804ea63cff9d30a6d8903299b11dc3c2a87e8c68577dd0",
+      "scenario_contract_sha256": "5a180c6871eae2df92ce3c5bac05379af997d2f71e4fcc51f15c79844a7dc23a",
+      "prompt_sha256": "f5cbf11f6654a945a24f47b37f248be44c063e9fd8865d099d53f817b0a84fad",
+      "automatic_failure_reasons": [],
+      "diff_sha256": "7f7aa19767e5641b3394e44561f9deff836d43cc06d362e0a9e4e4cbfb278909",
+      "oracle_results": [
+        {
+          "group": "public",
+          "commands": [
+            {
+              "args": [
+                "npm",
+                "test",
+                "--",
+                "src/overdue.public.test.tsx"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 10.3593163000005,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "a867b92700d9876530429ae2c519fd1d3321b764ebcc04983f083843f1d35864",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "args": [
+                "npm",
+                "run",
+                "typecheck"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 1.8688594000013836,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "b0009187501325cdea513b5f9d1d216e9d4d9b64ddffc54f3dfdf8616714a0d8",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "args": [
+                "npm",
+                "run",
+                "lint"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 7.708558499998617,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "c84c890755d7dd9ba883239b46e798ca54b939f758d64706567d033fa0edbc83",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "group": "preservation",
+          "commands": [
+            {
+              "args": [
+                "npm",
+                "test",
+                "--",
+                ".benchmark-oracle/preservation.test.tsx"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 9.294300599998678,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "8f22cbf7d4e4d1228ef27ee05ffc2d1a326866dce4958cef835dda052fa5f186",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "group": "acceptance",
+          "commands": [
+            {
+              "args": [
+                "npm",
+                "test",
+                "--",
+                "--reporter=verbose",
+                ".benchmark-oracle/acceptance.test.ts"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 1.4476945999995223,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "3b92c719eac9f445e9a602606574fe43b6370a7f9021fee496f48e437dd545ba",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        }
+      ],
+      "telemetry": "not_available",
+      "review": {
+        "rubrics": {
+          "context-and-locality": {
+            "score": 1,
+            "reason": "Diff 僅涉及 src/overdue.ts 與其公開測試，且 public、preservation、acceptance Oracle 均成功；但可觀察資料未提供固定 revision、允許 Diff 規則或每個路徑的 provenance，無法完整證明 locality。"
+          },
+          "behavior-and-validation": {
+            "score": 2,
+            "reason": "Diff 對 High 加上兩小時並以 <= 處理邊界，Completed 直接回傳 false；public 測試 5 項、preservation 1 項、acceptance 的邊界前與剛好邊界 2 項皆成功，typecheck 與 lint 也成功。"
+          },
+          "decision-and-escalation": {
+            "score": 0,
+            "reason": "可觀察的 Diff 與 Oracle 只記錄實作及命令結果，沒有事實、假設、Unknown、替代方案或升級與停止條件；Blind Spots 也僅列出 Fixture 與模型限制。"
+          }
+        },
+        "incremental_criteria": [
+          {
+            "criterion": "High Priority uses the exact two-hour boundary through the existing WorkItem model",
+            "score": 2,
+            "reason": "Diff 以 WorkItem 的 item.priority 判斷 High 並加兩小時，且 <= 覆蓋剛好到期；acceptance Oracle 明確顯示邊界前不逾期與剛好邊界逾期皆通過，typecheck 亦成功。"
+          },
+          {
+            "criterion": "Completed and Normal Priority branches remain typed and unchanged",
+            "score": 2,
+            "reason": "Diff 保留 WorkItem 型別並對 Completed 回傳 false，非 High 使用零寬限以保留 Normal 的原到期比較；public、preservation 與 typecheck Oracle 均成功。"
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "typescript-overdue-rule--core-only--r01",
+      "scenario_id": "typescript-overdue-rule",
+      "language": "typescript",
+      "arm_id": "core-only",
+      "repetition": 1,
+      "order_index": 4,
+      "terminal_state": "automatic_failure",
+      "contract_sha256": "fb1a68264c0f28cc36804ea63cff9d30a6d8903299b11dc3c2a87e8c68577dd0",
+      "scenario_contract_sha256": "5a180c6871eae2df92ce3c5bac05379af997d2f71e4fcc51f15c79844a7dc23a",
+      "prompt_sha256": "bbba01c0927652052b5ad09c653c329c4650727cfbb3868795640ab22fc296e3",
+      "automatic_failure_reasons": [
+        "invalid_claim"
+      ],
+      "diff_sha256": "b5682242d8590c53efada854290c8c7429c0ef63223183d3b5064fc2951e7308",
+      "oracle_results": [],
+      "telemetry": "not_available",
+      "review": {
+        "rubrics": {
+          "context-and-locality": {
+            "score": 1,
+            "reason": "Diff 僅修改 src/overdue.ts 與相鄰的公開測試，範圍集中在逾期判斷；但 oracle_results 為空，且 Automatic Failure 記錄為 invalid_claim，沒有可觀察的 Repository Gate 或契約保留佐證。"
+          },
+          "behavior-and-validation": {
+            "score": 1,
+            "reason": "Diff 以 High 的兩小時毫秒值與 <= 實作邊界，並先排除 Completed；但沒有 public、preservation、acceptance 或靜態檢查的 Oracle 執行結果，且存在 invalid_claim Automatic Failure。"
+          },
+          "decision-and-escalation": {
+            "score": 0,
+            "reason": "Packet 可觀察內容僅有程式與測試 Diff，沒有事實、假設、Unknown、替代方案或升級與停止條件的紀錄；Automatic Failure 為 invalid_claim。"
+          }
+        },
+        "incremental_criteria": [
+          {
+            "criterion": "High Priority uses the exact two-hour boundary through the existing WorkItem model",
+            "score": 1,
+            "reason": "Diff 保留 WorkItem 型別參數，依 item.priority === \"High\" 加上兩小時，並新增一毫秒前與剛好邊界的測試；但沒有 Oracle 執行結果，且 invalid_claim 限制此行為證據。"
+          },
+          {
+            "criterion": "Completed and Normal Priority branches remain typed and unchanged",
+            "score": 1,
+            "reason": "Diff 明確先排除 Completed，並讓非 High 優先序使用零寬限以維持原到期比較；但沒有 typecheck 或 preservation Oracle 結果，且 Automatic Failure 記錄為 invalid_claim。"
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "fastapi-provider-boundary--core-only--r01",
+      "scenario_id": "fastapi-provider-boundary",
+      "language": "python-fastapi",
+      "arm_id": "core-only",
+      "repetition": 1,
+      "order_index": 5,
+      "terminal_state": "automatic_failure",
+      "contract_sha256": "fb1a68264c0f28cc36804ea63cff9d30a6d8903299b11dc3c2a87e8c68577dd0",
+      "scenario_contract_sha256": "c1fe4bb830aea8ecd09a76a06d7c54935fc0c2ef2ff61213cb59f482170c4205",
+      "prompt_sha256": "b87f5fe684e6ad599e50508f4b627e2c6154020ca2f9411ed851d3052e096f87",
+      "automatic_failure_reasons": [
+        "invalid_claim"
+      ],
+      "diff_sha256": "131f7e1d977b4809ad22aa1a0ddffc65afeef009605a2b628161250a65210410",
+      "oracle_results": [],
+      "telemetry": "not_available",
+      "review": {
+        "rubrics": {
+          "context-and-locality": {
+            "score": 2,
+            "reason": "Diff 僅修改 app/main.py 的 Route DI wiring 與 tests/test_public_api.py 的對應測試，直接匯入既有 NotificationSender，未見新增同義 Protocol、第二套 Domain Model 或 Repository。"
+          },
+          "behavior-and-validation": {
+            "score": 1,
+            "reason": "Diff 新增 502 與 503 斷言，並保留可見的 202 decorator、404 分支與 503 例外轉譯；但 oracle_results 為空，且 automatic_failure_reasons 記載 invalid_claim，沒有已執行的驗證證據。"
+          },
+          "decision-and-escalation": {
+            "score": 0,
+            "reason": "Diff 可見採用 Depends(get_notification_sender) 的方案，但 Packet 未記錄假設、替代方案或停止與升級條件；oracle_results 為空且 automatic_failure_reasons 為 invalid_claim，無法把驗證主張視為可信決策紀錄。"
+          }
+        },
+        "incremental_criteria": [
+          {
+            "criterion": "The route reuses NotificationSender through FastAPI dependency injection",
+            "score": 1,
+            "reason": "Diff 將 sender 宣告為 Annotated[NotificationSender, Depends(get_notification_sender)]，並把它傳給 notify_work_item；但 Packet 沒有 Oracle 結果且記載 invalid_claim，未獨立確認實際 Route 執行。"
+          },
+          {
+            "criterion": "Dependency override replaces the provider without duplicating the domain boundary",
+            "score": 1,
+            "reason": "Diff 的測試以 app.dependency_overrides 對 get_notification_sender 置換 RejectingSender 與 UnavailableSender，且變更中未新增另一個 domain boundary；但 oracle_results 為空且有 invalid_claim，置換結果未被獨立驗證。"
+          },
+          {
+            "criterion": "The 202, 404, 502, and 503 failure semantics remain distinct",
+            "score": 1,
+            "reason": "Diff 保留 202 decorator 和可見的 404、503 處理，並新增 502、503 回應內容斷言；然而沒有 Oracle 結果且 automatic failure 為 invalid_claim，四種語意未獲執行驗證。"
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "csharp-overdue-rule--generic-clean-code--r01",
+      "scenario_id": "csharp-overdue-rule",
+      "language": "csharp",
+      "arm_id": "generic-clean-code",
+      "repetition": 1,
+      "order_index": 6,
+      "terminal_state": "passed",
+      "contract_sha256": "fb1a68264c0f28cc36804ea63cff9d30a6d8903299b11dc3c2a87e8c68577dd0",
+      "scenario_contract_sha256": "44c1d63637c207e7150ca5d2a61771b5ef76260378d33bebe2498227674e7dbd",
+      "prompt_sha256": "9ae03b99a184d02b81c499ab6f9c6bcce11de27ae06c041811ba7b20cdf7d1b2",
+      "automatic_failure_reasons": [],
+      "diff_sha256": "a83bf0696746e0ce369d4f772e4cf9dc9503e032840e4e9864e7c14d3cd43118",
+      "oracle_results": [
+        {
+          "group": "public",
+          "commands": [
+            {
+              "args": [
+                "dotnet.EXE",
+                "test",
+                "tests/CsharpOverdueRule.PublicTests/CsharpOverdueRule.PublicTests.csproj",
+                "--nologo"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 2.8018166000001656,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "6b8260b39a576de179d0699b6e0b100e52bf31e40c844ead5b915f78c8ce935e",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "args": [
+                "dotnet.EXE",
+                "format",
+                "tests/CsharpOverdueRule.PublicTests/CsharpOverdueRule.PublicTests.csproj",
+                "--verify-no-changes",
+                "--no-restore"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 5.595487899998261,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "group": "preservation",
+          "commands": [
+            {
+              "args": [
+                "dotnet.EXE",
+                "test",
+                ".benchmark-oracle/CsharpOverdueRule.PreservationTests/CsharpOverdueRule.PreservationTests.csproj",
+                "--nologo"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 4.05673360000219,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "8964990291eac0751181b7c8c02ff94ce266de161a6c7c6e58391ff3c3ba9afb",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "group": "acceptance",
+          "commands": [
+            {
+              "args": [
+                "dotnet.EXE",
+                "test",
+                ".benchmark-oracle/CsharpOverdueRule.AcceptanceTests/CsharpOverdueRule.AcceptanceTests.csproj",
+                "--nologo"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 3.8042064999972354,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "697fd07e65f1fe554af0487325d178c9625cf4cf7207f2fa86e6495819f54fc2",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        }
+      ],
+      "telemetry": "not_available",
+      "review": {
+        "rubrics": {
+          "context-and-locality": {
+            "score": 1,
+            "reason": "Diff 僅修改 OverduePolicy 的 High Priority 比較式並新增對應公開測試，與 Task 範圍相符；但 Packet 未提供固定 revision、允許 Diff 邊界或路徑 provenance。"
+          },
+          "behavior-and-validation": {
+            "score": 2,
+            "reason": "Diff 將 High Priority 判斷改為 AddHours(2) <= now，並測試邊界前一 tick 與剛好兩小時；public、preservation、acceptance Oracle 均以 exit code 0 通過。"
+          },
+          "decision-and-escalation": {
+            "score": 0,
+            "reason": "Packet 的 Diff、Oracle、Automatic Failure 與 Blind Spots 未記錄選定方案理由、替代方案、未知資訊或需升級的人類決策。"
+          }
+        },
+        "incremental_criteria": [
+          {
+            "criterion": "DateTimeOffset comparison preserves the exact two-hour UTC boundary",
+            "score": 2,
+            "reason": "Diff 對 DateTimeOffset 的 DueAtUtc 使用 AddHours(2) <= now，且新增測試確認兩小時前一 tick 為 False、剛好兩小時為 True；acceptance Oracle exit code 為 0。"
+          },
+          {
+            "criterion": "Completed and Normal Priority branches retain their existing semantics",
+            "score": 2,
+            "reason": "Diff 僅變更 High Priority ternary 分支，Normal 分支仍為 item.DueAtUtc <= now；preservation Oracle 的 3 個測試均以 exit code 0 通過。"
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "csharp-overdue-rule--control--r01",
+      "scenario_id": "csharp-overdue-rule",
+      "language": "csharp",
+      "arm_id": "control",
+      "repetition": 1,
+      "order_index": 7,
+      "terminal_state": "passed",
+      "contract_sha256": "fb1a68264c0f28cc36804ea63cff9d30a6d8903299b11dc3c2a87e8c68577dd0",
+      "scenario_contract_sha256": "44c1d63637c207e7150ca5d2a61771b5ef76260378d33bebe2498227674e7dbd",
+      "prompt_sha256": "1d3bff496893de45820c600216013f0bdd17144ff445c162c241b70cd410d774",
+      "automatic_failure_reasons": [],
+      "diff_sha256": "7688f5e175105129969ad033afa19cac98dfdada8e96325b0389d88154f6a88b",
+      "oracle_results": [
+        {
+          "group": "public",
+          "commands": [
+            {
+              "args": [
+                "dotnet.EXE",
+                "test",
+                "tests/CsharpOverdueRule.PublicTests/CsharpOverdueRule.PublicTests.csproj",
+                "--nologo"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 3.1256207000005816,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "d870e412be1455888458b4621f4cdfe1afc9a3ca38e5c4537e5bca1ccb1430e9",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "args": [
+                "dotnet.EXE",
+                "format",
+                "tests/CsharpOverdueRule.PublicTests/CsharpOverdueRule.PublicTests.csproj",
+                "--verify-no-changes",
+                "--no-restore"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 5.209048199998506,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "group": "preservation",
+          "commands": [
+            {
+              "args": [
+                "dotnet.EXE",
+                "test",
+                ".benchmark-oracle/CsharpOverdueRule.PreservationTests/CsharpOverdueRule.PreservationTests.csproj",
+                "--nologo"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 3.968758800001524,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "1207ea8a42700464ae7dd10bf0e9ff846b094b7d377bcef2dd8833572cc81600",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "group": "acceptance",
+          "commands": [
+            {
+              "args": [
+                "dotnet.EXE",
+                "test",
+                ".benchmark-oracle/CsharpOverdueRule.AcceptanceTests/CsharpOverdueRule.AcceptanceTests.csproj",
+                "--nologo"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 3.76945970000088,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "c46e45470fd66fee8108ddd4bdccf90dbf19ebf8f189a309594911e2ed88cfd6",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        }
+      ],
+      "telemetry": "not_available",
+      "review": {
+        "rubrics": {
+          "context-and-locality": {
+            "score": 1,
+            "reason": "Diff 僅修改 OverduePolicy 的 High Priority 比較式並新增對應公開測試，與 Task 範圍相符；但 Packet 未提供固定 revision、允許 Diff 邊界或路徑 provenance。"
+          },
+          "behavior-and-validation": {
+            "score": 2,
+            "reason": "Diff 將 High Priority 判斷改為 AddHours(2) <= now，並測試邊界前一 tick 與剛好兩小時；public、preservation、acceptance Oracle 均以 exit code 0 通過。"
+          },
+          "decision-and-escalation": {
+            "score": 0,
+            "reason": "Packet 的 Diff、Oracle、Automatic Failure 與 Blind Spots 未記錄選定方案理由、替代方案、未知資訊或需升級的人類決策。"
+          }
+        },
+        "incremental_criteria": [
+          {
+            "criterion": "DateTimeOffset comparison preserves the exact two-hour UTC boundary",
+            "score": 2,
+            "reason": "Diff 對 DateTimeOffset 的 DueAtUtc 使用 AddHours(2) <= now，且新增測試確認兩小時前一 tick 為 False、剛好兩小時為 True；acceptance Oracle exit code 為 0。"
+          },
+          {
+            "criterion": "Completed and Normal Priority branches retain their existing semantics",
+            "score": 2,
+            "reason": "Diff 僅變更 High Priority ternary 分支，Normal 分支仍為 item.DueAtUtc <= now；preservation Oracle 的 3 個測試均以 exit code 0 通過。"
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "typescript-runtime-validation--control--r01",
+      "scenario_id": "typescript-runtime-validation",
+      "language": "typescript",
+      "arm_id": "control",
+      "repetition": 1,
+      "order_index": 8,
+      "terminal_state": "passed",
+      "contract_sha256": "fb1a68264c0f28cc36804ea63cff9d30a6d8903299b11dc3c2a87e8c68577dd0",
+      "scenario_contract_sha256": "6ed693f481934b8a80d29500c57904f2793aefe7c9ba160c8f53a7227ea9d148",
+      "prompt_sha256": "c8c443ced366e289f991e7a2a0d765b45b0b9c313d22b2acf14976b5f52dbd31",
+      "automatic_failure_reasons": [],
+      "diff_sha256": "c944894b2d4e636072459e2e08998a3683c27733396db0f5142b43089b29baae",
+      "oracle_results": [
+        {
+          "group": "public",
+          "commands": [
+            {
+              "args": [
+                "npm",
+                "test",
+                "--",
+                "src/decodeWorkItem.public.test.ts"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 2.6073402000001806,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "6d67775faefdfd96fc744acbc2aa9761b8743723d1b6c742b4e29cf4b80a2101",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "args": [
+                "npm",
+                "run",
+                "typecheck"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 1.3809497000002011,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "ab79fc057397c502cc770283066314a41643dfb0c904abea0ddc3670331e0777",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "args": [
+                "npm",
+                "run",
+                "lint"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 7.755688299999747,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "7328f834fafb0632f704da19140caf1963c302f004d72fbe16c641a49b608988",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "group": "preservation",
+          "commands": [
+            {
+              "args": [
+                "npm",
+                "test",
+                "--",
+                ".benchmark-oracle/preservation.test.ts"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 1.4104245999988052,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "fd279430e48811e53788313a8e0cd73a20b029b0974b33d019380cf3aa89d73a",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "group": "acceptance",
+          "commands": [
+            {
+              "args": [
+                "npm",
+                "test",
+                "--",
+                "--reporter=verbose",
+                ".benchmark-oracle/acceptance.test.ts"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 1.3908315999979095,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "477400d5f8f7ab2f616fb99aadd8b6fa002e86ad63882aae5aded9beb7be5b28",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        }
+      ],
+      "telemetry": "not_available",
+      "review": {
+        "rubrics": {
+          "context-and-locality": {
+            "score": 2,
+            "reason": "Diff 僅修改 decodeWorkItem 的 runtime 檢查、結果描述與同一公開測試檔；Oracle 的 public、preservation 與 acceptance 群組皆成功。"
+          },
+          "behavior-and-validation": {
+            "score": 2,
+            "reason": "Diff 新增 priority、dueAtUtc 與 id 型別不符的 rejected/invalid-payload 測試，且 public 5 項、preservation 2 項、acceptance 2 項測試、typecheck 與 lint 均以 exit code 0 成功。"
+          },
+          "decision-and-escalation": {
+            "score": 0,
+            "reason": "Packet 的 Diff 與 Oracle 顯示採用欄位檢查、明確 WorkItem 建構和 assertNever，但沒有可觀察的事實、假設、未知、替代方案或升級停止條件紀錄。"
+          }
+        },
+        "incremental_criteria": [
+          {
+            "criterion": "The unknown payload is narrowed by runtime guards before WorkItem construction",
+            "score": 2,
+            "reason": "Diff 在建立 item 前以 isRecord、id/title 的 typeof 檢查、isWorkItemPriority 與 dueAtUtc 的 typeof 檢查拒絕不符資料；acceptance runtime-validation 測試成功。"
+          },
+          {
+            "criterion": "The existing WorkItem type is reused without any or unsafe assertion",
+            "score": 2,
+            "reason": "Diff 匯入既有 WorkItem 與 WorkItemPriority，並以 const item: WorkItem 的欄位建構取代 payload as unknown as WorkItem；typecheck 以 exit code 0 成功。"
+          },
+          {
+            "criterion": "Accepted and rejected results use exhaustive discriminated-union handling",
+            "score": 2,
+            "reason": "Diff 在 describeWorkItemResult 使用 accepted、rejected 與 default assertNever 的 switch；acceptance 對 exhaustive discriminated result handling 的測試成功。"
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "react-state-error-retention--control--r01",
+      "scenario_id": "react-state-error-retention",
+      "language": "typescript-react",
+      "arm_id": "control",
+      "repetition": 1,
+      "order_index": 9,
+      "terminal_state": "passed",
+      "contract_sha256": "fb1a68264c0f28cc36804ea63cff9d30a6d8903299b11dc3c2a87e8c68577dd0",
+      "scenario_contract_sha256": "e67598b70ff71f95d137668787b9541a875010c83cc5d859ffbb207598741524",
+      "prompt_sha256": "24eee3b235898470b02a4b90ed98cee000ecd50dff62ad168902754f3750c99a",
+      "automatic_failure_reasons": [],
+      "diff_sha256": "e366fdf5cd1d28718ef6f77c05a8f6379f3d7e504a9f3b130685c525e82965e5",
+      "oracle_results": [
+        {
+          "group": "public",
+          "commands": [
+            {
+              "args": [
+                "npm",
+                "test",
+                "--",
+                "src/WorkItemPanel.public.test.tsx"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 11.366727800002991,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "fe532b87e2a3d5233f0b0418ed3f228b24060439bcff77c70b61650305badaf3",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "args": [
+                "npm",
+                "run",
+                "typecheck"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 2.053693399997428,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "b35885ad6433b03aa19a7bb7aac5081e5b42f110f3230fa6856d885b31b2ae0c",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "args": [
+                "npm",
+                "run",
+                "lint"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 8.475173300001188,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "ab3c2bb7d62c76ff7e17301b50fe2699bb3017fe0fb84afe0df3373ba3378732",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "group": "preservation",
+          "commands": [
+            {
+              "args": [
+                "npm",
+                "test",
+                "--",
+                ".benchmark-oracle/preservation.test.tsx"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 10.192392900000414,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "3e6b01f5be8f1f56a03963ecbcbc7881667707e2a3ff50ba0301c3b4f37b848b",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "group": "acceptance",
+          "commands": [
+            {
+              "args": [
+                "npm",
+                "test",
+                "--",
+                "--reporter=verbose",
+                ".benchmark-oracle/acceptance.test.tsx"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 3.5575383999967016,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "f39f8e81970b38cb4c80b133fa4914feb8eead64f04ebb0634e0865abda877b0",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        }
+      ],
+      "telemetry": "not_available",
+      "review": {
+        "rubrics": {
+          "context-and-locality": {
+            "score": 2,
+            "reason": "Diff 僅變更 src/WorkItemPanel.tsx 和其 public test，新增的 workItemId state、cleanup、renderedState 與測試都直接對應指定非同步狀態行為，且未見公開 Props 或 LoadWorkItem Contract 變更。"
+          },
+          "behavior-and-validation": {
+            "score": 2,
+            "reason": "Diff 以 workItemId/renderedState 遮蔽不同 identity 的 state，並在 effect cleanup 使舊 request 失效；public、preservation、acceptance Oracle 全部成功，且 typecheck 與 lint 均以 exit code 0 完成。"
+          },
+          "decision-and-escalation": {
+            "score": 0,
+            "reason": "雖有 Diff、Oracle 與 Blind Spots，Packet 未記錄事實、假設、替代方案、停止或升級條件，也沒有 Human Decisions Required 的可觀察證據。"
+          }
+        },
+        "incremental_criteria": [
+          {
+            "criterion": "Still-valid content remains visible while retry is loading",
+            "score": 2,
+            "reason": "同一 workItemId 時 loading state 保留 currentState.content；public test 直接驗證 retry 中與 retry error 後內容可見，acceptance Oracle 的 retry 案例也成功。"
+          },
+          {
+            "criterion": "Earlier success or failure cannot overwrite the latest request state",
+            "score": 2,
+            "reason": "Diff 使用 latestRequestId、effect cleanup 及 workItemId/renderedState 防護舊回應；public test 覆蓋較舊 resolve 與 reject，acceptance Oracle 的 identity 成功與舊 failure 案例皆成功。"
+          },
+          {
+            "criterion": "Public loading, error, success, and props contracts remain unchanged",
+            "score": 2,
+            "reason": "Diff 未修改 WorkItemPanel Props 或 LoadWorkItem 宣告；public 與 preservation Oracle 成功，並有 typecheck 和 lint exit code 0，支持既有 loading、Alert 與成功內容契約。"
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "typescript-overdue-rule--core-plus-typescript--r01",
+      "scenario_id": "typescript-overdue-rule",
+      "language": "typescript",
+      "arm_id": "core-plus-typescript",
+      "repetition": 1,
+      "order_index": 10,
+      "terminal_state": "automatic_failure",
+      "contract_sha256": "fb1a68264c0f28cc36804ea63cff9d30a6d8903299b11dc3c2a87e8c68577dd0",
+      "scenario_contract_sha256": "5a180c6871eae2df92ce3c5bac05379af997d2f71e4fcc51f15c79844a7dc23a",
+      "prompt_sha256": "33122dcf5a1b9887e3e9cbbed3171bfd54888cde08732c39de21092b2fa9e099",
+      "automatic_failure_reasons": [
+        "invalid_claim"
+      ],
+      "diff_sha256": "fb4d953c13b8e447b77845eaead783fc16d8a188fd48549b6a65c9c5f41792da",
+      "oracle_results": [],
+      "telemetry": "not_available",
+      "review": {
+        "rubrics": {
+          "context-and-locality": {
+            "score": 1,
+            "reason": "Diff 僅修改 src/overdue.ts 與相鄰的公開測試，範圍集中在逾期判斷；但 oracle_results 為空，且 Automatic Failure 記錄為 invalid_claim，沒有可觀察的 Repository Gate 或契約保留佐證。"
+          },
+          "behavior-and-validation": {
+            "score": 1,
+            "reason": "Diff 以 High 的兩小時毫秒值與 <= 實作邊界，並先排除 Completed；但沒有 public、preservation、acceptance 或靜態檢查的 Oracle 執行結果，且存在 invalid_claim Automatic Failure。"
+          },
+          "decision-and-escalation": {
+            "score": 0,
+            "reason": "Packet 可觀察內容僅有程式與測試 Diff，沒有事實、假設、Unknown、替代方案或升級與停止條件的紀錄；Automatic Failure 為 invalid_claim。"
+          }
+        },
+        "incremental_criteria": [
+          {
+            "criterion": "High Priority uses the exact two-hour boundary through the existing WorkItem model",
+            "score": 1,
+            "reason": "Diff 保留 WorkItem 型別參數，依 item.priority === \"High\" 加上兩小時，並新增邊界內與剛好邊界的測試；但沒有 Oracle 執行結果，且 invalid_claim 限制此行為證據。"
+          },
+          {
+            "criterion": "Completed and Normal Priority branches remain typed and unchanged",
+            "score": 1,
+            "reason": "Diff 明確先排除 Completed，並讓非 High 優先序使用零寬限以維持原到期比較；但沒有 typecheck 或 preservation Oracle 結果，且 Automatic Failure 記錄為 invalid_claim。"
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "csharp-cancellation-cleanup--core-plus-csharp--r01",
+      "scenario_id": "csharp-cancellation-cleanup",
+      "language": "csharp",
+      "arm_id": "core-plus-csharp",
+      "repetition": 1,
+      "order_index": 11,
+      "terminal_state": "automatic_failure",
+      "contract_sha256": "fb1a68264c0f28cc36804ea63cff9d30a6d8903299b11dc3c2a87e8c68577dd0",
+      "scenario_contract_sha256": "0438b7f59ad59073a44711dab5a68c87d54eed081b92f7b68aea8aba14f81c71",
+      "prompt_sha256": "d225e40feb1570f03b500f08519d595b249cadeaec5a28c02ab647945aae376b",
+      "automatic_failure_reasons": [
+        "invalid_claim"
+      ],
+      "diff_sha256": "4fccd8b304e34b5174f8ec8ac372ddcfceddc92a69a814568ceb337b731afd54",
+      "oracle_results": [],
+      "telemetry": "not_available",
+      "review": {
+        "rubrics": {
+          "context-and-locality": {
+            "score": 2,
+            "reason": "Diff 僅修改 NotificationDispatchService 的取消傳遞與例外處理，並在相同功能的 PublicTests 新增驗證；未見超出該功能的產品路徑變更。"
+          },
+          "behavior-and-validation": {
+            "score": 1,
+            "reason": "Diff 與新增測試涵蓋 Token 傳遞、取消傳遞及 Session 釋放，但 oracle_results 為空且 automatic_failure_reasons 記錄 invalid_claim，沒有獨立執行結果可完整驗證。"
+          },
+          "decision-and-escalation": {
+            "score": 0,
+            "reason": "Packet 的 Diff、空白 Oracle 與 Blind Spots 未記錄 Repository Facts、Assumptions、Unknowns、替代方案、停止條件或需人工決定事項。"
+          }
+        },
+        "incremental_criteria": [
+          {
+            "criterion": "Caller CancellationToken reaches provider open and send operations",
+            "score": 1,
+            "reason": "Diff 將 cancellationToken 傳入 OpenSessionAsync 與 SendAsync，新增 TrackingProvider 和 TrackingSession 斷言相同 Token；但沒有 Oracle 結果，且 Packet 記錄 invalid_claim。"
+          },
+          {
+            "criterion": "OperationCanceledException remains cancellation rather than provider failure",
+            "score": 1,
+            "reason": "Diff 的 catch 篩選排除 OperationCanceledException，新增測試預期 Provider 與 Session 的取消例外向外傳遞；但沒有 Oracle 結果，且 Packet 記錄 invalid_claim。"
+          },
+          {
+            "criterion": "The asynchronous provider session is disposed exactly once",
+            "score": 1,
+            "reason": "Diff 保留 await using，新增成功、非取消失敗及取消測試斷言 DisposeCount 為 1；但沒有 Oracle 結果，且 Packet 記錄 invalid_claim。"
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "fastapi-overdue-rule--control--r01",
+      "scenario_id": "fastapi-overdue-rule",
+      "language": "python-fastapi",
+      "arm_id": "control",
+      "repetition": 1,
+      "order_index": 12,
+      "terminal_state": "passed",
+      "contract_sha256": "fb1a68264c0f28cc36804ea63cff9d30a6d8903299b11dc3c2a87e8c68577dd0",
+      "scenario_contract_sha256": "e4725643d9d7056cf94cc4aed26068df7b0ec07183536beb3edd412be6f3a4c3",
+      "prompt_sha256": "56e298122f8668f033500c648b3b02fb58e34f660c3c35410d2cbaf60c438fab",
+      "automatic_failure_reasons": [],
+      "diff_sha256": "ab6b5038df194699dc97553e4e5f547ae31e688075a3217fdb5c767f29d9454c",
+      "oracle_results": [
+        {
+          "group": "public",
+          "commands": [
+            {
+              "args": [
+                "{workspace}\\.venv\\Scripts\\python.exe",
+                "-m",
+                "pytest",
+                "-q",
+                "tests"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 1.3867696999986947,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "cfc8c7691d3a3c671d4dffb5a16d45053752e920a75c49284b8a5b7f2acd788b",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "args": [
+                "{workspace}\\.venv\\Scripts\\python.exe",
+                "-m",
+                "ruff",
+                "check",
+                "."
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 0.2616130000023986,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "args": [
+                "{workspace}\\.venv\\Scripts\\python.exe",
+                "-m",
+                "ruff",
+                "format",
+                "--check",
+                "."
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 0.27868390000003274,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "ef7d13d02214e98ca902b05257cdbe6a8e84f3b4714508efdc19766460b54209",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "group": "preservation",
+          "commands": [
+            {
+              "args": [
+                "{workspace}\\.venv\\Scripts\\python.exe",
+                "-m",
+                "pytest",
+                "-q",
+                ".benchmark-oracle/test_preservation.py"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 0.974697699999524,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "09229b326b028651d725fa47cd1bae9fd8e0145ff8779bdb84ae2762c00ab737",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "group": "acceptance",
+          "commands": [
+            {
+              "args": [
+                "{workspace}\\.venv\\Scripts\\python.exe",
+                "-m",
+                "pytest",
+                "-vv",
+                ".benchmark-oracle/test_acceptance.py"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 1.1884142999988399,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "952f417399a4fadc268b73a898074fa68ab910f38d48f02fb2783d6cd420059d",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        }
+      ],
+      "telemetry": "not_available",
+      "review": {
+        "rubrics": {
+          "context-and-locality": {
+            "score": 1,
+            "reason": "Diff 限於 app/overdue.py 的目標規則與 tests/test_public_api.py 的相關測試，沒有顯示其他 Route 或 Model 的修改；但 Packet 沒有固定 revision、allowed diff 規則來源或 Gold Files 查閱紀錄。"
+          },
+          "behavior-and-validation": {
+            "score": 2,
+            "reason": "逾期判定先排除 Completed，再只為 High 加兩小時並以 <= 處理邊界；公開測試 4 passed、preservation oracle 1 passed、acceptance 的兩項邊界測試皆 passed，ruff check 與 format check 也成功，且沒有 Automatic Failure。"
+          },
+          "decision-and-escalation": {
+            "score": 0,
+            "reason": "Packet 中沒有可觀察的 Repository facts、假設與未知項、替代方案、授權邊界或需要人類決定的升級條件；Diff 與 Oracle 結果本身不足以支持決策紀錄。"
+          }
+        },
+        "incremental_criteria": [
+          {
+            "criterion": "High Priority applies the exact two-hour timezone-aware boundary",
+            "score": 2,
+            "reason": "Diff 對 High 使用 timedelta(hours=2) 並在 overdue_at <= now 時納入逾期；Z 時間戳 API 測試同時驗證到期後 1:59:59 尚未逾期與剛滿兩小時逾期，acceptance oracle 的兩個邊界測試皆 passed。"
+          },
+          {
+            "criterion": "HTTP status, response schema, Completed, and Normal behavior remain unchanged",
+            "score": 2,
+            "reason": "Diff 明確保留 Completed 回傳 False 與非 High 的原始 due_at_utc <= now 行為，新增測試斷言 HTTP 200 與 overdue_ids；public pytest、preservation oracle 均成功，且無 Automatic Failure。"
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "react-effect-lifecycle--core-plus-typescript--r01",
+      "scenario_id": "react-effect-lifecycle",
+      "language": "typescript-react",
+      "arm_id": "core-plus-typescript",
+      "repetition": 1,
+      "order_index": 13,
+      "terminal_state": "automatic_failure",
+      "contract_sha256": "fb1a68264c0f28cc36804ea63cff9d30a6d8903299b11dc3c2a87e8c68577dd0",
+      "scenario_contract_sha256": "9b321658f4fc6fbf52c4431babf892daf93d6067317345ff597bf69d2e95c433",
+      "prompt_sha256": "e1125e590b0cf3ab4bda5ea72f935753f4caf4f1b4361963894a245e2d95a7fe",
+      "automatic_failure_reasons": [
+        "invalid_claim"
+      ],
+      "diff_sha256": "9db73956debf96475a8e2a204c869df79c3c55f5e9281a1b6767644d3099d6b4",
+      "oracle_results": [],
+      "telemetry": "not_available",
+      "review": {
+        "rubrics": {
+          "context-and-locality": {
+            "score": 1,
+            "reason": "Diff 僅觸及 src/WorkItemPreview.tsx 與其 public test，且沒有改動 Props 或 API 型別；但 oracle_results 為空且 automatic_failure_reasons 記錄 invalid_claim，無法補足定位與邊界 provenance。"
+          },
+          "behavior-and-validation": {
+            "score": 1,
+            "reason": "Diff 以 ref 取得目前 loader、只由 [workItemId] 重新建立 effect，並在成功與失敗分支檢查 signal.aborted；新增測試涵蓋 rerender、取消與 stale result，但沒有獨立 Oracle 執行結果且存在 invalid_claim。"
+          },
+          "decision-and-escalation": {
+            "score": 0,
+            "reason": "可觀察 Diff 只有實作與測試變更，oracle_results 為空且 automatic_failure_reasons 為 invalid_claim；未記錄可追溯的事實、假設、替代方案或升級停止條件。"
+          }
+        },
+        "incremental_criteria": [
+          {
+            "criterion": "Effect identity follows workItemId rather than callback or presentation props",
+            "score": 1,
+            "reason": "Diff 將 dependency 改為 [workItemId]，並以 loadPreviewRef.current 讀取目前 callback；新增 density 與 callback identity rerender 測試，但 oracle_results 為空且有 invalid_claim。"
+          },
+          {
+            "criterion": "An identity change aborts the prior request through AbortSignal",
+            "score": 1,
+            "reason": "Diff 保留 cleanup 的 controller.abort()，新增測試檢查 key 改變後 firstSignal 已 aborted；oracle_results 為空且有 invalid_claim，缺少執行驗證。"
+          },
+          {
+            "criterion": "An aborted request cannot overwrite the current success or error state",
+            "score": 1,
+            "reason": "Diff 在 then 與 catch 都檢查 !controller.signal.aborted，並新增 cancelled success 與 failed result 測試；oracle_results 為空且有 invalid_claim，驗證證據不完整。"
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "csharp-overdue-rule--core-only--r01",
+      "scenario_id": "csharp-overdue-rule",
+      "language": "csharp",
+      "arm_id": "core-only",
+      "repetition": 1,
+      "order_index": 14,
+      "terminal_state": "passed",
+      "contract_sha256": "fb1a68264c0f28cc36804ea63cff9d30a6d8903299b11dc3c2a87e8c68577dd0",
+      "scenario_contract_sha256": "44c1d63637c207e7150ca5d2a61771b5ef76260378d33bebe2498227674e7dbd",
+      "prompt_sha256": "c25f18c975e69adf0409c6a2e7aecab8a1af1379649fb16307e7e6c09cc98720",
+      "automatic_failure_reasons": [],
+      "diff_sha256": "f39b9fc8b2f9246d8804355544b4b8c0831942daa39015c34d04abb5314019c0",
+      "oracle_results": [
+        {
+          "group": "public",
+          "commands": [
+            {
+              "args": [
+                "dotnet.EXE",
+                "test",
+                "tests/CsharpOverdueRule.PublicTests/CsharpOverdueRule.PublicTests.csproj",
+                "--nologo"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 2.8702298999996856,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "3f6d91a693fab4361114b7bf09b2c7d048dea20be2b169868ed312afef5d78d6",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "args": [
+                "dotnet.EXE",
+                "format",
+                "tests/CsharpOverdueRule.PublicTests/CsharpOverdueRule.PublicTests.csproj",
+                "--verify-no-changes",
+                "--no-restore"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 5.382391399998596,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "group": "preservation",
+          "commands": [
+            {
+              "args": [
+                "dotnet.EXE",
+                "test",
+                ".benchmark-oracle/CsharpOverdueRule.PreservationTests/CsharpOverdueRule.PreservationTests.csproj",
+                "--nologo"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 4.305690900000627,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "72220a1090cabdbfcbd947715d7e2f91bcab739115846b02f53a3cda1590de18",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "group": "acceptance",
+          "commands": [
+            {
+              "args": [
+                "dotnet.EXE",
+                "test",
+                ".benchmark-oracle/CsharpOverdueRule.AcceptanceTests/CsharpOverdueRule.AcceptanceTests.csproj",
+                "--nologo"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 4.178553899997496,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "042c483184b67fc5e06f63d3895f9fa9d028a613ee0ec01e4043b3d82be9a8e5",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        }
+      ],
+      "telemetry": "not_available",
+      "review": {
+        "rubrics": {
+          "context-and-locality": {
+            "score": 1,
+            "reason": "Diff 僅修改 OverduePolicy 的 High Priority 比較式並新增對應公開測試，與 Task 範圍相符；但 Packet 未提供固定 revision、允許 Diff 邊界或路徑 provenance。"
+          },
+          "behavior-and-validation": {
+            "score": 2,
+            "reason": "Diff 將 High Priority 判斷改為 AddHours(2) <= now，Theory 覆蓋 7,199、7,200 與 7,201 秒；public、preservation、acceptance Oracle 均以 exit code 0 通過。"
+          },
+          "decision-and-escalation": {
+            "score": 0,
+            "reason": "Packet 的 Diff、Oracle、Automatic Failure 與 Blind Spots 未記錄選定方案理由、替代方案、未知資訊或需升級的人類決策。"
+          }
+        },
+        "incremental_criteria": [
+          {
+            "criterion": "DateTimeOffset comparison preserves the exact two-hour UTC boundary",
+            "score": 2,
+            "reason": "Diff 對 DateTimeOffset 的 DueAtUtc 使用 AddHours(2) <= now，Theory 確認 7,199 秒為 False、7,200 與 7,201 秒為 True；acceptance Oracle exit code 為 0。"
+          },
+          {
+            "criterion": "Completed and Normal Priority branches retain their existing semantics",
+            "score": 2,
+            "reason": "Diff 僅變更 High Priority ternary 分支，Normal 分支仍為 item.DueAtUtc <= now；preservation Oracle 的 3 個測試均以 exit code 0 通過。"
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "typescript-runtime-validation--core-plus-typescript--r01",
+      "scenario_id": "typescript-runtime-validation",
+      "language": "typescript",
+      "arm_id": "core-plus-typescript",
+      "repetition": 1,
+      "order_index": 15,
+      "terminal_state": "automatic_failure",
+      "contract_sha256": "fb1a68264c0f28cc36804ea63cff9d30a6d8903299b11dc3c2a87e8c68577dd0",
+      "scenario_contract_sha256": "6ed693f481934b8a80d29500c57904f2793aefe7c9ba160c8f53a7227ea9d148",
+      "prompt_sha256": "857498e9d56af1c2f630a2c0c082b5e996dd1c3e67e158163d27a43cc3ac9547",
+      "automatic_failure_reasons": [
+        "invalid_claim"
+      ],
+      "diff_sha256": "037626fe9a66610e2ebec348f6f8a0f1c5d0bf0d5e0f07dcd7eed6d84513750c",
+      "oracle_results": [],
+      "telemetry": "not_available",
+      "review": {
+        "rubrics": {
+          "context-and-locality": {
+            "score": 1,
+            "reason": "Diff 限於 decodeWorkItem 與其公開測試，具有局部修改證據；但 Packet 沒有 Oracle 結果、Diff 邊界 provenance 或 Repository 事實，且 Automatic Failure 列有 invalid_claim。"
+          },
+          "behavior-and-validation": {
+            "score": 1,
+            "reason": "Diff 對不合法 priority、缺少 dueAtUtc 與非字串 dueAtUtc 加入 rejected/invalid-payload 測試及檢查，但 oracle_results 為空，且 Automatic Failure 列有 invalid_claim，無法完整證實保留行為與驗證。"
+          },
+          "decision-and-escalation": {
+            "score": 0,
+            "reason": "Packet 的 Diff 僅呈現採用 isWorkItem 與 priority guard；沒有可觀察的事實、假設、未知、替代方案或升級停止條件紀錄，並列有 Automatic Failure: invalid_claim。"
+          }
+        },
+        "incremental_criteria": [
+          {
+            "criterion": "The unknown payload is narrowed by runtime guards before WorkItem construction",
+            "score": 2,
+            "reason": "Diff 新增 isWorkItem(value): value is WorkItem，檢查非陣列 record、id、title、priority 與 dueAtUtc；decodeWorkItem 僅在 guard 成功後回傳 item: payload。"
+          },
+          {
+            "criterion": "The existing WorkItem type is reused without any or unsafe assertion",
+            "score": 2,
+            "reason": "Diff 匯入既有 WorkItem 與 WorkItemPriority，使用其 type predicate 與 WorkItem[\"priority\"] 型別，並移除 payload as unknown as WorkItem；已顯示的變更沒有 any 或型別斷言。"
+          },
+          {
+            "criterion": "Accepted and rejected results use exhaustive discriminated-union handling",
+            "score": 0,
+            "reason": "Diff 沒有變更 describeWorkItemResult，也沒有顯示 switch/default assertNever 等可窮舉處理；oracle_results 為空且 Automatic Failure 列有 invalid_claim。"
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "typescript-runtime-validation--core-only--r01",
+      "scenario_id": "typescript-runtime-validation",
+      "language": "typescript",
+      "arm_id": "core-only",
+      "repetition": 1,
+      "order_index": 16,
+      "terminal_state": "automatic_failure",
+      "contract_sha256": "fb1a68264c0f28cc36804ea63cff9d30a6d8903299b11dc3c2a87e8c68577dd0",
+      "scenario_contract_sha256": "6ed693f481934b8a80d29500c57904f2793aefe7c9ba160c8f53a7227ea9d148",
+      "prompt_sha256": "59a4c90c51d2bc92c5744cf3561540b27ded6e28b94d0b62ff2f85e50baa12ed",
+      "automatic_failure_reasons": [
+        "invalid_claim"
+      ],
+      "diff_sha256": "a6fe1ec258890b2fa0ef00bfe053beec035c0f709066d8162efd5b4ea6561b6e",
+      "oracle_results": [],
+      "telemetry": "not_available",
+      "review": {
+        "rubrics": {
+          "context-and-locality": {
+            "score": 1,
+            "reason": "Diff 限於 decodeWorkItem 與其公開測試，具有局部修改證據；但 Packet 沒有 Oracle 結果、Diff 邊界 provenance 或 Repository 事實，且 Automatic Failure 列有 invalid_claim。"
+          },
+          "behavior-and-validation": {
+            "score": 1,
+            "reason": "Diff 對 priority 與 dueAtUtc 加入 runtime 檢查並新增三種 rejected/invalid-payload 測試，但 oracle_results 為空，且 Automatic Failure 列有 invalid_claim，無法完整證實保留行為與驗證。"
+          },
+          "decision-and-escalation": {
+            "score": 0,
+            "reason": "Packet 的 Diff 僅呈現選定的 isWorkItem 實作；沒有可觀察的事實、假設、未知、替代方案或升級停止條件紀錄，並列有 Automatic Failure: invalid_claim。"
+          }
+        },
+        "incremental_criteria": [
+          {
+            "criterion": "The unknown payload is narrowed by runtime guards before WorkItem construction",
+            "score": 2,
+            "reason": "Diff 新增 isWorkItem(payload): payload is WorkItem，並檢查 record、id、title、priority 與 dueAtUtc；decodeWorkItem 只在該 guard 成功時回傳 item: payload。"
+          },
+          {
+            "criterion": "The existing WorkItem type is reused without any or unsafe assertion",
+            "score": 2,
+            "reason": "Diff 保留 WorkItem 型別並以受 runtime 檢查支援的 isWorkItem type predicate 回傳 payload，且移除 payload as unknown as WorkItem；已顯示的變更沒有 any 或型別斷言。"
+          },
+          {
+            "criterion": "Accepted and rejected results use exhaustive discriminated-union handling",
+            "score": 0,
+            "reason": "Diff 沒有變更 describeWorkItemResult，也沒有顯示 switch/default assertNever 等可窮舉處理；oracle_results 為空且 Automatic Failure 列有 invalid_claim。"
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "typescript-overdue-rule--control--r01",
+      "scenario_id": "typescript-overdue-rule",
+      "language": "typescript",
+      "arm_id": "control",
+      "repetition": 1,
+      "order_index": 17,
+      "terminal_state": "passed",
+      "contract_sha256": "fb1a68264c0f28cc36804ea63cff9d30a6d8903299b11dc3c2a87e8c68577dd0",
+      "scenario_contract_sha256": "5a180c6871eae2df92ce3c5bac05379af997d2f71e4fcc51f15c79844a7dc23a",
+      "prompt_sha256": "d04538098437622d2fa985e34d2beb95c684a0f50e26fdd87ff88e000eded028",
+      "automatic_failure_reasons": [],
+      "diff_sha256": "25ca2ed60df1bd198a6447ee603aa8ca9fef8aec079464b7695846c7e51ecade",
+      "oracle_results": [
+        {
+          "group": "public",
+          "commands": [
+            {
+              "args": [
+                "npm",
+                "test",
+                "--",
+                "src/overdue.public.test.tsx"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 3.2155039999997825,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "1366f2af547d6d1347c393fb0d2a47b80a1509198359dd7cf59364eaf0bbd478",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "args": [
+                "npm",
+                "run",
+                "typecheck"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 1.3928062000013597,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "b0009187501325cdea513b5f9d1d216e9d4d9b64ddffc54f3dfdf8616714a0d8",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "args": [
+                "npm",
+                "run",
+                "lint"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 5.940870000002178,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "c84c890755d7dd9ba883239b46e798ca54b939f758d64706567d033fa0edbc83",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "group": "preservation",
+          "commands": [
+            {
+              "args": [
+                "npm",
+                "test",
+                "--",
+                ".benchmark-oracle/preservation.test.tsx"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 9.337630899997748,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "53baa2554c32c940c64cf179f3cb1c2db6b901c814505e4f36dd6cb6b97e30d9",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "group": "acceptance",
+          "commands": [
+            {
+              "args": [
+                "npm",
+                "test",
+                "--",
+                "--reporter=verbose",
+                ".benchmark-oracle/acceptance.test.ts"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 1.4239254999993136,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "618590f7a1021479b6597b47a951c8967c0d18b4e5c28accc62ed64e5d0dd680",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        }
+      ],
+      "telemetry": "not_available",
+      "review": {
+        "rubrics": {
+          "context-and-locality": {
+            "score": 1,
+            "reason": "Diff 僅涉及 src/overdue.ts 與其公開測試，且 public、preservation、acceptance Oracle 均成功；但可觀察資料未提供固定 revision、允許 Diff 規則或每個路徑的 provenance，無法完整證明 locality。"
+          },
+          "behavior-and-validation": {
+            "score": 2,
+            "reason": "Diff 對 High 加上兩小時並以 <= 處理邊界，Completed 直接回傳 false；public 測試 5 項、preservation 1 項、acceptance 的邊界前與剛好邊界 2 項皆成功，typecheck 與 lint 也成功。"
+          },
+          "decision-and-escalation": {
+            "score": 0,
+            "reason": "可觀察的 Diff 與 Oracle 只記錄實作及命令結果，沒有事實、假設、Unknown、替代方案或升級與停止條件；Blind Spots 也僅列出 Fixture 與模型限制。"
+          }
+        },
+        "incremental_criteria": [
+          {
+            "criterion": "High Priority uses the exact two-hour boundary through the existing WorkItem model",
+            "score": 2,
+            "reason": "Diff 以 WorkItem 的 item.priority 判斷 High 並加兩小時，且 <= 覆蓋剛好到期；acceptance Oracle 明確顯示邊界前不逾期與剛好邊界逾期皆通過，typecheck 亦成功。"
+          },
+          {
+            "criterion": "Completed and Normal Priority branches remain typed and unchanged",
+            "score": 2,
+            "reason": "Diff 保留 WorkItem 型別並對 Completed 回傳 false，非 High 使用零寬限以保留 Normal 的原到期比較；public、preservation 與 typecheck Oracle 均成功。"
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "fastapi-provider-boundary--core-plus-python--r01",
+      "scenario_id": "fastapi-provider-boundary",
+      "language": "python-fastapi",
+      "arm_id": "core-plus-python",
+      "repetition": 1,
+      "order_index": 18,
+      "terminal_state": "automatic_failure",
+      "contract_sha256": "fb1a68264c0f28cc36804ea63cff9d30a6d8903299b11dc3c2a87e8c68577dd0",
+      "scenario_contract_sha256": "c1fe4bb830aea8ecd09a76a06d7c54935fc0c2ef2ff61213cb59f482170c4205",
+      "prompt_sha256": "66ca0f34ee52033f6f1155dac98e7f5becf90bdd6f49d00d8bc6f6ada811a5ae",
+      "automatic_failure_reasons": [
+        "invalid_claim"
+      ],
+      "diff_sha256": "8234bc1285bcaa7e11c1ae4b729bd181bc049eaa46590e3766e93a0a8156be71",
+      "oracle_results": [],
+      "telemetry": "not_available",
+      "review": {
+        "rubrics": {
+          "context-and-locality": {
+            "score": 2,
+            "reason": "Diff 僅修改 app/main.py 的 Route DI wiring 與 tests/test_public_api.py 的對應測試，直接匯入既有 NotificationSender，未見新增同義 Protocol、第二套 Domain Model 或 Repository。"
+          },
+          "behavior-and-validation": {
+            "score": 1,
+            "reason": "Diff 新增 provider exception 的 503 斷言，並保留可見的 202 decorator、404 分支與既有錯誤轉譯；但 oracle_results 為空，且 automatic_failure_reasons 記載 invalid_claim，沒有已執行的驗證證據。"
+          },
+          "decision-and-escalation": {
+            "score": 0,
+            "reason": "Diff 可見採用 Depends(get_notification_sender) 的方案，但 Packet 未記錄假設、替代方案或停止與升級條件；oracle_results 為空且 automatic_failure_reasons 為 invalid_claim，無法把驗證主張視為可信決策紀錄。"
+          }
+        },
+        "incremental_criteria": [
+          {
+            "criterion": "The route reuses NotificationSender through FastAPI dependency injection",
+            "score": 1,
+            "reason": "Diff 將 sender 宣告為 Annotated[NotificationSender, Depends(get_notification_sender)]，並把它傳給 notify_work_item；但 Packet 沒有 Oracle 結果且記載 invalid_claim，未獨立確認實際 Route 執行。"
+          },
+          {
+            "criterion": "Dependency override replaces the provider without duplicating the domain boundary",
+            "score": 1,
+            "reason": "Diff 的測試以 app.dependency_overrides 對 get_notification_sender 置換 RejectingSender 與 UnavailableSender，且變更中未新增另一個 domain boundary；但 oracle_results 為空且有 invalid_claim，置換結果未被獨立驗證。"
+          },
+          {
+            "criterion": "The 202, 404, 502, and 503 failure semantics remain distinct",
+            "score": 1,
+            "reason": "Diff 保留 202 decorator 和可見的 404、503 處理，並新增 502、503 回應內容斷言；然而沒有 Oracle 結果且 automatic failure 為 invalid_claim，四種語意未獲執行驗證。"
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "fastapi-overdue-rule--core-only--r01",
+      "scenario_id": "fastapi-overdue-rule",
+      "language": "python-fastapi",
+      "arm_id": "core-only",
+      "repetition": 1,
+      "order_index": 19,
+      "terminal_state": "automatic_failure",
+      "contract_sha256": "fb1a68264c0f28cc36804ea63cff9d30a6d8903299b11dc3c2a87e8c68577dd0",
+      "scenario_contract_sha256": "e4725643d9d7056cf94cc4aed26068df7b0ec07183536beb3edd412be6f3a4c3",
+      "prompt_sha256": "0a7e69438a0cc36967408c834133a9d61144b1c990f2b8d9fc9f90d304b3758c",
+      "automatic_failure_reasons": [
+        "invalid_claim"
+      ],
+      "diff_sha256": "4c4d915c23036353463896872a381d312df7bcc25360b1a8fa150e15ec5d9261",
+      "oracle_results": [],
+      "telemetry": "not_available",
+      "review": {
+        "rubrics": {
+          "context-and-locality": {
+            "score": 1,
+            "reason": "Diff 僅修改 app/overdue.py 的逾期判定與 tests/test_public_api.py，與任務直接相關；但 Packet 未提供固定 revision、allowed diff provenance 或查閱證據。"
+          },
+          "behavior-and-validation": {
+            "score": 1,
+            "reason": "Diff 對 High 加入兩小時寬限並以 <= 處理邊界，新增測試覆蓋邊界前、邊界及 Completed High；但 oracle_results 為空，未見 Repository Gate 或 Normal 行為的執行證據，且 Automatic Failure 記錄 invalid_claim。"
+          },
+          "decision-and-escalation": {
+            "score": 0,
+            "reason": "Packet 僅有 Diff、空的 Oracle 結果與 Blind Spots，未提供 Repository facts、假設、未知、替代方案或停止／升級條件。"
+          }
+        },
+        "incremental_criteria": [
+          {
+            "criterion": "High Priority applies the exact two-hour timezone-aware boundary",
+            "score": 1,
+            "reason": "Diff 以 timedelta(hours=2) 僅調整 High，並以 overdue_at <= now 使剛好兩小時時逾期；新增 Z 時間戳測試覆蓋邊界前與邊界，但 oracle_results 為空，缺少獨立 Gate 證據。"
+          },
+          {
+            "criterion": "HTTP status, response schema, Completed, and Normal behavior remain unchanged",
+            "score": 1,
+            "reason": "Diff 保留 Completed 的排除與非 High 的 due_at_utc <= now 邏輯，且新增 API 測試斷言 HTTP 200、回應內容及 Completed High 排除；未見 Normal、既有 schema 或 Repository Gate 的 Oracle 執行證據。"
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "csharp-overdue-rule--core-plus-csharp--r01",
+      "scenario_id": "csharp-overdue-rule",
+      "language": "csharp",
+      "arm_id": "core-plus-csharp",
+      "repetition": 1,
+      "order_index": 20,
+      "terminal_state": "automatic_failure",
+      "contract_sha256": "fb1a68264c0f28cc36804ea63cff9d30a6d8903299b11dc3c2a87e8c68577dd0",
+      "scenario_contract_sha256": "44c1d63637c207e7150ca5d2a61771b5ef76260378d33bebe2498227674e7dbd",
+      "prompt_sha256": "60b603f3aa18e93a2c41db704a70718019d2eab256ed5673e47a1245b2bb900a",
+      "automatic_failure_reasons": [
+        "invalid_claim"
+      ],
+      "diff_sha256": "32d9a1a2ebd62175868b3e3f065814a05c5df57847fe6d9c00330fd5acf0263b",
+      "oracle_results": [],
+      "telemetry": "not_available",
+      "review": {
+        "rubrics": {
+          "context-and-locality": {
+            "score": 1,
+            "reason": "Diff 僅修改 OverduePolicy 的 High Priority 比較式並新增對應公開測試，與 Task 範圍相符；但 Packet 未提供固定 revision、允許 Diff 邊界或路徑 provenance。"
+          },
+          "behavior-and-validation": {
+            "score": 0,
+            "reason": "雖然 Diff 與新增測試表達了預期邊界，但 oracle_results 為空且 Automatic Failure 明列 invalid_claim，沒有可採信的 Repository Gate 執行證據。"
+          },
+          "decision-and-escalation": {
+            "score": 0,
+            "reason": "Packet 的 Diff、空 Oracle、Automatic Failure 與 Blind Spots 未記錄選定方案理由、替代方案、未知資訊或需升級的人類決策。"
+          }
+        },
+        "incremental_criteria": [
+          {
+            "criterion": "DateTimeOffset comparison preserves the exact two-hour UTC boundary",
+            "score": 1,
+            "reason": "Diff 將 DateTimeOffset 的 DueAtUtc 判斷改為 AddHours(2) <= now，且新增兩小時前一 tick 與邊界測試；但 oracle_results 為空並有 invalid_claim Automatic Failure，缺少可採信的執行驗證。"
+          },
+          {
+            "criterion": "Completed and Normal Priority branches retain their existing semantics",
+            "score": 1,
+            "reason": "Diff 顯示 Normal 分支仍為 item.DueAtUtc <= now，且只修改 High Priority 分支；但 Completed 保留行為未在可見 Diff 中驗證，oracle_results 為空且有 invalid_claim Automatic Failure。"
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "react-state-error-retention--core-plus-typescript-plus-react--r01",
+      "scenario_id": "react-state-error-retention",
+      "language": "typescript-react",
+      "arm_id": "core-plus-typescript-plus-react",
+      "repetition": 1,
+      "order_index": 21,
+      "terminal_state": "automatic_failure",
+      "contract_sha256": "fb1a68264c0f28cc36804ea63cff9d30a6d8903299b11dc3c2a87e8c68577dd0",
+      "scenario_contract_sha256": "e67598b70ff71f95d137668787b9541a875010c83cc5d859ffbb207598741524",
+      "prompt_sha256": "f65145d86e696afc83ef1b8c9d60e3f69f1c0e373831aa5699fe418fea24478c",
+      "automatic_failure_reasons": [
+        "invalid_claim"
+      ],
+      "diff_sha256": "1edfa4c7c6e7b5b1b4d61d369a71602244ff821be2f696093bcc5990ca0a6a6f",
+      "oracle_results": [],
+      "telemetry": "not_available",
+      "review": {
+        "rubrics": {
+          "context-and-locality": {
+            "score": 2,
+            "reason": "Diff 僅修改 src/WorkItemPanel.tsx 與其 src/WorkItemPanel.public.test.tsx；狀態調整及新增測試都直接對應 retry 與 Work Item identity 的任務，且未見 Props 或 LoadWorkItem 型別變更。"
+          },
+          "behavior-and-validation": {
+            "score": 1,
+            "reason": "Diff 以 workItemId、latestRequestId 與 visibleState 處理保留內容和過期回應，並新增相應測試；但 oracle_results 為空且 automatic_failure_reasons 含 invalid_claim，沒有可採信的執行驗證。"
+          },
+          "decision-and-escalation": {
+            "score": 0,
+            "reason": "Packet 的 Diff、空白 Oracle 與 Blind Spots 沒有記錄 Repository facts、假設、替代方案、停止條件或需人工決定的事項。"
+          }
+        },
+        "incremental_criteria": [
+          {
+            "criterion": "Still-valid content remains visible while retry is loading",
+            "score": 1,
+            "reason": "Diff 在同一 workItemId 時以 currentState.content 建立 loading state，新增測試也斷言 retry 時內容和 Loading 同時可見；但沒有 Oracle 結果，且 Packet 標示 invalid_claim。"
+          },
+          {
+            "criterion": "Earlier success or failure cannot overwrite the latest request state",
+            "score": 1,
+            "reason": "Diff 以 latestRequestId 過濾回應，並以 state.workItemId 與 visibleState 隔離 identity 不同的畫面，測試覆蓋舊成功與舊失敗；但 oracle_results 為空且有 invalid_claim。"
+          },
+          {
+            "criterion": "Public loading, error, success, and props contracts remain unchanged",
+            "score": 1,
+            "reason": "Diff 未變更 WorkItemPanel Props 或 LoadWorkItem 的宣告，且保留原有 renderState 路徑並擴充 public test；沒有 preservation Oracle 可確認既有 Loading、Alert 與成功內容的實際回歸結果。"
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "csharp-cancellation-cleanup--control--r01",
+      "scenario_id": "csharp-cancellation-cleanup",
+      "language": "csharp",
+      "arm_id": "control",
+      "repetition": 1,
+      "order_index": 22,
+      "terminal_state": "passed",
+      "contract_sha256": "fb1a68264c0f28cc36804ea63cff9d30a6d8903299b11dc3c2a87e8c68577dd0",
+      "scenario_contract_sha256": "0438b7f59ad59073a44711dab5a68c87d54eed081b92f7b68aea8aba14f81c71",
+      "prompt_sha256": "b2ea2a49dcc25106f552f3a7005ded5c0320e0847110d056e442d9bf09668f77",
+      "automatic_failure_reasons": [],
+      "diff_sha256": "39eb05160c9e6082fff68ea92ac6309f50bd8b91ecdf0acdb5076ba654cb216a",
+      "oracle_results": [
+        {
+          "group": "public",
+          "commands": [
+            {
+              "args": [
+                "dotnet.EXE",
+                "test",
+                "tests/CsharpCancellationCleanup.PublicTests/CsharpCancellationCleanup.PublicTests.csproj",
+                "--nologo"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 3.502162299999327,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "59e53cd801828bb511ecc303919cb63fd08ae07857a02262b1773f33372370a1",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "args": [
+                "dotnet.EXE",
+                "format",
+                "tests/CsharpCancellationCleanup.PublicTests/CsharpCancellationCleanup.PublicTests.csproj",
+                "--verify-no-changes",
+                "--no-restore"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 5.879436800001713,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "group": "preservation",
+          "commands": [
+            {
+              "args": [
+                "dotnet.EXE",
+                "test",
+                ".benchmark-oracle/CsharpCancellationCleanup.PreservationTests/CsharpCancellationCleanup.PreservationTests.csproj",
+                "--nologo"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 4.068002500000148,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "b1c38f1200c10f26f40325df51b8c47eab8ebc1421f5c32e521e016280ea3d37",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "group": "acceptance",
+          "commands": [
+            {
+              "args": [
+                "dotnet.EXE",
+                "test",
+                ".benchmark-oracle/CsharpCancellationCleanup.AcceptanceTests/CsharpCancellationCleanup.AcceptanceTests.csproj",
+                "--nologo"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 3.974471400000766,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "afb6e190f95a15b96af6203bd316211587091a01f5ebb5c3cd6fd10ac6946eaa",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        }
+      ],
+      "telemetry": "not_available",
+      "review": {
+        "rubrics": {
+          "context-and-locality": {
+            "score": 2,
+            "reason": "Diff 僅修改 NotificationDispatchService 中既有的 Token 傳遞與取消例外分支；未見與該功能無關的產品路徑變更。"
+          },
+          "behavior-and-validation": {
+            "score": 2,
+            "reason": "Diff 將 Token 傳給開啟與傳送作業、對 OperationCanceledException 重新拋出，並保留 await using；public、preservation、acceptance Oracle 均以 exit code 0 通過，format 驗證也通過。"
+          },
+          "decision-and-escalation": {
+            "score": 0,
+            "reason": "Packet 的 Diff、Oracle 與 Blind Spots 未記錄 Repository Facts、Assumptions、Unknowns、替代方案、停止條件或需人工決定事項。"
+          }
+        },
+        "incremental_criteria": [
+          {
+            "criterion": "Caller CancellationToken reaches provider open and send operations",
+            "score": 2,
+            "reason": "Diff 將 cancellationToken 傳入 OpenSessionAsync 與 SendAsync，且 acceptance Oracle 以 exit code 0 通過。"
+          },
+          {
+            "criterion": "OperationCanceledException remains cancellation rather than provider failure",
+            "score": 2,
+            "reason": "Diff 將原本把 OperationCanceledException 映射為結果的分支改為 throw，且 acceptance Oracle 以 exit code 0 通過。"
+          },
+          {
+            "criterion": "The asynchronous provider session is disposed exactly once",
+            "score": 2,
+            "reason": "Diff 保留 await using 的非同步 Session 生命週期管理，且 public、preservation 與 acceptance Oracle 均以 exit code 0 通過。"
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "csharp-cancellation-cleanup--core-only--r01",
+      "scenario_id": "csharp-cancellation-cleanup",
+      "language": "csharp",
+      "arm_id": "core-only",
+      "repetition": 1,
+      "order_index": 23,
+      "terminal_state": "automatic_failure",
+      "contract_sha256": "fb1a68264c0f28cc36804ea63cff9d30a6d8903299b11dc3c2a87e8c68577dd0",
+      "scenario_contract_sha256": "0438b7f59ad59073a44711dab5a68c87d54eed081b92f7b68aea8aba14f81c71",
+      "prompt_sha256": "9858dc82265547977a70c18f85293fb4af842cbf1c12473b8e9a82eb59b8dbc6",
+      "automatic_failure_reasons": [
+        "invalid_claim"
+      ],
+      "diff_sha256": "cef3e18f0a6d0be7c4e357cf0994bff60b87f60c8e98f51d95643742f929ebda",
+      "oracle_results": [],
+      "telemetry": "not_available",
+      "review": {
+        "rubrics": {
+          "context-and-locality": {
+            "score": 2,
+            "reason": "Diff 僅修改 NotificationDispatchService 的取消處理與 XML 例外註解，並更新同一功能的 PublicTests；未見超出該功能的產品路徑變更。"
+          },
+          "behavior-and-validation": {
+            "score": 1,
+            "reason": "Diff 將呼叫端 Token 傳入 Provider 與 Session、重新拋出取消例外並保留 await using；新增測試覆蓋成功、非取消失敗及兩個取消來源，但 oracle_results 為空且 Packet 記錄 invalid_claim。"
+          },
+          "decision-and-escalation": {
+            "score": 0,
+            "reason": "Packet 的 Diff、空白 Oracle 與 Blind Spots 未記錄 Repository Facts、Assumptions、Unknowns、替代方案、停止條件或需人工決定事項。"
+          }
+        },
+        "incremental_criteria": [
+          {
+            "criterion": "Caller CancellationToken reaches provider open and send operations",
+            "score": 1,
+            "reason": "Diff 將 cancellationToken 傳入 OpenSessionAsync 與 SendAsync，更新成功案例斷言 Provider 與 Session 收到相同 Token；但沒有 Oracle 結果，且 Packet 記錄 invalid_claim。"
+          },
+          {
+            "criterion": "OperationCanceledException remains cancellation rather than provider failure",
+            "score": 1,
+            "reason": "Diff 對 OperationCanceledException 使用 throw，新增 Provider 與 Session 取消案例皆預期同一例外向外傳遞；但沒有 Oracle 結果，且 Packet 記錄 invalid_claim。"
+          },
+          {
+            "criterion": "The asynchronous provider session is disposed exactly once",
+            "score": 1,
+            "reason": "Diff 保留 await using，成功、非取消失敗與 Session 取消案例皆斷言 DisposeCount 為 1；但沒有 Oracle 結果，且 Packet 記錄 invalid_claim。"
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "react-state-error-retention--core-only--r01",
+      "scenario_id": "react-state-error-retention",
+      "language": "typescript-react",
+      "arm_id": "core-only",
+      "repetition": 1,
+      "order_index": 24,
+      "terminal_state": "automatic_failure",
+      "contract_sha256": "fb1a68264c0f28cc36804ea63cff9d30a6d8903299b11dc3c2a87e8c68577dd0",
+      "scenario_contract_sha256": "e67598b70ff71f95d137668787b9541a875010c83cc5d859ffbb207598741524",
+      "prompt_sha256": "52eee673dcc2152399c4af32decd0a078404f8a1458b39e705cd7301de2fa034",
+      "automatic_failure_reasons": [
+        "invalid_claim"
+      ],
+      "diff_sha256": "3975cf99b4a749c8933e9c1f1de385af6081f65ff9f3d438f7ce7b546ff1bc67",
+      "oracle_results": [],
+      "telemetry": "not_available",
+      "review": {
+        "rubrics": {
+          "context-and-locality": {
+            "score": 2,
+            "reason": "Diff 限定於 src/WorkItemPanel.tsx 和該元件的 public test；修改的 state metadata、渲染防護與案例測試都直接服務於指定的 retry 與 identity 行為，未改動公開 Contract。"
+          },
+          "behavior-and-validation": {
+            "score": 1,
+            "reason": "Diff 以 workItemId 保存 state 歸屬、visibleState 遮蔽不同 identity 的舊內容，並加入 retry failure 和舊成功或失敗的案例；但 oracle_results 為空且 automatic_failure_reasons 含 invalid_claim，沒有可驗證的測試執行證據。"
+          },
+          "decision-and-escalation": {
+            "score": 0,
+            "reason": "Packet 未提供選定方案的理由、替代方案、事實與假設的可追溯紀錄，亦未列出停止或升級條件；Blind Spots 不補足這些決策證據。"
+          }
+        },
+        "incremental_criteria": [
+          {
+            "criterion": "Still-valid content remains visible while retry is loading",
+            "score": 1,
+            "reason": "Diff 在 workItemId 相同時把 currentState.content 帶入 loading state，新增案例斷言 retry 時仍顯示內容與 Loading；沒有 Oracle 結果且 Packet 標示 invalid_claim。"
+          },
+          {
+            "criterion": "Earlier success or failure cannot overwrite the latest request state",
+            "score": 1,
+            "reason": "Diff 的 latestRequestId 過濾較舊回應，visibleState 在 identity 不同時顯示新的 loading state，測試列出舊成功與舊失敗；缺少 Oracle 執行證據，且有 invalid_claim。"
+          },
+          {
+            "criterion": "Public loading, error, success, and props contracts remain unchanged",
+            "score": 1,
+            "reason": "WorkItemPanel Props 與 LoadWorkItem 宣告未在 Diff 中變更，renderState 仍處理 loading、error 和成功內容；沒有 public 或 preservation Oracle 來確認回歸結果。"
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "react-effect-lifecycle--core-only--r01",
+      "scenario_id": "react-effect-lifecycle",
+      "language": "typescript-react",
+      "arm_id": "core-only",
+      "repetition": 1,
+      "order_index": 25,
+      "terminal_state": "automatic_failure",
+      "contract_sha256": "fb1a68264c0f28cc36804ea63cff9d30a6d8903299b11dc3c2a87e8c68577dd0",
+      "scenario_contract_sha256": "9b321658f4fc6fbf52c4431babf892daf93d6067317345ff597bf69d2e95c433",
+      "prompt_sha256": "53e69efb36ae82d328fbec85dff44de2b30fe527bd2ca1a1b30d12e023f38686",
+      "automatic_failure_reasons": [
+        "invalid_claim"
+      ],
+      "diff_sha256": "5b4f71a245073924a182c55956f9c926964686d0a49e5e1b34cf802e801e0b8f",
+      "oracle_results": [],
+      "telemetry": "not_available",
+      "review": {
+        "rubrics": {
+          "context-and-locality": {
+            "score": 1,
+            "reason": "Diff 僅觸及 src/WorkItemPreview.tsx 與其 public test，且沒有改動 Props 或 API 型別；但 oracle_results 為空且 automatic_failure_reasons 記錄 invalid_claim，無法補足定位與邊界 provenance。"
+          },
+          "behavior-and-validation": {
+            "score": 1,
+            "reason": "Diff 以 useEffectEvent 取得目前 loader、以 [workItemId] 作為 effect dependency，並在成功與失敗分支防止 aborted request 寫入；新增測試涵蓋關鍵分支，但沒有獨立 Oracle 執行結果且存在 invalid_claim。"
+          },
+          "decision-and-escalation": {
+            "score": 0,
+            "reason": "可觀察 Diff 只有實作與測試變更，oracle_results 為空且 automatic_failure_reasons 為 invalid_claim；未記錄可追溯的事實、假設、替代方案或升級停止條件。"
+          }
+        },
+        "incremental_criteria": [
+          {
+            "criterion": "Effect identity follows workItemId rather than callback or presentation props",
+            "score": 1,
+            "reason": "Diff 使用 useEffectEvent(loadPreview) 取得最新 callback，且 effect dependency 僅為 [workItemId]；新增 rerender 測試，但 oracle_results 為空且有 invalid_claim。"
+          },
+          {
+            "criterion": "An identity change aborts the prior request through AbortSignal",
+            "score": 1,
+            "reason": "Diff 保留 cleanup 的 controller.abort()，新增測試檢查 key 改變後舊 signal aborted；oracle_results 為空且有 invalid_claim，缺少執行驗證。"
+          },
+          {
+            "criterion": "An aborted request cannot overwrite the current success or error state",
+            "score": 1,
+            "reason": "Diff 在 then 與 catch 都檢查 !controller.signal.aborted，並新增 old success 與 old failure 測試；oracle_results 為空且有 invalid_claim，驗證證據不完整。"
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "fastapi-overdue-rule--generic-clean-code--r01",
+      "scenario_id": "fastapi-overdue-rule",
+      "language": "python-fastapi",
+      "arm_id": "generic-clean-code",
+      "repetition": 1,
+      "order_index": 26,
+      "terminal_state": "passed",
+      "contract_sha256": "fb1a68264c0f28cc36804ea63cff9d30a6d8903299b11dc3c2a87e8c68577dd0",
+      "scenario_contract_sha256": "e4725643d9d7056cf94cc4aed26068df7b0ec07183536beb3edd412be6f3a4c3",
+      "prompt_sha256": "a2673653734da249071cea548bb65e055af6f22db89b718be628a70b875da152",
+      "automatic_failure_reasons": [],
+      "diff_sha256": "81a53d6ffe7289553347c7afac429447e339234b01b74adf8994733a444d982b",
+      "oracle_results": [
+        {
+          "group": "public",
+          "commands": [
+            {
+              "args": [
+                "{workspace}\\.venv\\Scripts\\python.exe",
+                "-m",
+                "pytest",
+                "-q",
+                "tests"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 1.2973495000005641,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "5e9312d28c8b345d3aa07615031f38064851f78e14622f083bf1d743abe89108",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "args": [
+                "{workspace}\\.venv\\Scripts\\python.exe",
+                "-m",
+                "ruff",
+                "check",
+                "."
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 0.2609842000019853,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "args": [
+                "{workspace}\\.venv\\Scripts\\python.exe",
+                "-m",
+                "ruff",
+                "format",
+                "--check",
+                "."
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 0.3094452999976056,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "ef7d13d02214e98ca902b05257cdbe6a8e84f3b4714508efdc19766460b54209",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "group": "preservation",
+          "commands": [
+            {
+              "args": [
+                "{workspace}\\.venv\\Scripts\\python.exe",
+                "-m",
+                "pytest",
+                "-q",
+                ".benchmark-oracle/test_preservation.py"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 0.8911320000006526,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "e596cce97643441f2f2c7ef01ee068b6705ce1e028a07a32ba3bd3b3d35d7353",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "group": "acceptance",
+          "commands": [
+            {
+              "args": [
+                "{workspace}\\.venv\\Scripts\\python.exe",
+                "-m",
+                "pytest",
+                "-vv",
+                ".benchmark-oracle/test_acceptance.py"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 0.8735190000006696,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "040c60d064441b8ffffd9842444fb52fc379ca57fee1650fce701b40b39406d4",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        }
+      ],
+      "telemetry": "not_available",
+      "review": {
+        "rubrics": {
+          "context-and-locality": {
+            "score": 1,
+            "reason": "Diff 僅觸及 app/overdue.py 的逾期判定及 tests/test_public_api.py 的相應 API 測試，範圍貼合任務；但 Packet 未提供固定 revision、allowed diff provenance 或查閱 Gold Files 的紀錄。"
+          },
+          "behavior-and-validation": {
+            "score": 2,
+            "reason": "Diff 與參數化 API 測試覆蓋 High 在兩小時前、剛好兩小時及之後的結果與 Completed 排除；public pytest 5 passed、preservation oracle 1 passed、acceptance 的兩個邊界測試皆 passed，ruff check 與 format check 亦成功，且沒有 Automatic Failure。"
+          },
+          "decision-and-escalation": {
+            "score": 0,
+            "reason": "Packet 提供 Diff、Oracle 結果與 Blind Spots，但未記錄 Repository facts、假設、未知、方案比較、Human Decisions Required 或停止／升級條件。"
+          }
+        },
+        "incremental_criteria": [
+          {
+            "criterion": "High Priority applies the exact two-hour timezone-aware boundary",
+            "score": 2,
+            "reason": "Diff 使用 timedelta(hours=2)、僅對 High 加入寬限並以 <= 判定邊界；Z 時間戳的參數化測試覆蓋 11:59:59、12:00:00、12:00:01，acceptance oracle 的兩個兩小時邊界測試均 passed。"
+          },
+          {
+            "criterion": "HTTP status, response schema, Completed, and Normal behavior remain unchanged",
+            "score": 2,
+            "reason": "Diff 保留 Completed 排除與非 High 的 due_at_utc <= now 分支，新增測試斷言 HTTP 200 與 overdue_ids 回應；public pytest 5 passed 與 preservation oracle 1 passed 提供保留行為的驗證，且無 Automatic Failure。"
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "fastapi-provider-boundary--control--r01",
+      "scenario_id": "fastapi-provider-boundary",
+      "language": "python-fastapi",
+      "arm_id": "control",
+      "repetition": 1,
+      "order_index": 27,
+      "terminal_state": "passed",
+      "contract_sha256": "fb1a68264c0f28cc36804ea63cff9d30a6d8903299b11dc3c2a87e8c68577dd0",
+      "scenario_contract_sha256": "c1fe4bb830aea8ecd09a76a06d7c54935fc0c2ef2ff61213cb59f482170c4205",
+      "prompt_sha256": "55f9093edd26f71fc26c4396c2665eda1b556e8092d397b737cbd7d40a6063ad",
+      "automatic_failure_reasons": [],
+      "diff_sha256": "bdf6548bea3bf24e7d239e6807d02656eda8d3253f17af4713e9e04442ff710a",
+      "oracle_results": [
+        {
+          "group": "public",
+          "commands": [
+            {
+              "args": [
+                "{workspace}\\.venv\\Scripts\\python.exe",
+                "-m",
+                "pytest",
+                "-q",
+                "tests"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 0.7123920999983966,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "bbd970409bcfca68e58beb793843eef17a45aded4777fb0756cb88e31139ade7",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "args": [
+                "{workspace}\\.venv\\Scripts\\python.exe",
+                "-m",
+                "ruff",
+                "check",
+                "."
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 0.11236889999781852,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "args": [
+                "{workspace}\\.venv\\Scripts\\python.exe",
+                "-m",
+                "ruff",
+                "format",
+                "--check",
+                "."
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 0.10522999999739113,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "0321fffcb91606a42c0a19d8c1121d5c544379d663821fce616c71a7bb62f6b5",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "group": "preservation",
+          "commands": [
+            {
+              "args": [
+                "{workspace}\\.venv\\Scripts\\python.exe",
+                "-m",
+                "pytest",
+                "-q",
+                ".benchmark-oracle/test_preservation.py"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 0.6952860999990662,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "5f3b656bfcf9f799a7c2c75783cc46c3368b8e51ed19b48226b38d4ff458eba6",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "group": "acceptance",
+          "commands": [
+            {
+              "args": [
+                "{workspace}\\.venv\\Scripts\\python.exe",
+                "-m",
+                "pytest",
+                "-vv",
+                ".benchmark-oracle/test_acceptance.py"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 0.7122767000000749,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "5d4e7dc490320cecef40de836ddd04c54d211f674f589537a4c4190d368f2fec",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        }
+      ],
+      "telemetry": "not_available",
+      "review": {
+        "rubrics": {
+          "context-and-locality": {
+            "score": 2,
+            "reason": "Diff 僅修改 app/main.py 的 Route DI wiring 與 tests/test_public_api.py 的對應測試，直接匯入既有 NotificationSender，未見新增同義 Protocol、第二套 Domain Model 或 Repository。"
+          },
+          "behavior-and-validation": {
+            "score": 2,
+            "reason": "Diff 保留 202 decorator、404 分支與既有錯誤轉譯，並以 dependency override 測試 502 與 503；Oracle 顯示 public 4 passed、preservation 2 passed、acceptance 的 FastAPI override 測試通過，且 ruff check 與 format check 均成功。"
+          },
+          "decision-and-escalation": {
+            "score": 1,
+            "reason": "Diff 可追溯地選擇 Annotated[NotificationSender, Depends(get_notification_sender)] 與 app.dependency_overrides；但 Packet 的 Blind Spots 僅說明 Fixture 與模型/Client 的侷限，未記錄假設、替代方案或停止與升級條件。"
+          }
+        },
+        "incremental_criteria": [
+          {
+            "criterion": "The route reuses NotificationSender through FastAPI dependency injection",
+            "score": 2,
+            "reason": "Diff 將 Route 的 sender 參數標示為 Annotated[NotificationSender, Depends(get_notification_sender)]，並傳給 notify_work_item；acceptance Oracle 的 test_route_uses_fastapi_dependency_override 通過。"
+          },
+          {
+            "criterion": "Dependency override replaces the provider without duplicating the domain boundary",
+            "score": 2,
+            "reason": "Diff 以 app.dependency_overrides 將 get_notification_sender 替換為 RejectingSender 與 UnavailableSender，並直接使用既有 NotificationSender；acceptance Oracle 通過，變更中未見新增 Protocol、Model 或 Repository。"
+          },
+          {
+            "criterion": "The 202, 404, 502, and 503 failure semantics remain distinct",
+            "score": 2,
+            "reason": "Diff 保留 202 decorator 與 404 分支，且測試明確斷言 502 notification_failed 和 503 provider_unavailable；public、preservation 與 acceptance Oracle 全數成功。"
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "typescript-runtime-validation--generic-clean-code--r01",
+      "scenario_id": "typescript-runtime-validation",
+      "language": "typescript",
+      "arm_id": "generic-clean-code",
+      "repetition": 1,
+      "order_index": 28,
+      "terminal_state": "passed",
+      "contract_sha256": "fb1a68264c0f28cc36804ea63cff9d30a6d8903299b11dc3c2a87e8c68577dd0",
+      "scenario_contract_sha256": "6ed693f481934b8a80d29500c57904f2793aefe7c9ba160c8f53a7227ea9d148",
+      "prompt_sha256": "3e32910d89d9146c1825bfa3a7cdb6f517a7b6aaceb5c1c774c7779ec23ff40f",
+      "automatic_failure_reasons": [],
+      "diff_sha256": "5f00834b98697b4e42f84c93542ed8999a26f627785f7739f77403644d73fa7e",
+      "oracle_results": [
+        {
+          "group": "public",
+          "commands": [
+            {
+              "args": [
+                "npm",
+                "test",
+                "--",
+                "src/decodeWorkItem.public.test.ts"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 1.6722797000002174,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "db6b543eb463d0174fd138e97725783c0b4c9d708443ca8d260d1604f484ba42",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "args": [
+                "npm",
+                "run",
+                "typecheck"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 0.8660395000006247,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "ab79fc057397c502cc770283066314a41643dfb0c904abea0ddc3670331e0777",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "args": [
+                "npm",
+                "run",
+                "lint"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 5.024766800001089,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "7328f834fafb0632f704da19140caf1963c302f004d72fbe16c641a49b608988",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "group": "preservation",
+          "commands": [
+            {
+              "args": [
+                "npm",
+                "test",
+                "--",
+                ".benchmark-oracle/preservation.test.ts"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 0.76790389999951,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "bea81ce53403d5eb707c84f2c4eb6bc467865c344cc3ff42782a70fb463674a9",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "group": "acceptance",
+          "commands": [
+            {
+              "args": [
+                "npm",
+                "test",
+                "--",
+                "--reporter=verbose",
+                ".benchmark-oracle/acceptance.test.ts"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 0.7888875999997254,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "d3798661fc723c48cfe324bc87b103fc869018012052bdc8bdc65c310b80a15e",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        }
+      ],
+      "telemetry": "not_available",
+      "review": {
+        "rubrics": {
+          "context-and-locality": {
+            "score": 2,
+            "reason": "Diff 僅修改 decodeWorkItem 的驗證與結果描述邏輯，並在同一公開測試檔加入無效欄位案例；Oracle 的 public、preservation 與 acceptance 群組皆成功。"
+          },
+          "behavior-and-validation": {
+            "score": 2,
+            "reason": "Diff 對缺少或不合法 priority、dueAtUtc 回傳 rejected/invalid-payload；public 6 項、preservation 2 項、acceptance 2 項測試，以及 typecheck 與 lint 均以 exit code 0 成功。"
+          },
+          "decision-and-escalation": {
+            "score": 0,
+            "reason": "Packet 的 Diff 與 Oracle 顯示已採用 runtime guard 與 assertNever，但未提供事實、假設、未知、替代方案或升級停止條件的可追溯紀錄。"
+          }
+        },
+        "incremental_criteria": [
+          {
+            "criterion": "The unknown payload is narrowed by runtime guards before WorkItem construction",
+            "score": 2,
+            "reason": "Diff 新增 isRecord、isWorkItemPriority 與 isWorkItem，decodeWorkItem 只在 isWorkItem(payload) 成功後回傳 item: payload；acceptance runtime-validation 測試成功。"
+          },
+          {
+            "criterion": "The existing WorkItem type is reused without any or unsafe assertion",
+            "score": 2,
+            "reason": "Diff 以 WorkItem[\"priority\"] 與 isWorkItem 的 type predicate 重用既有型別，並移除 payload as unknown as WorkItem；typecheck 以 exit code 0 成功。"
+          },
+          {
+            "criterion": "Accepted and rejected results use exhaustive discriminated-union handling",
+            "score": 2,
+            "reason": "Diff 將 describeWorkItemResult 改為 accepted、rejected 與 default assertNever 的 switch；acceptance 對 exhaustive discriminated result handling 的測試成功。"
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "fastapi-provider-boundary--generic-clean-code--r01",
+      "scenario_id": "fastapi-provider-boundary",
+      "language": "python-fastapi",
+      "arm_id": "generic-clean-code",
+      "repetition": 1,
+      "order_index": 29,
+      "terminal_state": "passed",
+      "contract_sha256": "fb1a68264c0f28cc36804ea63cff9d30a6d8903299b11dc3c2a87e8c68577dd0",
+      "scenario_contract_sha256": "c1fe4bb830aea8ecd09a76a06d7c54935fc0c2ef2ff61213cb59f482170c4205",
+      "prompt_sha256": "b60a888048a875d51e5b1c6b6579a667075e90d5f60223387118feb1abe34942",
+      "automatic_failure_reasons": [],
+      "diff_sha256": "c1462fa94be270d47060015062735a0a2393082536d1fa5d3aa05ddd9ce047fb",
+      "oracle_results": [
+        {
+          "group": "public",
+          "commands": [
+            {
+              "args": [
+                "{workspace}\\.venv\\Scripts\\python.exe",
+                "-m",
+                "pytest",
+                "-q",
+                "tests"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 0.6960703999975522,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "ed1d6d6a1dbca3f527d1e012e3d38f3a3d709f37ef3211f820a38db5783b7bb3",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "args": [
+                "{workspace}\\.venv\\Scripts\\python.exe",
+                "-m",
+                "ruff",
+                "check",
+                "."
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 0.1094727999989118,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "args": [
+                "{workspace}\\.venv\\Scripts\\python.exe",
+                "-m",
+                "ruff",
+                "format",
+                "--check",
+                "."
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 0.10846949999904609,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "0321fffcb91606a42c0a19d8c1121d5c544379d663821fce616c71a7bb62f6b5",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "group": "preservation",
+          "commands": [
+            {
+              "args": [
+                "{workspace}\\.venv\\Scripts\\python.exe",
+                "-m",
+                "pytest",
+                "-q",
+                ".benchmark-oracle/test_preservation.py"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 0.6793828000008943,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "cbd86ee8e6029d74debf3a39b15fc0f4b774741e76fe13b4cbe1e4416aadc218",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "group": "acceptance",
+          "commands": [
+            {
+              "args": [
+                "{workspace}\\.venv\\Scripts\\python.exe",
+                "-m",
+                "pytest",
+                "-vv",
+                ".benchmark-oracle/test_acceptance.py"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 0.6724769000029482,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "bda57622ab8d47f5bf42678d82b79096d189de9c29c451df964bc7df3a7a752d",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        }
+      ],
+      "telemetry": "not_available",
+      "review": {
+        "rubrics": {
+          "context-and-locality": {
+            "score": 2,
+            "reason": "Diff 僅修改 app/main.py 的 Route DI wiring 與 tests/test_public_api.py 的對應測試，直接匯入既有 NotificationSender，未見新增同義 Protocol、第二套 Domain Model 或 Repository。"
+          },
+          "behavior-and-validation": {
+            "score": 2,
+            "reason": "Diff 保留 202 decorator、404 分支與既有錯誤轉譯，並以 dependency override 測試 502 與 503；Oracle 顯示 public 4 passed、preservation 2 passed、acceptance 的 FastAPI override 測試通過，且 ruff check 與 format check 均成功。"
+          },
+          "decision-and-escalation": {
+            "score": 1,
+            "reason": "Diff 可追溯地選擇 Annotated[NotificationSender, Depends(get_notification_sender)] 與 app.dependency_overrides；但 Packet 的 Blind Spots 僅說明 Fixture 與模型/Client 的侷限，未記錄假設、替代方案或停止與升級條件。"
+          }
+        },
+        "incremental_criteria": [
+          {
+            "criterion": "The route reuses NotificationSender through FastAPI dependency injection",
+            "score": 2,
+            "reason": "Diff 將 Route 的 sender 參數標示為 Annotated[NotificationSender, Depends(get_notification_sender)]，並傳給 notify_work_item；acceptance Oracle 的 test_route_uses_fastapi_dependency_override 通過。"
+          },
+          {
+            "criterion": "Dependency override replaces the provider without duplicating the domain boundary",
+            "score": 2,
+            "reason": "Diff 以 app.dependency_overrides 將 get_notification_sender 替換為 rejecting 與 unavailable provider，並直接使用既有 NotificationSender；acceptance Oracle 通過，變更中未見新增 Protocol、Model 或 Repository。"
+          },
+          {
+            "criterion": "The 202, 404, 502, and 503 failure semantics remain distinct",
+            "score": 2,
+            "reason": "Diff 保留 202 decorator 與 404 分支，且測試明確斷言 502 notification_failed 和 503 provider_unavailable；public、preservation 與 acceptance Oracle 全數成功。"
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "react-state-error-retention--generic-clean-code--r01",
+      "scenario_id": "react-state-error-retention",
+      "language": "typescript-react",
+      "arm_id": "generic-clean-code",
+      "repetition": 1,
+      "order_index": 30,
+      "terminal_state": "passed",
+      "contract_sha256": "fb1a68264c0f28cc36804ea63cff9d30a6d8903299b11dc3c2a87e8c68577dd0",
+      "scenario_contract_sha256": "e67598b70ff71f95d137668787b9541a875010c83cc5d859ffbb207598741524",
+      "prompt_sha256": "d3c38162c6cc98af2c758c94fbed2886bc6d5d90f77e144082f56a7edfe3f3b5",
+      "automatic_failure_reasons": [],
+      "diff_sha256": "e3af115aee85de19f51ee45ffb060ecf61d8f7275afff2e859ea0f0a2411a53c",
+      "oracle_results": [
+        {
+          "group": "public",
+          "commands": [
+            {
+              "args": [
+                "npm",
+                "test",
+                "--",
+                "src/WorkItemPanel.public.test.tsx"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 7.2379550999976345,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "a2007e424b1224bbc3e4ceef81e9292c6a4bac58861fea736432393b623fd49d",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "args": [
+                "npm",
+                "run",
+                "typecheck"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 1.3227356999996118,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "b35885ad6433b03aa19a7bb7aac5081e5b42f110f3230fa6856d885b31b2ae0c",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "args": [
+                "npm",
+                "run",
+                "lint"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 5.2379896999991615,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "ab3c2bb7d62c76ff7e17301b50fe2699bb3017fe0fb84afe0df3373ba3378732",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "group": "preservation",
+          "commands": [
+            {
+              "args": [
+                "npm",
+                "test",
+                "--",
+                ".benchmark-oracle/preservation.test.tsx"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 1.5094575000002806,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "77831b09dadae0123eff2e5c8413490ab73df556b37e37bbe94daf704c6b4e06",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "group": "acceptance",
+          "commands": [
+            {
+              "args": [
+                "npm",
+                "test",
+                "--",
+                "--reporter=verbose",
+                ".benchmark-oracle/acceptance.test.tsx"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 1.623884000000544,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "05b5b10892f7e9b92418b2aa11b4230db9e627073f9f31fe1a821a660ae24453",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        }
+      ],
+      "telemetry": "not_available",
+      "review": {
+        "rubrics": {
+          "context-and-locality": {
+            "score": 2,
+            "reason": "Diff 僅修改 src/WorkItemPanel.tsx 與其 public test；變更限定在非同步 state、Retry 按鈕與對應測試，未修改 WorkItemPanel Props 或 LoadWorkItem Contract。"
+          },
+          "behavior-and-validation": {
+            "score": 1,
+            "reason": "Public、preservation、acceptance、typecheck 與 lint Oracle 都成功，但 Diff 在 workItemId 改變的 render 仍直接 renderState(state)，且 latestRequestId 要到下一個 useEffect 呼叫 requestWorkItem 才前進；舊回應若在此之前結算，仍可短暫寫入並呈現舊 state，該交錯未由 Oracle 證明。"
+          },
+          "decision-and-escalation": {
+            "score": 0,
+            "reason": "Packet 提供 Diff、Oracle 與 Blind Spots，但沒有可追溯的事實、假設、替代方案、升級或停止條件紀錄。"
+          }
+        },
+        "incremental_criteria": [
+          {
+            "criterion": "Still-valid content remains visible while retry is loading",
+            "score": 2,
+            "reason": "Retry 按鈕改為 requestWorkItem(true)，Diff 會保留 currentState.content；public test 與 acceptance Oracle 的「keeps still-valid content visible while retrying」皆成功。"
+          },
+          {
+            "criterion": "Earlier success or failure cannot overwrite the latest request state",
+            "score": 1,
+            "reason": "latestRequestId 會過濾已開始後續 request 的回應，且 acceptance Oracle 成功；但 Diff 沒有以 workItemId 標記或遮蔽 render state，identity 改變到下一個 useEffect 啟動新 request 的空檔中，舊回應仍可能通過目前 requestId 並被 renderState(state) 呈現。"
+          },
+          {
+            "criterion": "Public loading, error, success, and props contracts remain unchanged",
+            "score": 2,
+            "reason": "Diff 未改變公開 Props 或 LoadWorkItem 宣告，public Oracle、preservation Oracle 均成功，且 typecheck 與 lint 皆以 exit code 0 完成。"
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "react-state-error-retention--core-plus-typescript--r01",
+      "scenario_id": "react-state-error-retention",
+      "language": "typescript-react",
+      "arm_id": "core-plus-typescript",
+      "repetition": 1,
+      "order_index": 31,
+      "terminal_state": "automatic_failure",
+      "contract_sha256": "fb1a68264c0f28cc36804ea63cff9d30a6d8903299b11dc3c2a87e8c68577dd0",
+      "scenario_contract_sha256": "e67598b70ff71f95d137668787b9541a875010c83cc5d859ffbb207598741524",
+      "prompt_sha256": "8b0f6fab3bc3fb86a2c890a15c4025a40be331cce220f1a4fde460a33bff288b",
+      "automatic_failure_reasons": [
+        "invalid_claim"
+      ],
+      "diff_sha256": "ea8c55032cb563f83e159e10ebab90d3df62e1c4a6f74240d68a56fba8cd8b4a",
+      "oracle_results": [],
+      "telemetry": "not_available",
+      "review": {
+        "rubrics": {
+          "context-and-locality": {
+            "score": 2,
+            "reason": "Diff 僅修改 src/WorkItemPanel.tsx 與其 src/WorkItemPanel.public.test.tsx；狀態變更和測試皆聚焦於 retry 保留內容與 identity 切換，未見公開 Props 或 LoadWorkItem 型別調整。"
+          },
+          "behavior-and-validation": {
+            "score": 1,
+            "reason": "Diff 使用 workItemId、latestRequestId 和 visibleState 來處理內容保留與過期回應，並加入成功與失敗的相關測試；但 oracle_results 為空且 automatic_failure_reasons 含 invalid_claim，沒有獨立執行結果。"
+          },
+          "decision-and-escalation": {
+            "score": 0,
+            "reason": "Packet 中沒有決策理由、已知與未知資訊的區分、替代方案、停止條件或人類升級事項；Blind Spots 只描述 Fixture 與模型範圍。"
+          }
+        },
+        "incremental_criteria": [
+          {
+            "criterion": "Still-valid content remains visible while retry is loading",
+            "score": 1,
+            "reason": "同一 workItemId 的 loading state 會保留 currentState.content，且新增測試斷言 retry 期間仍顯示內容與 Loading；oracle_results 為空並有 invalid_claim，因此僅有未驗證的 Diff 支持。"
+          },
+          {
+            "criterion": "Earlier success or failure cannot overwrite the latest request state",
+            "score": 1,
+            "reason": "Diff 以 latestRequestId 排除舊回應，並在 state.workItemId 不同時 render loading，測試涵蓋舊成功與舊失敗；沒有 Oracle 執行結果，且 Packet 列出 invalid_claim。"
+          },
+          {
+            "criterion": "Public loading, error, success, and props contracts remain unchanged",
+            "score": 1,
+            "reason": "Props 與 LoadWorkItem 宣告在 Diff 中未變，且原有 renderState 分支仍被使用；不過沒有 preservation 或 public Oracle 結果可證實既有契約已回歸通過。"
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "react-effect-lifecycle--generic-clean-code--r01",
+      "scenario_id": "react-effect-lifecycle",
+      "language": "typescript-react",
+      "arm_id": "generic-clean-code",
+      "repetition": 1,
+      "order_index": 32,
+      "terminal_state": "passed",
+      "contract_sha256": "fb1a68264c0f28cc36804ea63cff9d30a6d8903299b11dc3c2a87e8c68577dd0",
+      "scenario_contract_sha256": "9b321658f4fc6fbf52c4431babf892daf93d6067317345ff597bf69d2e95c433",
+      "prompt_sha256": "130f937a7da01a3c211bf84ca513a8288d9174f452e10feb029f417cd93ea52d",
+      "automatic_failure_reasons": [],
+      "diff_sha256": "bbb1bbcdfab37c23e9e985050c035fa11d68a3b316297b806f8a03d752203317",
+      "oracle_results": [
+        {
+          "group": "public",
+          "commands": [
+            {
+              "args": [
+                "npm",
+                "test",
+                "--",
+                "src/WorkItemPreview.public.test.tsx"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 6.675214999999298,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "9501d3b49ed30bde86e3546a8a4a845273fb1519ba3bf9b1ec1d685968d1689c",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "args": [
+                "npm",
+                "run",
+                "typecheck"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 1.2105020999988483,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "44f7e09adbec1042ab84fc4007ecf88115d594495f45fa0e0798451d0b52a41e",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "args": [
+                "npm",
+                "run",
+                "lint"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 5.039320500000031,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "d1b757faba4a8b2893ddedda6793dd63bb0c311d97f726fea6fa484163da94d5",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "group": "preservation",
+          "commands": [
+            {
+              "args": [
+                "npm",
+                "test",
+                "--",
+                ".benchmark-oracle/preservation.test.tsx"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 1.4974662000022363,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "6357ebba23750636d219283a3e17936c1a619bf970998c2a4e0201687c41128b",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "group": "acceptance",
+          "commands": [
+            {
+              "args": [
+                "npm",
+                "test",
+                "--",
+                "--reporter=verbose",
+                ".benchmark-oracle/acceptance.test.tsx"
+              ],
+              "exit_code": 0,
+              "elapsed_seconds": 1.4943397999995796,
+              "timed_out": false,
+              "classification": "success",
+              "attempt": 1,
+              "stdout_sha256": "3bc819887db45995bf67c54a8479b1147d3e6fb864655d9728071b3b35e7663c",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        }
+      ],
+      "telemetry": "not_available",
+      "review": {
+        "rubrics": {
+          "context-and-locality": {
+            "score": 1,
+            "reason": "Diff 限於 src/WorkItemPreview.tsx 與其 public test，沒有可見的 Props 或 API contract 變更；但 Diff 與 Oracle 未記錄固定 revision、Gold Files 或 allowed-diff provenance，情境定位證據仍不完整。"
+          },
+          "behavior-and-validation": {
+            "score": 2,
+            "reason": "Diff 以 [workItemId] 驅動 effect、在 cleanup abort 舊 request，並以 isCurrentRequest 與 signal.aborted 保護成功及失敗分支；public 6 tests、preservation 2 tests、acceptance 2 tests、typecheck 與 lint 的 Oracle 全部 exit code 0。"
+          },
+          "decision-and-escalation": {
+            "score": 0,
+            "reason": "Diff 與通過的 Oracle 僅記錄程式及驗證結果，未提供可追溯的 Repository facts、假設、替代方案、Human Decisions Required 或升級停止條件。"
+          }
+        },
+        "incremental_criteria": [
+          {
+            "criterion": "Effect identity follows workItemId rather than callback or presentation props",
+            "score": 2,
+            "reason": "Diff 將 dependency 改為 [workItemId]，以 ref 保存最新 loader，且 public test 的 non-key prop rerender 情境通過；acceptance Oracle 的 ordinary rerender test 也通過。"
+          },
+          {
+            "criterion": "An identity change aborts the prior request through AbortSignal",
+            "score": 2,
+            "reason": "Diff 的 cleanup 將 isCurrentRequest 設為 false 並呼叫 controller.abort()；public test 檢查 key 改變後舊 signal aborted，整組 public、acceptance Oracle 都 exit code 0。"
+          },
+          {
+            "criterion": "An aborted request cannot overwrite the current success or error state",
+            "score": 2,
+            "reason": "Diff 在 then 與 catch 同時要求 isCurrentRequest 且未 aborted；public test 明確涵蓋 stale success 與 stale failure，acceptance Oracle 的 aborted request overwrite test 通過。"
+          }
+        ]
+      }
+    },
+    {
+      "run_id": "react-effect-lifecycle--core-plus-typescript-plus-react--r01",
+      "scenario_id": "react-effect-lifecycle",
+      "language": "typescript-react",
+      "arm_id": "core-plus-typescript-plus-react",
+      "repetition": 1,
+      "order_index": 33,
+      "terminal_state": "automatic_failure",
+      "contract_sha256": "fb1a68264c0f28cc36804ea63cff9d30a6d8903299b11dc3c2a87e8c68577dd0",
+      "scenario_contract_sha256": "9b321658f4fc6fbf52c4431babf892daf93d6067317345ff597bf69d2e95c433",
+      "prompt_sha256": "8509f9df2e5e724c74c304bd7496048be2f5ca3f4661d67877638f8c4f8585ba",
+      "automatic_failure_reasons": [
+        "invalid_claim"
+      ],
+      "diff_sha256": "1003a3ce103ba57d520dac8d1c5f64b19cbb8333ca843cf5ddc2b9dce56f4b7a",
+      "oracle_results": [],
+      "telemetry": "not_available",
+      "review": {
+        "rubrics": {
+          "context-and-locality": {
+            "score": 1,
+            "reason": "Diff 僅觸及 src/WorkItemPreview.tsx 與其 public test，且沒有改動 Props 或 API 型別；但 oracle_results 為空且 automatic_failure_reasons 記錄 invalid_claim，無法補足定位與邊界 provenance。"
+          },
+          "behavior-and-validation": {
+            "score": 1,
+            "reason": "Diff 將 effect 限於 [workItemId]、cleanup 呼叫 controller.abort()，並在成功與失敗分支檢查 signal.aborted；新增測試涵蓋 rerender、舊成功與舊失敗，但沒有獨立 Oracle 執行結果且存在 invalid_claim。"
+          },
+          "decision-and-escalation": {
+            "score": 0,
+            "reason": "可觀察 Diff 只有實作與測試變更，oracle_results 為空且 automatic_failure_reasons 為 invalid_claim；未記錄可追溯的事實、假設、替代方案或升級停止條件。"
+          }
+        },
+        "incremental_criteria": [
+          {
+            "criterion": "Effect identity follows workItemId rather than callback or presentation props",
+            "score": 1,
+            "reason": "Diff 將 dependency 改為 [workItemId]，並新增相同識別碼下更換 density 與 callback 的測試；oracle_results 為空且有 invalid_claim，缺少執行驗證。"
+          },
+          {
+            "criterion": "An identity change aborts the prior request through AbortSignal",
+            "score": 1,
+            "reason": "Diff 的 cleanup 回傳 controller.abort()，測試也檢查舊 request signal 已 aborted；oracle_results 為空且有 invalid_claim，缺少獨立驗證。"
+          },
+          {
+            "criterion": "An aborted request cannot overwrite the current success or error state",
+            "score": 1,
+            "reason": "Diff 在 then 與 catch 都以 !controller.signal.aborted 防止寫入，並新增舊成功與舊失敗測試；oracle_results 為空且有 invalid_claim，驗證證據不完整。"
+          }
+        ]
+      }
+    }
+  ],
+  "source_revisions": {
+    "fixture_tag": "profile-pilot-v1",
+    "fixture_commit": "6ed8712f2b3d4eaf902dbe1470a8740f92700878",
+    "skill_tag": "v0.5.0",
+    "skill_commit": "bd895776a80566381003182bfdb24f0f02784731",
+    "manifest_path": "evals/manifests/v0.5.1-profile-pilot.json",
+    "manifest_sha256": "21292c1092bb4bc49e37087df7242cfa3d50adea94adecfff667fcc21b24e4cd",
+    "harness_sha256": "f95f0743c938639f9e059ea5d3f5a53ef1263c3155a8efea12f8bbb3aff3a17c",
+    "contract_sha256": "fb1a68264c0f28cc36804ea63cff9d30a6d8903299b11dc3c2a87e8c68577dd0",
+    "prompts": {
+      "csharp-overdue-rule/control": "1d3bff496893de45820c600216013f0bdd17144ff445c162c241b70cd410d774",
+      "csharp-overdue-rule/generic-clean-code": "9ae03b99a184d02b81c499ab6f9c6bcce11de27ae06c041811ba7b20cdf7d1b2",
+      "csharp-overdue-rule/core-only": "c25f18c975e69adf0409c6a2e7aecab8a1af1379649fb16307e7e6c09cc98720",
+      "csharp-overdue-rule/core-plus-csharp": "60b603f3aa18e93a2c41db704a70718019d2eab256ed5673e47a1245b2bb900a",
+      "csharp-cancellation-cleanup/control": "b2ea2a49dcc25106f552f3a7005ded5c0320e0847110d056e442d9bf09668f77",
+      "csharp-cancellation-cleanup/generic-clean-code": "4dcd762d3cf6b7d4d001060e9e2025e1cb092b9cf6facfc9b2ae1233106e24ec",
+      "csharp-cancellation-cleanup/core-only": "9858dc82265547977a70c18f85293fb4af842cbf1c12473b8e9a82eb59b8dbc6",
+      "csharp-cancellation-cleanup/core-plus-csharp": "d225e40feb1570f03b500f08519d595b249cadeaec5a28c02ab647945aae376b",
+      "fastapi-overdue-rule/control": "56e298122f8668f033500c648b3b02fb58e34f660c3c35410d2cbaf60c438fab",
+      "fastapi-overdue-rule/generic-clean-code": "a2673653734da249071cea548bb65e055af6f22db89b718be628a70b875da152",
+      "fastapi-overdue-rule/core-only": "0a7e69438a0cc36967408c834133a9d61144b1c990f2b8d9fc9f90d304b3758c",
+      "fastapi-overdue-rule/core-plus-python": "7a1c93cd96bba538a6ef63d144c41d615fac06299b2f6c858e7e24e8e7f1962a",
+      "fastapi-provider-boundary/control": "55f9093edd26f71fc26c4396c2665eda1b556e8092d397b737cbd7d40a6063ad",
+      "fastapi-provider-boundary/generic-clean-code": "b60a888048a875d51e5b1c6b6579a667075e90d5f60223387118feb1abe34942",
+      "fastapi-provider-boundary/core-only": "b87f5fe684e6ad599e50508f4b627e2c6154020ca2f9411ed851d3052e096f87",
+      "fastapi-provider-boundary/core-plus-python": "66ca0f34ee52033f6f1155dac98e7f5becf90bdd6f49d00d8bc6f6ada811a5ae",
+      "typescript-overdue-rule/control": "d04538098437622d2fa985e34d2beb95c684a0f50e26fdd87ff88e000eded028",
+      "typescript-overdue-rule/generic-clean-code": "f5cbf11f6654a945a24f47b37f248be44c063e9fd8865d099d53f817b0a84fad",
+      "typescript-overdue-rule/core-only": "bbba01c0927652052b5ad09c653c329c4650727cfbb3868795640ab22fc296e3",
+      "typescript-overdue-rule/core-plus-typescript": "33122dcf5a1b9887e3e9cbbed3171bfd54888cde08732c39de21092b2fa9e099",
+      "typescript-runtime-validation/control": "c8c443ced366e289f991e7a2a0d765b45b0b9c313d22b2acf14976b5f52dbd31",
+      "typescript-runtime-validation/generic-clean-code": "3e32910d89d9146c1825bfa3a7cdb6f517a7b6aaceb5c1c774c7779ec23ff40f",
+      "typescript-runtime-validation/core-only": "59a4c90c51d2bc92c5744cf3561540b27ded6e28b94d0b62ff2f85e50baa12ed",
+      "typescript-runtime-validation/core-plus-typescript": "857498e9d56af1c2f630a2c0c082b5e996dd1c3e67e158163d27a43cc3ac9547",
+      "react-state-error-retention/control": "24eee3b235898470b02a4b90ed98cee000ecd50dff62ad168902754f3750c99a",
+      "react-state-error-retention/generic-clean-code": "d3c38162c6cc98af2c758c94fbed2886bc6d5d90f77e144082f56a7edfe3f3b5",
+      "react-state-error-retention/core-only": "52eee673dcc2152399c4af32decd0a078404f8a1458b39e705cd7301de2fa034",
+      "react-state-error-retention/core-plus-typescript": "8b0f6fab3bc3fb86a2c890a15c4025a40be331cce220f1a4fde460a33bff288b",
+      "react-state-error-retention/core-plus-typescript-plus-react": "f65145d86e696afc83ef1b8c9d60e3f69f1c0e373831aa5699fe418fea24478c",
+      "react-effect-lifecycle/control": "61748cfa0aad971701827d2b233b57616f6bdb0b0eca7fa2b06875a503e9f949",
+      "react-effect-lifecycle/generic-clean-code": "130f937a7da01a3c211bf84ca513a8288d9174f452e10feb029f417cd93ea52d",
+      "react-effect-lifecycle/core-only": "53e69efb36ae82d328fbec85dff44de2b30fe527bd2ca1a1b30d12e023f38686",
+      "react-effect-lifecycle/core-plus-typescript": "e1125e590b0cf3ab4bda5ea72f935753f4caf4f1b4361963894a245e2d95a7fe",
+      "react-effect-lifecycle/core-plus-typescript-plus-react": "8509f9df2e5e724c74c304bd7496048be2f5ca3f4661d67877638f8c4f8585ba"
+    },
+    "evaluators": {
+      "csharp-overdue-rule": "3c61e1a9703b452af26a849f455d2af998b6cb3de60776c00495d29b47bde5bd",
+      "csharp-cancellation-cleanup": "0d618abd8de54797e98c2b217a950449c6271fd651a14ed7f414acdbc6662f98",
+      "fastapi-overdue-rule": "748c182b6a9734a5f11522d93af7c4e6a9aaa8d84372a3b5b9d6e682579f2d9e",
+      "fastapi-provider-boundary": "fbff7d60388ac4adce76a81202755df1dd48727f7417fb954d033c83de95bc30",
+      "typescript-overdue-rule": "a5e39e604d3b5c4427c4e8b34e61d0daa8312a58add0e22b3dcf526e849953d4",
+      "typescript-runtime-validation": "27e51fdab21bf9894a3763054f1d7fd5cafe596ad697e97d73eecd46e1b12212",
+      "react-state-error-retention": "9858d1be22b6ba6131aa276d4dfa5da3822e1b6bab366fca6622133ffb7dc752",
+      "react-effect-lifecycle": "cbb489832dd844402b5e86b902634ff87711f1a3a4b5fc00d3848f108a2a82b6"
+    },
+    "rubrics": {
+      "evals/rubrics/behavior-and-validation.md": "c7e5e56830cfd282d9090014bc8d6f03a45ac13468f18985b3453e620c3abfe1",
+      "evals/rubrics/context-and-locality.md": "7f33678bbcb299bc047f6be93a42f1b6cc3e91babd2d4f7d238b9a9484bb2404",
+      "evals/rubrics/decision-and-escalation.md": "ddbcecbdc6d13d813396e5b3f14612985465bcdb6ae1843a4e19330738f645ff",
+      "evals/rubrics/profile-increment.md": "96a8498c79440cca554b0fcf6ecf2df8766d9ee99adb5b28199106834ea4f288"
+    }
+  },
+  "execution": {
+    "model": "gpt-5.6-sol",
+    "reasoning_effort": "high",
+    "client": "codex-desktop-collaboration",
+    "subject_executor": {
+      "kind": "codex-desktop-collaboration",
+      "protocol_version": "desktop-subject-v4",
+      "dispatch_mode": "external-collaboration-subagent",
+      "report_relative_path": ".benchmark-subject-report.json",
+      "network_enforcement": "not_available",
+      "telemetry": "not_available"
+    },
+    "subject_timeout_seconds": 480,
+    "fixture_timeout_seconds": 120,
+    "oracle_timeout_seconds": 120,
+    "repetitions": 1,
+    "random_seed": 560501
+  },
+  "review_metadata": {
+    "anonymization": "single-candidate",
+    "reviewer_model": "gpt-5.6-terra",
+    "reviewer_reasoning_effort": "max",
+    "expected_candidates": 34,
+    "completed_candidates": 34,
+    "rubric_ids": [
+      "context-and-locality",
+      "behavior-and-validation",
+      "decision-and-escalation"
+    ],
+    "incremental_criteria_scored": true
+  },
+  "profile_outcomes": [
+    {
+      "profile_id": "csharp",
+      "stage": "pilot",
+      "direct_comparator": "core-only",
+      "treatment_arm": "core-plus-csharp",
+      "scenario_ids": [
+        "csharp-overdue-rule",
+        "csharp-cancellation-cleanup"
+      ],
+      "comparator_run_ids": [
+        "csharp-overdue-rule--core-only--r01",
+        "csharp-cancellation-cleanup--core-only--r01"
+      ],
+      "treatment_run_ids": [
+        "csharp-overdue-rule--core-plus-csharp--r01",
+        "csharp-cancellation-cleanup--core-plus-csharp--r01"
+      ],
+      "outcome": "inconclusive",
+      "criteria_evidence": [
+        {
+          "scenario_id": "csharp-overdue-rule",
+          "criterion": "DateTimeOffset comparison preserves the exact two-hour UTC boundary",
+          "comparator_run_id": "csharp-overdue-rule--core-only--r01",
+          "treatment_run_id": "csharp-overdue-rule--core-plus-csharp--r01",
+          "comparator_score": 2,
+          "treatment_score": 1,
+          "delta": -1
+        },
+        {
+          "scenario_id": "csharp-overdue-rule",
+          "criterion": "Completed and Normal Priority branches retain their existing semantics",
+          "comparator_run_id": "csharp-overdue-rule--core-only--r01",
+          "treatment_run_id": "csharp-overdue-rule--core-plus-csharp--r01",
+          "comparator_score": 2,
+          "treatment_score": 1,
+          "delta": -1
+        },
+        {
+          "scenario_id": "csharp-cancellation-cleanup",
+          "criterion": "Caller CancellationToken reaches provider open and send operations",
+          "comparator_run_id": "csharp-cancellation-cleanup--core-only--r01",
+          "treatment_run_id": "csharp-cancellation-cleanup--core-plus-csharp--r01",
+          "comparator_score": 1,
+          "treatment_score": 1,
+          "delta": 0
+        },
+        {
+          "scenario_id": "csharp-cancellation-cleanup",
+          "criterion": "OperationCanceledException remains cancellation rather than provider failure",
+          "comparator_run_id": "csharp-cancellation-cleanup--core-only--r01",
+          "treatment_run_id": "csharp-cancellation-cleanup--core-plus-csharp--r01",
+          "comparator_score": 1,
+          "treatment_score": 1,
+          "delta": 0
+        },
+        {
+          "scenario_id": "csharp-cancellation-cleanup",
+          "criterion": "The asynchronous provider session is disposed exactly once",
+          "comparator_run_id": "csharp-cancellation-cleanup--core-only--r01",
+          "treatment_run_id": "csharp-cancellation-cleanup--core-plus-csharp--r01",
+          "comparator_score": 1,
+          "treatment_score": 1,
+          "delta": 0
+        }
+      ],
+      "decision_reasons": [
+        "comparator evidence gap: csharp-cancellation-cleanup",
+        "treatment evidence gap: csharp-cancellation-cleanup",
+        "treatment evidence gap: csharp-overdue-rule"
+      ],
+      "limitations": [
+        "Single-repetition pilot under pinned model, client, fixtures, and prompts.",
+        "Only the declared direct comparator and treatment arms inform maturity."
+      ]
+    },
+    {
+      "profile_id": "python",
+      "stage": "pilot",
+      "direct_comparator": "core-only",
+      "treatment_arm": "core-plus-python",
+      "scenario_ids": [
+        "fastapi-overdue-rule",
+        "fastapi-provider-boundary"
+      ],
+      "comparator_run_ids": [
+        "fastapi-overdue-rule--core-only--r01",
+        "fastapi-provider-boundary--core-only--r01"
+      ],
+      "treatment_run_ids": [
+        "fastapi-overdue-rule--core-plus-python--r01",
+        "fastapi-provider-boundary--core-plus-python--r01"
+      ],
+      "outcome": "inconclusive",
+      "criteria_evidence": [
+        {
+          "scenario_id": "fastapi-overdue-rule",
+          "criterion": "High Priority applies the exact two-hour timezone-aware boundary",
+          "comparator_run_id": "fastapi-overdue-rule--core-only--r01",
+          "treatment_run_id": "fastapi-overdue-rule--core-plus-python--r01",
+          "comparator_score": 1,
+          "treatment_score": 1,
+          "delta": 0
+        },
+        {
+          "scenario_id": "fastapi-overdue-rule",
+          "criterion": "HTTP status, response schema, Completed, and Normal behavior remain unchanged",
+          "comparator_run_id": "fastapi-overdue-rule--core-only--r01",
+          "treatment_run_id": "fastapi-overdue-rule--core-plus-python--r01",
+          "comparator_score": 1,
+          "treatment_score": 1,
+          "delta": 0
+        },
+        {
+          "scenario_id": "fastapi-provider-boundary",
+          "criterion": "The route reuses NotificationSender through FastAPI dependency injection",
+          "comparator_run_id": "fastapi-provider-boundary--core-only--r01",
+          "treatment_run_id": "fastapi-provider-boundary--core-plus-python--r01",
+          "comparator_score": 1,
+          "treatment_score": 1,
+          "delta": 0
+        },
+        {
+          "scenario_id": "fastapi-provider-boundary",
+          "criterion": "Dependency override replaces the provider without duplicating the domain boundary",
+          "comparator_run_id": "fastapi-provider-boundary--core-only--r01",
+          "treatment_run_id": "fastapi-provider-boundary--core-plus-python--r01",
+          "comparator_score": 1,
+          "treatment_score": 1,
+          "delta": 0
+        },
+        {
+          "scenario_id": "fastapi-provider-boundary",
+          "criterion": "The 202, 404, 502, and 503 failure semantics remain distinct",
+          "comparator_run_id": "fastapi-provider-boundary--core-only--r01",
+          "treatment_run_id": "fastapi-provider-boundary--core-plus-python--r01",
+          "comparator_score": 1,
+          "treatment_score": 1,
+          "delta": 0
+        }
+      ],
+      "decision_reasons": [
+        "comparator evidence gap: fastapi-overdue-rule",
+        "comparator evidence gap: fastapi-provider-boundary",
+        "treatment evidence gap: fastapi-overdue-rule",
+        "treatment evidence gap: fastapi-provider-boundary"
+      ],
+      "limitations": [
+        "Single-repetition pilot under pinned model, client, fixtures, and prompts.",
+        "Only the declared direct comparator and treatment arms inform maturity."
+      ]
+    },
+    {
+      "profile_id": "typescript",
+      "stage": "pilot",
+      "direct_comparator": "core-only",
+      "treatment_arm": "core-plus-typescript",
+      "scenario_ids": [
+        "typescript-overdue-rule",
+        "typescript-runtime-validation"
+      ],
+      "comparator_run_ids": [
+        "typescript-overdue-rule--core-only--r01",
+        "typescript-runtime-validation--core-only--r01"
+      ],
+      "treatment_run_ids": [
+        "typescript-overdue-rule--core-plus-typescript--r01",
+        "typescript-runtime-validation--core-plus-typescript--r01"
+      ],
+      "outcome": "inconclusive",
+      "criteria_evidence": [
+        {
+          "scenario_id": "typescript-overdue-rule",
+          "criterion": "High Priority uses the exact two-hour boundary through the existing WorkItem model",
+          "comparator_run_id": "typescript-overdue-rule--core-only--r01",
+          "treatment_run_id": "typescript-overdue-rule--core-plus-typescript--r01",
+          "comparator_score": 1,
+          "treatment_score": 1,
+          "delta": 0
+        },
+        {
+          "scenario_id": "typescript-overdue-rule",
+          "criterion": "Completed and Normal Priority branches remain typed and unchanged",
+          "comparator_run_id": "typescript-overdue-rule--core-only--r01",
+          "treatment_run_id": "typescript-overdue-rule--core-plus-typescript--r01",
+          "comparator_score": 1,
+          "treatment_score": 1,
+          "delta": 0
+        },
+        {
+          "scenario_id": "typescript-runtime-validation",
+          "criterion": "The unknown payload is narrowed by runtime guards before WorkItem construction",
+          "comparator_run_id": "typescript-runtime-validation--core-only--r01",
+          "treatment_run_id": "typescript-runtime-validation--core-plus-typescript--r01",
+          "comparator_score": 2,
+          "treatment_score": 2,
+          "delta": 0
+        },
+        {
+          "scenario_id": "typescript-runtime-validation",
+          "criterion": "The existing WorkItem type is reused without any or unsafe assertion",
+          "comparator_run_id": "typescript-runtime-validation--core-only--r01",
+          "treatment_run_id": "typescript-runtime-validation--core-plus-typescript--r01",
+          "comparator_score": 2,
+          "treatment_score": 2,
+          "delta": 0
+        },
+        {
+          "scenario_id": "typescript-runtime-validation",
+          "criterion": "Accepted and rejected results use exhaustive discriminated-union handling",
+          "comparator_run_id": "typescript-runtime-validation--core-only--r01",
+          "treatment_run_id": "typescript-runtime-validation--core-plus-typescript--r01",
+          "comparator_score": 0,
+          "treatment_score": 0,
+          "delta": 0
+        }
+      ],
+      "decision_reasons": [
+        "comparator evidence gap: typescript-overdue-rule",
+        "comparator evidence gap: typescript-runtime-validation",
+        "treatment evidence gap: typescript-overdue-rule",
+        "treatment evidence gap: typescript-runtime-validation"
+      ],
+      "limitations": [
+        "Single-repetition pilot under pinned model, client, fixtures, and prompts.",
+        "Only the declared direct comparator and treatment arms inform maturity."
+      ]
+    },
+    {
+      "profile_id": "react",
+      "stage": "pilot",
+      "direct_comparator": "core-plus-typescript",
+      "treatment_arm": "core-plus-typescript-plus-react",
+      "scenario_ids": [
+        "react-state-error-retention",
+        "react-effect-lifecycle"
+      ],
+      "comparator_run_ids": [
+        "react-state-error-retention--core-plus-typescript--r01",
+        "react-effect-lifecycle--core-plus-typescript--r01"
+      ],
+      "treatment_run_ids": [
+        "react-state-error-retention--core-plus-typescript-plus-react--r01",
+        "react-effect-lifecycle--core-plus-typescript-plus-react--r01"
+      ],
+      "outcome": "inconclusive",
+      "criteria_evidence": [
+        {
+          "scenario_id": "react-state-error-retention",
+          "criterion": "Still-valid content remains visible while retry is loading",
+          "comparator_run_id": "react-state-error-retention--core-plus-typescript--r01",
+          "treatment_run_id": "react-state-error-retention--core-plus-typescript-plus-react--r01",
+          "comparator_score": 1,
+          "treatment_score": 1,
+          "delta": 0
+        },
+        {
+          "scenario_id": "react-state-error-retention",
+          "criterion": "Earlier success or failure cannot overwrite the latest request state",
+          "comparator_run_id": "react-state-error-retention--core-plus-typescript--r01",
+          "treatment_run_id": "react-state-error-retention--core-plus-typescript-plus-react--r01",
+          "comparator_score": 1,
+          "treatment_score": 1,
+          "delta": 0
+        },
+        {
+          "scenario_id": "react-state-error-retention",
+          "criterion": "Public loading, error, success, and props contracts remain unchanged",
+          "comparator_run_id": "react-state-error-retention--core-plus-typescript--r01",
+          "treatment_run_id": "react-state-error-retention--core-plus-typescript-plus-react--r01",
+          "comparator_score": 1,
+          "treatment_score": 1,
+          "delta": 0
+        },
+        {
+          "scenario_id": "react-effect-lifecycle",
+          "criterion": "Effect identity follows workItemId rather than callback or presentation props",
+          "comparator_run_id": "react-effect-lifecycle--core-plus-typescript--r01",
+          "treatment_run_id": "react-effect-lifecycle--core-plus-typescript-plus-react--r01",
+          "comparator_score": 1,
+          "treatment_score": 1,
+          "delta": 0
+        },
+        {
+          "scenario_id": "react-effect-lifecycle",
+          "criterion": "An identity change aborts the prior request through AbortSignal",
+          "comparator_run_id": "react-effect-lifecycle--core-plus-typescript--r01",
+          "treatment_run_id": "react-effect-lifecycle--core-plus-typescript-plus-react--r01",
+          "comparator_score": 1,
+          "treatment_score": 1,
+          "delta": 0
+        },
+        {
+          "scenario_id": "react-effect-lifecycle",
+          "criterion": "An aborted request cannot overwrite the current success or error state",
+          "comparator_run_id": "react-effect-lifecycle--core-plus-typescript--r01",
+          "treatment_run_id": "react-effect-lifecycle--core-plus-typescript-plus-react--r01",
+          "comparator_score": 1,
+          "treatment_score": 1,
+          "delta": 0
+        }
+      ],
+      "decision_reasons": [
+        "comparator evidence gap: react-effect-lifecycle",
+        "comparator evidence gap: react-state-error-retention",
+        "treatment evidence gap: react-effect-lifecycle",
+        "treatment evidence gap: react-state-error-retention"
+      ],
+      "limitations": [
+        "Single-repetition pilot under pinned model, client, fixtures, and prompts.",
+        "Only the declared direct comparator and treatment arms inform maturity."
+      ]
+    }
+  ]
+}

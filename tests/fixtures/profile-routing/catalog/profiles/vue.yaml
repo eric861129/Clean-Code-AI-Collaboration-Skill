@@ -3,7 +3,7 @@ id: vue
 kind: framework
 display_name: Vue
 status: planned
-suite_version: "0.5.0"
+suite_version: "0.5.1"
 detection:
   owning_manifests: [{pattern: package.json, boundary: package}]
   supporting_files: []

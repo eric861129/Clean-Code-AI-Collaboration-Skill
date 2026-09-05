@@ -562,7 +562,7 @@ class SkillContractTests(unittest.TestCase):
             with self.subTest(term=term):
                 self.assertIn(term, content)
 
-    def test_v040_metadata_and_clean_lenses_are_discoverable(self) -> None:
+    def test_current_metadata_and_clean_lenses_are_discoverable(self) -> None:
         content = SKILL_PATH.read_text(encoding="utf-8")
         frontmatter = re.match(
             r"---\n(?P<frontmatter>.*?)\n---\n",
@@ -572,7 +572,7 @@ class SkillContractTests(unittest.TestCase):
         required = {
             "license: MIT",
             "compatibility:",
-            'version: "0.5.0"',
+            'version: "0.5.1"',
             "C — Context-Aware Code",
             "L — Localized Change",
             "E — Explicit Intent and Boundaries",
@@ -589,15 +589,18 @@ class SkillContractTests(unittest.TestCase):
             with self.subTest(term=term):
                 self.assertIn(term, content)
 
-    def test_readme_installation_uses_current_skill_version(self) -> None:
+    def test_readme_installation_matches_released_source_version(self) -> None:
         skill = SKILL_PATH.read_text(encoding="utf-8")
         readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
-        version = re.search(
+        source_version = re.search(
             r'^  version: "([^"]+)"$', skill, re.MULTILINE
         ).group(1)
 
-        self.assertIn(f"git checkout v{version}", readme)
-        self.assertIn(f"version: \"{version}\"", readme)
+        self.assertEqual("0.5.1", source_version)
+        self.assertIn(f"固定安裝 Tag 為 `v{source_version}`", readme)
+        self.assertIn(f"git checkout v{source_version}", readme)
+        self.assertIn(f'version: "{source_version}"', readme)
+        self.assertNotIn("0.5.1` Candidate", readme)
 
     def test_v040_readme_documents_strategy_configuration(self) -> None:
         readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")

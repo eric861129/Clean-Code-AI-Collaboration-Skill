@@ -21,15 +21,24 @@ IMPLEMENTATION_AUTHORIZATION = (
 )
 
 
-def build_prompt(scenario: dict[str, object], arm_id: str) -> str:
-    task = str(scenario["task"]) + IMPLEMENTATION_AUTHORIZATION
-    if arm_id == "control":
-        return task
-    if arm_id == "generic-clean-code":
-        return task + "\n\n請遵守 Clean Code 完成任務。"
-    if arm_id == "skill-v0.3.0":
-        return task + "\n\n請使用 $clean-code-ai-collaboration 完成任務。"
-    raise ValueError(f"unknown arm: {arm_id}")
+def build_prompt(
+    scenario: dict[str, object], arm_id: str, manifest: BenchmarkManifest
+) -> str:
+    try:
+        arm = next(arm for arm in manifest.arms if arm.id == arm_id)
+    except StopIteration as error:
+        raise ValueError(f"unknown arm: {arm_id}") from error
+    task = _normalize_lf(str(scenario["task"])) + IMPLEMENTATION_AUTHORIZATION
+    instruction = _normalize_lf(arm.instruction)
+    return task if not instruction else task + f"\n\n{instruction}"
+
+
+def canonical_prompt_bytes(prompt: str) -> bytes:
+    return _normalize_lf(prompt).encode("utf-8")
+
+
+def _normalize_lf(value: str) -> str:
+    return value.replace("\r\n", "\n").replace("\r", "\n")
 
 
 def run_subject(
@@ -40,15 +49,16 @@ def run_subject(
     attempt: int = 1,
 ) -> SubjectObservation:
     scenario = _scenario_for(manifest, slot.scenario_id)
-    prompt = build_prompt(scenario, slot.arm_id)
-    prompt_sha256 = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+    prompt = build_prompt(scenario, slot.arm_id, manifest)
+    prompt_bytes = canonical_prompt_bytes(prompt)
+    prompt_sha256 = hashlib.sha256(prompt_bytes).hexdigest()
     workspace.artifact_dir.mkdir(parents=True, exist_ok=True)
     prompt_path = workspace.artifact_dir / "prompt.md"
     raw_jsonl_path = workspace.artifact_dir / "subject.jsonl"
     stderr_path = workspace.artifact_dir / "subject.stderr.txt"
     last_message_path = workspace.artifact_dir / "last-message.md"
     environment_path = workspace.artifact_dir / "subject-environment.json"
-    prompt_path.write_text(prompt, encoding="utf-8")
+    prompt_path.write_bytes(prompt_bytes)
 
     if command_override is None:
         command = _codex_command(manifest, workspace.root, last_message_path)

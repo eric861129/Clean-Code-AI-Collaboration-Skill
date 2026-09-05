@@ -444,7 +444,7 @@ class EvalContractTests(unittest.TestCase):
 
     def test_rubric_files_exist_and_define_scoring(self) -> None:
         actual = {path.name for path in (EVAL_ROOT / "rubrics").glob("*.md")}
-        self.assertEqual(RUBRIC_NAMES, actual)
+        self.assertEqual(RUBRIC_NAMES | {"profile-increment.md"}, actual)
         for path in (EVAL_ROOT / "rubrics").glob("*.md"):
             content = path.read_text(encoding="utf-8")
             self.assertIn("## Scoring", content)

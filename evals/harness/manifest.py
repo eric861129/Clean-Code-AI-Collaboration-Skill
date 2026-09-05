@@ -2,20 +2,25 @@ from __future__ import annotations
 
 import json
 import re
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
-from evals.harness.models import BenchmarkManifest
+from evals.harness.models import ArmDefinition, BenchmarkManifest
 
-EXPECTED_ARM_IDS = {"control", "generic-clean-code", "skill-v0.3.0"}
-EXPECTED_SCENARIO_IDS = {
-    "react-overdue-rule",
-    "react-effect-lifecycle",
-    "fastapi-overdue-rule",
-    "fastapi-provider-boundary",
-}
 DESKTOP_EXECUTOR_KIND = "codex-desktop-collaboration"
 DESKTOP_REPORT_PATH = ".benchmark-subject-report.json"
 DESKTOP_DISPATCH_MODE = "external-collaboration-subagent"
+FREEZE_POLICIES = {"post_pilot", "pre_execution"}
+PROFILE_SCENARIO_TYPES = {"shared_business", "ecosystem_native"}
+PROFILE_COMPARISON_ARMS = {
+    "csharp": ("core-only", "core-plus-csharp"),
+    "python": ("core-only", "core-plus-python"),
+    "typescript": ("core-only", "core-plus-typescript"),
+    "react": (
+        "core-plus-typescript",
+        "core-plus-typescript-plus-react",
+    ),
+}
+IDENTIFIER_PATTERN = r"[a-z0-9]+(?:[.-][a-z0-9]+)*"
 REQUIRED_SCENARIO_FIELDS = {
     "id",
     "language",
@@ -41,8 +46,23 @@ def validate_manifest(raw: dict[str, object]) -> BenchmarkManifest:
     skill = _required_mapping(raw, "skill")
     execution = _required_mapping(raw, "execution")
     subject_executor = _required_mapping(execution, "subject_executor")
-    arms = _required_mapping_sequence(raw, "arms")
-    scenarios = _required_mapping_sequence(raw, "scenarios")
+    freeze_policy = str(raw.get("freeze_policy", "post_pilot"))
+    if freeze_policy not in FREEZE_POLICIES:
+        raise ValueError("freeze policy is invalid")
+    requires_profile_contract = (
+        freeze_policy == "pre_execution"
+        or "profile-pilot" in str(raw.get("benchmark_version", ""))
+    )
+    arms = _arm_definitions(
+        _required_mapping_sequence(raw, "arms"),
+        require_explicit_inspection_paths=requires_profile_contract,
+    )
+    _validate_arm_skill_contract(arms, skill)
+    scenarios = _scenario_definitions(
+        _required_mapping_sequence(raw, "scenarios"),
+        arm_ids=tuple(arm.id for arm in arms),
+        requires_profile_attribution=requires_profile_contract,
+    )
 
     fixture_commit = str(fixture_repository.get("commit", ""))
     if re.fullmatch(r"[0-9a-f]{40}", fixture_commit) is None:
@@ -52,45 +72,7 @@ def validate_manifest(raw: dict[str, object]) -> BenchmarkManifest:
     if re.fullmatch(r"[0-9a-f]{40}", skill_commit) is None:
         raise ValueError("skill commit must be a 40-character skill commit")
 
-    arm_ids = [str(arm.get("id", "")) for arm in arms]
-    unknown_arms = set(arm_ids) - EXPECTED_ARM_IDS
-    if unknown_arms:
-        raise ValueError(f"unknown arm: {sorted(unknown_arms)}")
-    if set(arm_ids) != EXPECTED_ARM_IDS or len(arm_ids) != len(EXPECTED_ARM_IDS):
-        raise ValueError("manifest must define each expected arm exactly once")
-
-    scenario_ids = [str(scenario.get("id", "")) for scenario in scenarios]
-    if set(scenario_ids) != EXPECTED_SCENARIO_IDS or len(scenario_ids) != len(
-        EXPECTED_SCENARIO_IDS
-    ):
-        raise ValueError("manifest must define each expected scenario exactly once")
-    for scenario in scenarios:
-        missing = REQUIRED_SCENARIO_FIELDS - set(scenario)
-        if missing:
-            raise ValueError(
-                f"scenario {scenario.get('id', '<unknown>')} missing fields: "
-                f"{sorted(missing)}"
-            )
-        commands = scenario["commands"]
-        if not isinstance(commands, dict) or set(commands) != {
-            "public",
-            "preservation",
-            "acceptance",
-        }:
-            raise ValueError(
-                "scenario commands must define public, preservation, acceptance"
-            )
-        expected_failure_count = scenario["expected_baseline_failure_count"]
-        if (
-            not isinstance(expected_failure_count, int)
-            or isinstance(expected_failure_count, bool)
-            or expected_failure_count <= 0
-        ):
-            raise ValueError("expected baseline failure count must be positive")
-
     repetitions = _positive_integer(execution, "repetitions")
-    if repetitions != 3:
-        raise ValueError("cross-language benchmark requires exactly 3 repetitions")
 
     if execution.get("client") != DESKTOP_EXECUTOR_KIND:
         raise ValueError("cross-language benchmark requires Desktop collaboration")
@@ -128,9 +110,244 @@ def validate_manifest(raw: dict[str, object]) -> BenchmarkManifest:
         oracle_timeout_seconds=_positive_integer(execution, "oracle_timeout_seconds"),
         repetitions=repetitions,
         random_seed=_positive_integer(execution, "random_seed"),
-        scenarios=tuple(scenarios),
-        arms=tuple(arms),
+        freeze_policy=freeze_policy,
+        scenarios=scenarios,
+        arms=arms,
     )
+
+
+def _arm_definitions(
+    raw_arms: list[dict[str, object]],
+    *,
+    require_explicit_inspection_paths: bool,
+) -> tuple[ArmDefinition, ...]:
+    arms: list[ArmDefinition] = []
+    seen_ids: set[str] = set()
+    for raw_arm in raw_arms:
+        arm_id = raw_arm.get("id")
+        if not isinstance(arm_id, str) or re.fullmatch(IDENTIFIER_PATTERN, arm_id) is None:
+            raise ValueError("arm ID is invalid")
+        if arm_id in seen_ids:
+            raise ValueError(f"duplicate arm: {arm_id}")
+        instruction = raw_arm.get("instruction")
+        if not isinstance(instruction, str):
+            raise ValueError(f"arm instruction is invalid: {arm_id}")
+        skill = raw_arm.get("skill")
+        if skill is not None and (
+            not isinstance(skill, str)
+            or re.fullmatch(IDENTIFIER_PATTERN, skill) is None
+        ):
+            raise ValueError(f"arm Skill is invalid: {arm_id}")
+        version = raw_arm.get("version")
+        if version is not None and (
+            not isinstance(version, str) or not version.strip()
+        ):
+            raise ValueError(f"arm version is invalid: {arm_id}")
+        if skill is None and version is not None:
+            raise ValueError(f"arm without a Skill cannot declare a version: {arm_id}")
+        required_skill_inspection_paths = _arm_inspection_paths(
+            raw_arm,
+            arm_id,
+            skill,
+            require_explicit=require_explicit_inspection_paths,
+        )
+        arms.append(
+            ArmDefinition(
+                id=arm_id,
+                instruction=instruction,
+                skill=skill,
+                version=version,
+                required_skill_inspection_paths=required_skill_inspection_paths,
+            )
+        )
+        seen_ids.add(arm_id)
+    if "control" not in seen_ids:
+        raise ValueError("manifest must define a control arm")
+    return tuple(arms)
+
+
+def _validate_arm_skill_contract(
+    arms: tuple[ArmDefinition, ...], skill: dict[str, object]
+) -> None:
+    expected_name = skill.get("name")
+    allowed_versions = {
+        value
+        for value in (skill.get("version"), skill.get("tag"))
+        if isinstance(value, str) and value
+    }
+    for arm in arms:
+        if arm.skill is None:
+            continue
+        if arm.version is None:
+            raise ValueError(f"Skill arm must declare a version: {arm.id}")
+        if (
+            isinstance(expected_name, str)
+            and expected_name
+            and arm.skill != expected_name
+        ):
+            raise ValueError(f"arm Skill does not match pinned Skill: {arm.id}")
+        if arm.version not in allowed_versions:
+            raise ValueError(f"arm version does not match pinned Skill: {arm.id}")
+
+
+def _arm_inspection_paths(
+    raw_arm: dict[str, object],
+    arm_id: str,
+    skill: object,
+    *,
+    require_explicit: bool,
+) -> tuple[str, ...]:
+    if "required_skill_inspection_paths" not in raw_arm:
+        if require_explicit:
+            raise ValueError(
+                f"profile arm must declare required Skill inspection paths: {arm_id}"
+            )
+        if isinstance(skill, str):
+            return (f".agents/skills/{skill}/SKILL.md",)
+        return ()
+    raw_paths = raw_arm["required_skill_inspection_paths"]
+    if raw_paths is None:
+        raise ValueError(f"arm inspection paths are invalid: {arm_id}")
+    if not isinstance(raw_paths, list) or not all(
+        isinstance(path, str) and path for path in raw_paths
+    ):
+        raise ValueError(f"arm inspection paths are invalid: {arm_id}")
+    if len(raw_paths) != len(set(raw_paths)):
+        raise ValueError(f"duplicate arm inspection path: {arm_id}")
+    if skill is None:
+        if raw_paths:
+            raise ValueError(f"arm without a Skill cannot inspect Skill files: {arm_id}")
+        return ()
+    if not raw_paths:
+        raise ValueError(f"Skill arm inspection paths must not be empty: {arm_id}")
+
+    skill_root = PurePosixPath(".agents") / "skills" / str(skill)
+    entrypoint = skill_root / "SKILL.md"
+    paths: list[str] = []
+    for value in raw_paths:
+        path = PurePosixPath(value)
+        if (
+            "\\" in value
+            or path.is_absolute()
+            or PureWindowsPath(value).is_absolute()
+            or ".." in path.parts
+            or value != path.as_posix()
+        ):
+            raise ValueError(
+                f"arm inspection path must be a repository-relative POSIX path: {arm_id}"
+            )
+        if path == skill_root or skill_root not in path.parents:
+            raise ValueError(
+                f"arm inspection path must stay inside staged Skill root: {arm_id}"
+            )
+        paths.append(value)
+    if entrypoint.as_posix() not in paths:
+        raise ValueError(f"arm inspection paths must include Skill entrypoint: {arm_id}")
+    return tuple(paths)
+
+
+def _scenario_definitions(
+    raw_scenarios: list[dict[str, object]],
+    *,
+    arm_ids: tuple[str, ...],
+    requires_profile_attribution: bool,
+) -> tuple[dict[str, object], ...]:
+    scenarios: list[dict[str, object]] = []
+    seen_ids: set[str] = set()
+    for raw_scenario in raw_scenarios:
+        scenario = dict(raw_scenario)
+        scenario_id = scenario.get("id")
+        if (
+            not isinstance(scenario_id, str)
+            or re.fullmatch(IDENTIFIER_PATTERN, scenario_id) is None
+        ):
+            raise ValueError("scenario ID is invalid")
+        if scenario_id in seen_ids:
+            raise ValueError(f"duplicate scenario: {scenario_id}")
+        missing = REQUIRED_SCENARIO_FIELDS - set(scenario)
+        if missing:
+            raise ValueError(
+                f"scenario {scenario_id} missing fields: {sorted(missing)}"
+            )
+        commands = scenario["commands"]
+        if not isinstance(commands, dict) or set(commands) != {
+            "public",
+            "preservation",
+            "acceptance",
+        }:
+            raise ValueError(
+                "scenario commands must define public, preservation, acceptance"
+            )
+        expected_failure_count = scenario["expected_baseline_failure_count"]
+        if (
+            not isinstance(expected_failure_count, int)
+            or isinstance(expected_failure_count, bool)
+            or expected_failure_count <= 0
+        ):
+            raise ValueError("expected baseline failure count must be positive")
+        comparison_arms = _comparison_arms(scenario, arm_ids)
+        scenario["comparison_arms"] = comparison_arms
+        if requires_profile_attribution:
+            _validate_profile_attribution(scenario, comparison_arms)
+        scenarios.append(scenario)
+        seen_ids.add(scenario_id)
+    return tuple(scenarios)
+
+
+def _comparison_arms(
+    scenario: dict[str, object], arm_ids: tuple[str, ...]
+) -> tuple[str, ...]:
+    raw_comparison_arms = scenario.get("comparison_arms")
+    if raw_comparison_arms is None:
+        return arm_ids
+    if (
+        not isinstance(raw_comparison_arms, list)
+        or not raw_comparison_arms
+        or not all(isinstance(arm_id, str) for arm_id in raw_comparison_arms)
+    ):
+        raise ValueError("comparison arms must not be empty")
+    comparison_arms = tuple(raw_comparison_arms)
+    if len(set(comparison_arms)) != len(comparison_arms):
+        raise ValueError("duplicate comparison arm")
+    unknown_arms = set(comparison_arms) - set(arm_ids)
+    if unknown_arms:
+        raise ValueError(f"unknown comparison arm: {sorted(unknown_arms)}")
+    return comparison_arms
+
+
+def _validate_profile_attribution(
+    scenario: dict[str, object], comparison_arms: tuple[str, ...]
+) -> None:
+    profile_under_test = scenario.get("profile_under_test")
+    if not isinstance(profile_under_test, str) or not profile_under_test.strip():
+        raise ValueError("profile under test is required")
+    expected_comparison = PROFILE_COMPARISON_ARMS.get(profile_under_test)
+    if expected_comparison is None:
+        raise ValueError("profile under test is not part of the fixed pilot")
+    if scenario.get("scenario_type") not in PROFILE_SCENARIO_TYPES:
+        raise ValueError("scenario type is invalid")
+    direct_comparator = scenario.get("direct_comparator")
+    if direct_comparator not in comparison_arms:
+        raise ValueError("direct comparator is not a scenario comparison arm")
+    treatment_arm = scenario.get("treatment_arm")
+    if treatment_arm not in comparison_arms:
+        raise ValueError("treatment arm is not a scenario comparison arm")
+    if direct_comparator == treatment_arm:
+        raise ValueError("direct comparator and treatment arm must differ")
+    if (direct_comparator, treatment_arm) != expected_comparison:
+        raise ValueError(
+            f"profile comparison arms are invalid: {profile_under_test}"
+        )
+    incremental_criteria = scenario.get("incremental_criteria")
+    if (
+        not isinstance(incremental_criteria, list)
+        or not incremental_criteria
+        or not all(
+            isinstance(criterion, str) and criterion.strip()
+            for criterion in incremental_criteria
+        )
+    ):
+        raise ValueError("incremental criteria must be a non-empty string array")
 
 
 def _required_mapping(raw: dict[str, object], name: str) -> dict[str, object]:

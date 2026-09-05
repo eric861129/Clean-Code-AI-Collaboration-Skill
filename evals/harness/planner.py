@@ -8,10 +8,9 @@ from evals.harness.models import BenchmarkManifest, RunSlot
 def build_run_slots(manifest: BenchmarkManifest) -> tuple[RunSlot, ...]:
     unordered: list[tuple[str, str, str, str, int]] = []
     for scenario in manifest.scenarios:
-        for arm in manifest.arms:
+        for arm_id in scenario["comparison_arms"]:
             for repetition in range(1, manifest.repetitions + 1):
                 scenario_id = str(scenario["id"])
-                arm_id = str(arm["id"])
                 unordered.append(
                     (
                         f"{scenario_id}--{arm_id}--r{repetition:02d}",
@@ -22,6 +21,9 @@ def build_run_slots(manifest: BenchmarkManifest) -> tuple[RunSlot, ...]:
                     )
                 )
 
+    run_ids = [run_id for run_id, *_ in unordered]
+    if len(set(run_ids)) != len(run_ids):
+        raise ValueError("duplicate run ID")
     random.Random(manifest.random_seed).shuffle(unordered)
     return tuple(
         RunSlot(

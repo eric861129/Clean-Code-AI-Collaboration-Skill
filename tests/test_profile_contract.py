@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import redirect_stderr, redirect_stdout
 import hashlib
 import io
+import json
 from pathlib import Path
 import shutil
 import tempfile
@@ -19,7 +20,12 @@ from scripts.generate_profile_matrix import (
     replace_generated_region,
     synchronize_generated_regions,
 )
-from scripts.validate_profiles import load_registry, main, validate_repository
+from scripts.validate_profiles import (
+    load_registry,
+    main,
+    validate_loaded_profiles,
+    validate_repository,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -54,6 +60,14 @@ class ProfileContractTests(unittest.TestCase):
         self.temporary_directory = tempfile.TemporaryDirectory()
         self.fixture_root = Path(self.temporary_directory.name)
         shutil.copytree(ROOT / "profiles", self.fixture_root / "profiles")
+        for relative_path in (
+            Path("evals/profile-pilot-result.schema.json"),
+            Path("evals/manifests/v0.5.1-profile-pilot.json"),
+            Path("evals/results/v0.5.1-profile-pilot.json"),
+        ):
+            target = self.fixture_root / relative_path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ROOT / relative_path, target)
         shutil.copytree(
             ROOT / "clean-code-ai-collaboration" / "references",
             self.fixture_root / "clean-code-ai-collaboration" / "references",
@@ -106,13 +120,15 @@ class ProfileContractTests(unittest.TestCase):
         runtime_path.parent.mkdir(parents=True, exist_ok=True)
         runtime_path.write_text(runtime, encoding="utf-8", newline="\n")
 
-    def test_catalog_has_the_fixed_v050_order(self) -> None:
+    def test_catalog_has_the_fixed_v051_order(self) -> None:
         profiles = load_registry(ROOT)
 
         self.assertEqual(PROFILE_IDS, [profile["id"] for profile in profiles])
 
-    def test_registry_has_four_experimental_profiles(self) -> None:
+    def test_registry_records_the_v051_profile_pilot_without_promotion(self) -> None:
         self.assertEqual([], list(validate_repository(ROOT)))
+        result_path = ROOT / "evals" / "results" / "v0.5.1-profile-pilot.json"
+        result_digest = hashlib.sha256(result_path.read_bytes()).hexdigest()
         expected_references = {
             "csharp": "language-csharp.md",
             "python": "language-python.md",
@@ -121,6 +137,7 @@ class ProfileContractTests(unittest.TestCase):
         }
         for profile in load_registry(ROOT):
             with self.subTest(profile=profile["id"]):
+                self.assertEqual("0.5.1", profile["suite_version"])
                 expected_status = (
                     "experimental"
                     if profile["id"] in expected_references
@@ -140,9 +157,33 @@ class ProfileContractTests(unittest.TestCase):
                     profile["ownership"]["maintainers"],
                 )
                 self.assertEqual(
-                    "not_started",
+                    (
+                        "pilot_recorded"
+                        if profile["id"] in expected_references
+                        else "not_started"
+                    ),
                     profile["evidence"]["benchmark_status"],
                 )
+                if profile["id"] in expected_references:
+                    self.assertEqual(
+                        ["evals/manifests/v0.5.1-profile-pilot.json"],
+                        profile["evidence"]["manifests"],
+                    )
+                    self.assertEqual(
+                        [
+                            {
+                                "stage": "pilot",
+                                "outcome": "inconclusive",
+                                "path": "evals/results/v0.5.1-profile-pilot.json",
+                                "sha256": result_digest,
+                                "public": True,
+                            }
+                        ],
+                        profile["evidence"]["results"],
+                    )
+                else:
+                    self.assertEqual([], profile["evidence"]["manifests"])
+                    self.assertEqual([], profile["evidence"]["results"])
 
     def test_profile_authoring_guide_defines_the_complete_lifecycle(self) -> None:
         guide = (ROOT / "docs" / "profile-authoring.md").read_text(
@@ -162,6 +203,9 @@ class ProfileContractTests(unittest.TestCase):
             "failed",
             "inconclusive",
             "no_difference",
+            "pilot_recorded",
+            "Public Result",
+            "SHA-256",
             "Suite SemVer",
             "Originality",
             "Attribution",
@@ -584,7 +628,7 @@ class ProfileContractTests(unittest.TestCase):
         self.update_profile(
             "csharp",
             lambda profile: profile["evidence"].update(
-                {"benchmark_status": "pilot_recorded"}
+                {"benchmark_status": "full_run_recorded"}
             ),
         )
 
@@ -666,13 +710,168 @@ class ProfileContractTests(unittest.TestCase):
 
         self.assertIn("evidence-hash-mismatch", self.diagnostic_codes())
 
+    def test_evidence_metadata_must_match_public_profile_outcome(self) -> None:
+        evidence_path = self.fixture_root / "evidence" / "result.json"
+        evidence_path.parent.mkdir()
+
+        cases = (
+            ("passed", "pilot", True, "passed", "pilot", None),
+            (
+                "no_difference",
+                "pilot",
+                True,
+                "passed",
+                "pilot",
+                "evidence-result-mismatch",
+            ),
+            (
+                "passed",
+                "full_run",
+                True,
+                "passed",
+                "pilot",
+                "evidence-result-mismatch",
+            ),
+            (
+                "passed",
+                "pilot",
+                False,
+                "passed",
+                "pilot",
+                "evidence-public-required",
+            ),
+        )
+        for (
+            metadata_outcome,
+            metadata_stage,
+            public,
+            result_outcome,
+            result_stage,
+            expected_code,
+        ) in cases:
+            with self.subTest(expected_code=expected_code):
+                shutil.copytree(
+                    ROOT / "profiles",
+                    self.fixture_root / "profiles",
+                    dirs_exist_ok=True,
+                )
+                result = json.loads(
+                    (ROOT / "evals/results/v0.5.1-profile-pilot.json").read_text(
+                        encoding="utf-8"
+                    )
+                )
+                result["profile_outcomes"][0].update(
+                    stage=result_stage, outcome=result_outcome
+                )
+                payload = json.dumps(result)
+                evidence_path.write_text(payload, encoding="utf-8")
+                digest = hashlib.sha256(evidence_path.read_bytes()).hexdigest()
+                self._set_evidence_profile(
+                    status="experimental",
+                    benchmark_status=(
+                        "full_run_recorded"
+                        if metadata_stage == "full_run"
+                        else "pilot_recorded"
+                    ),
+                    stage=metadata_stage,
+                    outcome=metadata_outcome,
+                    digest=digest,
+                    public=public,
+                )
+
+                codes = self.diagnostic_codes()
+                if expected_code is None:
+                    self.assertNotIn("evidence-result-mismatch", codes)
+                    self.assertNotIn("evidence-public-required", codes)
+                else:
+                    self.assertIn(expected_code, codes)
+
+        evidence_path.write_text(
+            (
+                '{"status":"complete","profile_outcomes":['
+                '{"profile_id":"react","stage":"pilot",'
+                '"outcome":"passed"}]}\n'
+            ),
+            encoding="utf-8",
+        )
+        digest = hashlib.sha256(evidence_path.read_bytes()).hexdigest()
+        self._set_evidence_profile(
+            status="experimental",
+            benchmark_status="pilot_recorded",
+            stage="pilot",
+            outcome="passed",
+            digest=digest,
+            public=True,
+        )
+        self.assertIn("evidence-profile-mismatch", self.diagnostic_codes())
+
+    def test_evidence_requires_complete_public_result_schema(self) -> None:
+        result_path = self.fixture_root / "evals/results/v0.5.1-profile-pilot.json"
+        result = json.loads(result_path.read_text(encoding="utf-8"))
+        del result["runs"]
+        result_path.write_text(json.dumps(result), encoding="utf-8")
+        digest = hashlib.sha256(result_path.read_bytes()).hexdigest()
+        for profile_id in ("csharp", "python", "typescript", "react"):
+            self.update_profile(
+                profile_id,
+                lambda profile: profile["evidence"]["results"][0].update(
+                    sha256=digest
+                ),
+            )
+
+        self.assertIn("evidence-result-schema-invalid", self.diagnostic_codes())
+
+    def test_evidence_schema_must_be_available_and_valid(self) -> None:
+        entries = [
+            (f"profiles/{profile['id']}.yaml", profile)
+            for profile in load_registry(ROOT)
+        ]
+        for schema_bytes in (None, b"{", b'{"type":123}'):
+            with self.subTest(schema=schema_bytes):
+                def read_source(relative_path: str) -> bytes:
+                    if relative_path == "evals/profile-pilot-result.schema.json":
+                        if schema_bytes is None:
+                            raise FileNotFoundError(relative_path)
+                        return schema_bytes
+                    return (ROOT / relative_path).read_bytes()
+
+                codes = [
+                    item.code for item in validate_loaded_profiles(entries, read_source)
+                ]
+                self.assertIn("evidence-result-schema-invalid", codes)
+
+    def test_public_evidence_rejects_non_object_result(self) -> None:
+        result_path = self.fixture_root / "evals/results/v0.5.1-profile-pilot.json"
+        result_path.write_text("[]\n", encoding="utf-8")
+        digest = hashlib.sha256(result_path.read_bytes()).hexdigest()
+        for profile_id in ("csharp", "python", "typescript", "react"):
+            self.update_profile(
+                profile_id,
+                lambda profile: profile["evidence"]["results"][0].update(
+                    sha256=digest
+                ),
+            )
+
+        self.assertIn("evidence-result-invalid", self.diagnostic_codes())
+
     def test_beta_and_stable_require_public_passed_stage_evidence(self) -> None:
         evidence_path = self.fixture_root / "evidence" / "result.json"
         evidence_path.parent.mkdir()
-        evidence_path.write_text('{"status":"passed"}\n', encoding="utf-8")
-        digest = hashlib.sha256(evidence_path.read_bytes()).hexdigest()
         reference = self.fixture_root / "evidence" / "profile.md"
         reference.write_text("# Profile\n", encoding="utf-8")
+
+        def write_result(stage: str, outcome: str) -> str:
+            result = json.loads(
+                (ROOT / "evals/results/v0.5.1-profile-pilot.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            result["profile_outcomes"][0].update(stage=stage, outcome=outcome)
+            evidence_path.write_text(
+                json.dumps(result),
+                encoding="utf-8",
+            )
+            return hashlib.sha256(evidence_path.read_bytes()).hexdigest()
 
         valid_cases = (
             ("beta", "pilot_recorded", "pilot"),
@@ -685,6 +884,7 @@ class ProfileContractTests(unittest.TestCase):
                     self.fixture_root / "profiles",
                     dirs_exist_ok=True,
                 )
+                digest = write_result(stage, "passed")
                 self._set_evidence_profile(
                     status=status,
                     benchmark_status=benchmark_status,
@@ -694,7 +894,12 @@ class ProfileContractTests(unittest.TestCase):
                     public=True,
                 )
 
-                self.assertEqual([], self.diagnostic_codes())
+                codes = self.diagnostic_codes()
+                self.assertNotIn("maturity-evidence-missing", codes)
+                if stage == "pilot":
+                    self.assertEqual([], codes)
+                else:
+                    self.assertEqual(["evidence-result-schema-invalid"], codes)
 
         for outcome in ("failed", "no_difference", "inconclusive"):
             with self.subTest(outcome=outcome):
@@ -703,6 +908,7 @@ class ProfileContractTests(unittest.TestCase):
                     self.fixture_root / "profiles",
                     dirs_exist_ok=True,
                 )
+                digest = write_result("pilot", outcome)
                 self._set_evidence_profile(
                     status="beta",
                     benchmark_status="pilot_recorded",

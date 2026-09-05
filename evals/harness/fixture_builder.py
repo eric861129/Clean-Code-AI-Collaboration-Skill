@@ -1,12 +1,19 @@
 from __future__ import annotations
 
 import hashlib
+import shutil
 import sys
 import tarfile
 from pathlib import Path
 from uuid import uuid4
 
-from evals.harness.models import BenchmarkManifest, HarnessPaths, RunSlot, Workspace
+from evals.harness.models import (
+    ArmDefinition,
+    BenchmarkManifest,
+    HarnessPaths,
+    RunSlot,
+    Workspace,
+)
 from evals.harness.process import run_process
 
 
@@ -16,6 +23,7 @@ def build_workspace(
     paths: HarnessPaths,
 ) -> Workspace:
     scenario = _scenario_for(manifest, slot.scenario_id)
+    arm = _arm_for(manifest, slot.arm_id)
     workspace_root = paths.runs_root / "workspaces" / slot.run_id
     artifact_dir = paths.runs_root / "artifacts" / slot.run_id
     if workspace_root.exists() or artifact_dir.exists():
@@ -45,17 +53,12 @@ def build_workspace(
     )
     _write_workspace_gitignore(workspace_root)
 
-    if slot.arm_id == "skill-v0.3.0":
-        skill_root = (
-            workspace_root
-            / ".agents"
-            / "skills"
-            / "clean-code-ai-collaboration"
-        )
+    if arm.skill is not None:
+        skill_root = workspace_root / ".agents" / "skills" / arm.skill
         skill_root.mkdir(parents=True)
         _export_tree(
             repository=paths.skill_repository,
-            treeish=f"{manifest.skill_tag}:clean-code-ai-collaboration",
+            treeish=f"{manifest.skill_commit}:{arm.skill}",
             destination=skill_root,
             cache_root=paths.runs_root / "cache" / "archives",
             timeout_seconds=manifest.fixture_timeout_seconds,
@@ -120,6 +123,13 @@ def _scenario_for(
         raise ValueError(f"unknown scenario: {scenario_id}") from error
 
 
+def _arm_for(manifest: BenchmarkManifest, arm_id: str) -> ArmDefinition:
+    try:
+        return next(arm for arm in manifest.arms if arm.id == arm_id)
+    except StopIteration as error:
+        raise ValueError(f"unknown arm: {arm_id}") from error
+
+
 def _verify_revision(
     repository: Path,
     treeish: str,
@@ -167,6 +177,8 @@ def _write_workspace_gitignore(workspace_root: Path) -> None:
         ".ruff_cache/\n"
         "__pycache__/\n"
         "*.pyc\n"
+        "bin/\n"
+        "obj/\n"
         ".benchmark-oracle/\n"
         ".benchmark-subject-report.json\n",
         encoding="utf-8",
@@ -179,7 +191,7 @@ def _install_dependencies(
     runs_root: Path,
     timeout_seconds: int,
 ) -> None:
-    if language == "typescript-react":
+    if language in {"typescript", "typescript-react"}:
         npm_cache = runs_root / "cache" / "npm"
         npm_cache.mkdir(parents=True, exist_ok=True)
         _run_checked(
@@ -192,6 +204,21 @@ def _install_dependencies(
                 "--no-audit",
                 "--no-fund",
             ],
+            workspace_root,
+            timeout_seconds,
+        )
+        return
+
+    if language == "csharp":
+        dotnet = shutil.which("dotnet")
+        if dotnet is None:
+            raise ValueError("required .NET SDK executable is unavailable")
+        public_projects = sorted(workspace_root.glob("tests/**/*.csproj"))
+        if len(public_projects) != 1:
+            raise ValueError("C# fixture must contain exactly one public test project")
+        project = public_projects[0].relative_to(workspace_root).as_posix()
+        _run_checked(
+            [dotnet, "restore", project, "--locked-mode", "--nologo"],
             workspace_root,
             timeout_seconds,
         )

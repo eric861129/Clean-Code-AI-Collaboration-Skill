@@ -6,7 +6,7 @@ import json
 import re
 import secrets
 import subprocess
-from pathlib import Path, PurePosixPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
 from evals.harness.anonymizer import RUBRIC_IDS, write_review_packet
@@ -36,22 +36,20 @@ from evals.harness.models import (
 from evals.harness.oracle_runner import run_oracles
 from evals.harness.planner import build_run_slots, full_slots, pilot_slots
 from evals.harness.process import run_process
-from evals.harness.result_builder import build_public_result, can_retry
+from evals.harness.profile_outcomes import build_profile_outcomes
+from evals.harness.result_builder import (
+    build_public_result,
+    can_retry,
+    validate_profile_pilot_result,
+)
 from evals.harness.subject_runner import build_prompt, run_subject
 
 ROOT = Path(__file__).resolve().parents[2]
-MANIFEST_PATH = ROOT / "evals" / "manifests" / "v0.3.0-cross-language.json"
-RUNS_ROOT = ROOT / ".benchmark-runs"
-FIXTURE_CLONE = RUNS_ROOT / "sources" / "fixtures"
-RUN_DOCUMENTS = RUNS_ROOT / "run-documents"
-PREFLIGHT_ROOT = RUNS_ROOT / "preflights"
-FREEZE_ROOT = RUNS_ROOT / "contract-freezes"
-CAMPAIGN_STATE_PATH = RUNS_ROOT / "campaign-state.json"
-INVALIDATIONS_ROOT = RUNS_ROOT / "invalidations"
-TIMEOUT_ADJUDICATIONS_ROOT = RUNS_ROOT / "timeout-adjudications"
-DISPATCH_ROOT = RUNS_ROOT / "desktop-dispatches"
-CONTROLLER_DISPATCH_ROOT = RUNS_ROOT / "desktop-controller-dispatches"
-ATTEMPT_RECEIPTS_ROOT = RUNS_ROOT / "desktop-attempt-receipts"
+DEFAULT_MANIFEST_RELATIVE_PATH = Path("evals/manifests/v0.3.0-cross-language.json")
+DEFAULT_RUNS_ROOT_RELATIVE_PATH = Path(".benchmark-runs")
+DEFAULT_RESULT_OUTPUT_RELATIVE_PATH = Path(
+    "evals/results/v0.3.0-cross-language.json"
+)
 LEGACY_NEWLINE_RECOVERY_REASON = "prompt_hash_newline_defect"
 DISPATCH_INDEX_SCHEMA_VERSION = "desktop-dispatch-index/v2"
 
@@ -59,14 +57,29 @@ DISPATCH_INDEX_SCHEMA_VERSION = "desktop-dispatch-index/v2"
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
-    manifest = load_manifest(MANIFEST_PATH)
+    manifest_path = _resolve_manifest_path(args.manifest)
+    runs_root = _resolve_runs_root(args.runs_root)
+    manifest = load_manifest(manifest_path)
+    repository_root = ROOT.resolve()
     paths = HarnessPaths(
-        repository_root=ROOT,
-        runs_root=RUNS_ROOT,
-        fixture_clone=FIXTURE_CLONE,
-        skill_repository=ROOT,
+        repository_root=repository_root,
+        runs_root=runs_root,
+        fixture_clone=runs_root / "sources" / "fixtures",
+        skill_repository=repository_root,
+        manifest_path=manifest_path,
     )
     command = args.command
+    if command in {
+        "prepare",
+        "stage",
+        "collect",
+        "freeze",
+        "invalidate-pilot",
+        "adjudicate-timeout",
+        "review-packets",
+        "build-result",
+    }:
+        _claim_campaign_state_file(manifest, paths)
     if command == "prepare":
         _prepare(manifest, paths)
     elif command == "pilot":
@@ -84,7 +97,7 @@ def main(argv: list[str] | None = None) -> int:
             args.subject_thread_id,
         )
     elif command == "freeze":
-        _write_freeze(manifest, paths, args.decision_note)
+        _write_freeze(manifest, paths, args.decision_note, args.phase)
     elif command == "invalidate-pilot":
         _invalidate_pilot(
             manifest,
@@ -106,13 +119,13 @@ def main(argv: list[str] | None = None) -> int:
     elif command == "review-packets":
         _write_review_packets(manifest, paths, args.phase)
     elif command == "build-result":
-        _write_result(manifest, paths, Path(args.output))
+        _write_result(manifest, paths, _resolve_result_output(args.output))
     elif command == "verify":
         _verify_runs(manifest, paths, args.phase)
     elif command == "verify-freeze":
         _verify_freeze(manifest, paths)
     elif command == "verify-reviews":
-        _verify_reviews(manifest)
+        _verify_reviews(manifest, paths)
     else:  # pragma: no cover - argparse prevents this branch
         parser.error(f"unknown command: {command}")
     return 0
@@ -120,6 +133,14 @@ def main(argv: list[str] | None = None) -> int:
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Cross-language Benchmark Harness")
+    parser.add_argument(
+        "--manifest",
+        default=DEFAULT_MANIFEST_RELATIVE_PATH.as_posix(),
+    )
+    parser.add_argument(
+        "--runs-root",
+        default=DEFAULT_RUNS_ROOT_RELATIVE_PATH.as_posix(),
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("prepare")
     subparsers.add_parser("pilot")
@@ -137,6 +158,7 @@ def _build_parser() -> argparse.ArgumentParser:
     collect.add_argument("--elapsed-seconds", type=float)
     collect.add_argument("--subject-thread-id")
     freeze = subparsers.add_parser("freeze")
+    freeze.add_argument("--phase", choices=("pilot",), default="pilot")
     freeze.add_argument("--decision-note", required=True)
     invalidation = subparsers.add_parser("invalidate-pilot")
     invalidation.add_argument("--scenario", required=True)
@@ -158,7 +180,7 @@ def _build_parser() -> argparse.ArgumentParser:
     result = subparsers.add_parser("build-result")
     result.add_argument(
         "--output",
-        default=str(ROOT / "evals" / "results" / "v0.3.0-cross-language.json"),
+        default=DEFAULT_RESULT_OUTPUT_RELATIVE_PATH.as_posix(),
     )
 
     verify = subparsers.add_parser("verify")
@@ -168,12 +190,116 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _resolve_manifest_path(value: str) -> Path:
+    manifest_path = _resolve_repository_relative_path(value, "manifest")
+    if manifest_path.suffix != ".json":
+        raise ValueError("manifest must be a JSON file")
+    if not manifest_path.is_file():
+        raise FileNotFoundError(f"manifest does not exist: {manifest_path}")
+    return manifest_path
+
+
+def _resolve_runs_root(value: str) -> Path:
+    relative = _relative_path(value, "runs root")
+    if not relative.parts or relative.parts[0] != ".benchmark-runs":
+        raise ValueError("runs root must be inside .benchmark-runs")
+    repository_root = ROOT.resolve()
+    permitted_root = (ROOT / ".benchmark-runs").resolve()
+    if not _is_within(permitted_root, repository_root):
+        raise ValueError(".benchmark-runs must not resolve outside the repository")
+    runs_root = (ROOT.joinpath(*relative.parts)).resolve()
+    if not _is_within(runs_root, permitted_root):
+        raise ValueError("runs root must be inside .benchmark-runs")
+    return runs_root
+
+
+def _resolve_result_output(value: str) -> Path:
+    relative = _relative_path(value, "result output")
+    if len(relative.parts) < 3 or relative.parts[:2] != ("evals", "results"):
+        raise ValueError("result output must be inside evals/results")
+    repository_root = ROOT.resolve()
+    result_root = (ROOT / "evals" / "results").resolve()
+    if not _is_within(result_root, repository_root):
+        raise ValueError("evals/results must not resolve outside the repository")
+    output = (ROOT.joinpath(*relative.parts)).resolve()
+    if output.suffix != ".json" or not _is_within(output, result_root):
+        raise ValueError("result output must be a JSON file inside evals/results")
+    if output.exists():
+        raise FileExistsError(f"refusing to overwrite result: {output}")
+    return output
+
+
+def _resolve_repository_relative_path(value: str, label: str) -> Path:
+    relative = _relative_path(value, label)
+    repository_root = ROOT.resolve()
+    path = ROOT.joinpath(*relative.parts)
+    resolved = path.resolve()
+    if not _is_within(resolved, repository_root):
+        raise ValueError(f"{label} must remain inside the repository")
+    return resolved
+
+
+def _relative_path(value: str, label: str) -> PurePosixPath:
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"{label} must be a repository-relative path")
+    normalized = value.replace("\\", "/")
+    path = PurePosixPath(normalized)
+    if (
+        path.is_absolute()
+        or PureWindowsPath(value).is_absolute()
+        or ".." in path.parts
+    ):
+        raise ValueError(f"{label} must be a repository-relative path")
+    return path
+
+
+def _is_within(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return False
+    return True
+
+
+def _claim_campaign_state_file(
+    manifest: BenchmarkManifest,
+    paths: HarnessPaths,
+) -> None:
+    if paths.manifest_path is None:
+        raise ValueError("campaign manifest path is missing")
+    campaign = {
+        "benchmark_version": manifest.benchmark_version,
+        "manifest_path": str(
+            paths.manifest_path.relative_to(paths.repository_root)
+        ).replace("\\", "/"),
+        "manifest_sha256": _file_sha256(paths.manifest_path),
+    }
+    state_path = paths.campaign_state_path
+    if not state_path.is_file():
+        _write_json(
+            state_path,
+            {"schema_version": "1.0", "campaign": campaign, "scenarios": {}},
+        )
+        return
+    state = _read_json(state_path)
+    existing_campaign = state.get("campaign")
+    if existing_campaign is None:
+        scenarios = state.get("scenarios", {})
+        if not isinstance(scenarios, dict) or scenarios:
+            raise RuntimeError("runs root has an unowned campaign state file")
+        state["campaign"] = campaign
+        _replace_json(state_path, state)
+        return
+    if existing_campaign != campaign:
+        raise RuntimeError("runs root state file belongs to another campaign")
+
+
 def _prepare(manifest: BenchmarkManifest, paths: HarnessPaths) -> None:
     _ensure_fixture_clone(manifest, paths)
     _verify_skill_revision(manifest, paths)
     contract = _freeze_document(manifest, paths)
     contract_sha256 = _canonical_sha256(contract)
-    preflight_path = _preflight_path(contract_sha256)
+    preflight_path = _preflight_path(contract_sha256, paths)
     if preflight_path.exists():
         preflight = _read_json(preflight_path)
         if preflight.get("status") != "passed":
@@ -215,7 +341,9 @@ def _prepare(manifest: BenchmarkManifest, paths: HarnessPaths) -> None:
                 "automatic_failure_reasons": list(
                     evidence.automatic_failure_reasons
                 ),
-                "oracle_results": _serialize_oracles(evidence, workspace.root),
+                "oracle_results": _serialize_oracles(
+                    evidence, workspace.root, paths
+                ),
                 "oracle_evidence": str(
                     oracle_evidence.relative_to(paths.runs_root)
                 ).replace("\\", "/"),
@@ -270,9 +398,11 @@ def _stage_desktop_slots(
         raise RuntimeError("stage requires the Desktop collaboration executor")
     if phase == "pilot":
         _require_preflight(manifest, paths)
+        if manifest.freeze_policy == "pre_execution":
+            _verify_freeze(manifest, paths, phase)
         slots = pilot_slots(build_run_slots(manifest))
     else:
-        _verify_freeze(manifest, paths)
+        _verify_freeze(manifest, paths, "pilot")
         slots = full_slots(build_run_slots(manifest))
     if run_id is not None:
         slots = tuple(slot for slot in slots if slot.run_id == run_id)
@@ -288,7 +418,7 @@ def _stage_desktop_slots(
     for slot in slots:
         if contract_sha256 != _canonical_sha256(_freeze_document(manifest, paths)):
             raise RuntimeError("benchmark contract changed during Desktop staging")
-        generation = _active_generation(slot.scenario_id)
+        generation = _active_generation(slot.scenario_id, paths)
         scenario_contract_sha256 = _scenario_contract_sha256(
             manifest,
             paths,
@@ -297,8 +427,9 @@ def _stage_desktop_slots(
         _require_generation_contract_change(
             slot.scenario_id,
             scenario_contract_sha256,
+            paths,
         )
-        run_document = _run_document_path(slot, generation)
+        run_document = _run_document_path(slot, generation, paths)
         if run_document.is_file():
             _validate_terminal_document(
                 slot,
@@ -307,11 +438,13 @@ def _stage_desktop_slots(
             )
             skipped.append(slot.run_id)
             continue
-        attempt = _next_desktop_attempt(slot, generation)
+        attempt = _next_desktop_attempt(slot, generation, paths)
         dispatch_id = _desktop_dispatch_id(slot, generation, attempt)
-        dispatch_index = _dispatch_index_path(dispatch_id)
+        dispatch_index = _dispatch_index_path(dispatch_id, paths)
         if dispatch_index.is_file():
-            if not _attempt_receipt_path(slot, generation, attempt).is_file():
+            if not _attempt_receipt_path(
+                slot, generation, attempt, paths
+            ).is_file():
                 pending.append(dispatch_id)
                 continue
             raise RuntimeError(
@@ -341,9 +474,9 @@ def _stage_desktop_slots(
             physical_run_id=physical_slot.run_id,
             contract_sha256=contract_sha256,
             scenario_contract_sha256=scenario_contract_sha256,
-            controller_dispatch_root=CONTROLLER_DISPATCH_ROOT,
+            controller_dispatch_root=paths.controller_dispatch_root,
         )
-        _write_dispatch_index(dispatch)
+        _write_dispatch_index(dispatch, paths)
         staged.append(
             {
                 "dispatch_id": dispatch.dispatch_id,
@@ -376,9 +509,9 @@ def _collect_desktop_dispatch(
 ) -> None:
     if elapsed_seconds is not None and elapsed_seconds < 0:
         raise ValueError("desktop subject elapsed seconds cannot be negative")
-    dispatch = _load_dispatch_by_id(dispatch_id)
+    dispatch = _load_dispatch_by_id(dispatch_id, paths)
     slot = _slot_for_run_id(manifest, dispatch.logical_run_id)
-    generation = _active_generation(slot.scenario_id)
+    generation = _active_generation(slot.scenario_id, paths)
     scenario_contract_sha256 = _scenario_contract_sha256(
         manifest,
         paths,
@@ -393,9 +526,11 @@ def _collect_desktop_dispatch(
     contract_sha256 = _canonical_sha256(_freeze_document(manifest, paths))
     if dispatch.contract_sha256 != contract_sha256:
         raise ValueError("desktop dispatch belongs to another benchmark contract")
-    if _run_document_path(slot, generation).is_file():
+    if _run_document_path(slot, generation, paths).is_file():
         raise FileExistsError("terminal run document already exists")
-    receipt_path = _attempt_receipt_path(slot, generation, dispatch.attempt)
+    receipt_path = _attempt_receipt_path(
+        slot, generation, dispatch.attempt, paths
+    )
     if receipt_path.is_file():
         raise FileExistsError("desktop dispatch already has an immutable receipt")
 
@@ -450,6 +585,7 @@ def _collect_desktop_dispatch(
             subject_evidence_name = "not_available"
         _finalize_desktop_candidate_failure(
             manifest,
+            paths,
             slot,
             dispatch,
             contract_sha256,
@@ -532,7 +668,7 @@ def _collect_desktop_dispatch(
 
     write_attempt_receipt(
         dispatch,
-        ATTEMPT_RECEIPTS_ROOT,
+        paths.attempt_receipts_root,
         outcome=effective_outcome,
         reason=effective_reason,
         elapsed_seconds=elapsed_seconds,
@@ -540,7 +676,7 @@ def _collect_desktop_dispatch(
         artifact_directory=artifact_directory,
         subject_evidence=subject_evidence.name,
     )
-    attempts = _desktop_attempts(slot, generation)
+    attempts = _desktop_attempts(slot, generation, paths)
     if effective_outcome == "timeout":
         document = _run_document(
             manifest,
@@ -575,13 +711,15 @@ def _collect_desktop_dispatch(
                 else "passed"
             ),
             reasons=reasons,
-            oracle_results=_serialize_oracles(oracle, dispatch.workspace.root),
+            oracle_results=_serialize_oracles(
+                oracle, dispatch.workspace.root, paths
+            ),
             telemetry=_read_subject_telemetry(subject_evidence),
         )
         document["attempts"][-1]["oracle_evidence"] = str(
             oracle_evidence.relative_to(dispatch.workspace.artifact_dir)
         ).replace("\\", "/")
-    _write_json(_run_document_path(slot, generation), document)
+    _write_json(_run_document_path(slot, generation, paths), document)
     print(
         _console_json(
             {
@@ -608,7 +746,7 @@ def _finalize_desktop_infrastructure_failure(
 ) -> None:
     write_attempt_receipt(
         dispatch,
-        ATTEMPT_RECEIPTS_ROOT,
+        paths.attempt_receipts_root,
         outcome="infrastructure_failure",
         reason=reason,
         elapsed_seconds=elapsed_seconds,
@@ -616,7 +754,7 @@ def _finalize_desktop_infrastructure_failure(
         artifact_directory=artifact_directory,
         subject_evidence=subject_evidence,
     )
-    attempts = _desktop_attempts(slot, generation)
+    attempts = _desktop_attempts(slot, generation, paths)
     if can_retry(reason, dispatch.attempt):
         print(
             _console_json(
@@ -637,7 +775,7 @@ def _finalize_desktop_infrastructure_failure(
         attempts,
         reason,
     )
-    _write_json(_run_document_path(slot, generation), document)
+    _write_json(_run_document_path(slot, generation, paths), document)
     print(
         _console_json(
             {
@@ -650,6 +788,7 @@ def _finalize_desktop_infrastructure_failure(
 
 def _finalize_desktop_candidate_failure(
     manifest: BenchmarkManifest,
+    paths: HarnessPaths,
     slot: RunSlot,
     dispatch: SubjectDispatch,
     contract_sha256: str,
@@ -672,7 +811,7 @@ def _finalize_desktop_candidate_failure(
         raise ValueError(f"invalid desktop candidate failure reason: {reason}")
     write_attempt_receipt(
         dispatch,
-        ATTEMPT_RECEIPTS_ROOT,
+        paths.attempt_receipts_root,
         outcome="candidate_failure",
         reason=reason,
         elapsed_seconds=elapsed_seconds,
@@ -680,7 +819,7 @@ def _finalize_desktop_candidate_failure(
         artifact_directory=artifact_directory,
         subject_evidence=subject_evidence,
     )
-    attempts = _desktop_attempts(slot, generation)
+    attempts = _desktop_attempts(slot, generation, paths)
     document = _run_document(
         manifest,
         slot,
@@ -694,7 +833,7 @@ def _finalize_desktop_candidate_failure(
         oracle_results=[],
         telemetry="not_available",
     )
-    _write_json(_run_document_path(slot, generation), document)
+    _write_json(_run_document_path(slot, generation, paths), document)
     print(
         _console_json(
             {
@@ -718,9 +857,9 @@ def _empty_diff() -> DiffEvidence:
 def _next_desktop_attempt(
     slot: RunSlot,
     generation: int,
-    receipts_root: Path = ATTEMPT_RECEIPTS_ROOT,
+    paths: HarnessPaths,
 ) -> int:
-    receipts = _desktop_attempts(slot, generation, receipts_root)
+    receipts = _desktop_attempts(slot, generation, paths)
     if not receipts:
         return 1
     last = receipts[-1]
@@ -738,11 +877,11 @@ def _next_desktop_attempt(
 def _desktop_attempts(
     slot: RunSlot,
     generation: int,
-    receipts_root: Path = ATTEMPT_RECEIPTS_ROOT,
+    paths: HarnessPaths,
 ) -> list[dict[str, object]]:
     attempts: list[dict[str, object]] = []
     for attempt in (1, 2):
-        path = _attempt_receipt_path(slot, generation, attempt, receipts_root)
+        path = _attempt_receipt_path(slot, generation, attempt, paths)
         if not path.is_file():
             continue
         receipt = _read_json(path)
@@ -760,7 +899,7 @@ def _desktop_attempts(
                 "reason": receipt.get("reason"),
                 "artifact_directory": receipt.get("artifact_directory"),
                 "subject_evidence": receipt.get("subject_evidence"),
-                "receipt": str(path.relative_to(receipts_root.parent)).replace(
+                "receipt": str(path.relative_to(paths.runs_root)).replace(
                     "\\", "/"
                 ),
             }
@@ -771,28 +910,20 @@ def _desktop_attempts(
 def _require_no_inflight_desktop_attempts(
     slot: RunSlot,
     generation: int,
-    dispatch_root: Path = DISPATCH_ROOT,
-    receipts_root: Path = ATTEMPT_RECEIPTS_ROOT,
-    run_documents_root: Path = RUN_DOCUMENTS,
+    paths: HarnessPaths,
 ) -> None:
     """作廢 Generation 前，拒絕遺漏任何正在進行或等待重試的 Attempt。"""
 
-    terminal = (
-        run_documents_root
-        / slot.scenario_id
-        / f"{slot.run_id}--g{generation:02d}.json"
-    )
+    terminal = _run_document_path(slot, generation, paths)
     if terminal.is_file():
         return
 
     receipts: list[dict[str, object]] = []
     for attempt in (1, 2):
-        dispatch = dispatch_root / (
+        dispatch = paths.desktop_dispatch_root / (
             f"{_desktop_dispatch_id(slot, generation, attempt)}.json"
         )
-        receipt_path = receipts_root / slot.run_id / (
-            f"g{generation:02d}--a{attempt:02d}.json"
-        )
+        receipt_path = _attempt_receipt_path(slot, generation, attempt, paths)
         if dispatch.is_file() and not receipt_path.is_file():
             raise RuntimeError(
                 f"cannot invalidate a pending Desktop dispatch: {dispatch.stem}"
@@ -818,9 +949,9 @@ def _attempt_receipt_path(
     slot: RunSlot,
     generation: int,
     attempt: int,
-    receipts_root: Path = ATTEMPT_RECEIPTS_ROOT,
+    paths: HarnessPaths,
 ) -> Path:
-    return receipts_root / slot.run_id / (
+    return paths.attempt_receipts_root / slot.run_id / (
         f"g{generation:02d}--a{attempt:02d}.json"
     )
 
@@ -829,26 +960,29 @@ def _desktop_dispatch_id(slot: RunSlot, generation: int, attempt: int) -> str:
     return f"desktop-dispatch-{slot.run_id}--g{generation:02d}--a{attempt:02d}"
 
 
-def _dispatch_index_path(dispatch_id: str) -> Path:
+def _dispatch_index_path(dispatch_id: str, paths: HarnessPaths) -> Path:
     if re.fullmatch(r"desktop-dispatch-[A-Za-z0-9_.-]+", dispatch_id) is None:
         raise ValueError("invalid desktop dispatch ID")
-    return DISPATCH_ROOT / f"{dispatch_id}.json"
+    return paths.desktop_dispatch_root / f"{dispatch_id}.json"
 
 
-def _controller_dispatch_path(dispatch_id: str) -> Path:
+def _controller_dispatch_path(dispatch_id: str, paths: HarnessPaths) -> Path:
     if re.fullmatch(r"desktop-dispatch-[A-Za-z0-9_.-]+", dispatch_id) is None:
         raise ValueError("invalid desktop dispatch ID")
-    return CONTROLLER_DISPATCH_ROOT / f"{dispatch_id}.json"
+    return paths.controller_dispatch_root / f"{dispatch_id}.json"
 
 
-def _write_dispatch_index(dispatch: SubjectDispatch) -> Path:
+def _write_dispatch_index(
+    dispatch: SubjectDispatch,
+    paths: HarnessPaths,
+) -> Path:
     dispatch_id = dispatch.dispatch_id
-    controller_dispatch_path = _controller_dispatch_path(dispatch_id)
+    controller_dispatch_path = _controller_dispatch_path(dispatch_id, paths)
     if dispatch.dispatch_path.resolve() != controller_dispatch_path.resolve():
         raise ValueError("desktop dispatch is not in the private controller root")
     if not controller_dispatch_path.is_file():
         raise ValueError("desktop private controller dispatch is missing")
-    path = _dispatch_index_path(dispatch_id)
+    path = _dispatch_index_path(dispatch_id, paths)
     _write_json(
         path,
         {
@@ -856,15 +990,18 @@ def _write_dispatch_index(dispatch: SubjectDispatch) -> Path:
             "dispatch_id": dispatch_id,
             "dispatch_sha256": str(dispatch.dispatch_sha256),
             "dispatch_path": str(
-                controller_dispatch_path.relative_to(RUNS_ROOT)
+                controller_dispatch_path.relative_to(paths.runs_root)
             ).replace("\\", "/"),
         },
     )
     return path
 
 
-def _load_dispatch_by_id(dispatch_id: str) -> SubjectDispatch:
-    index = _read_json(_dispatch_index_path(dispatch_id))
+def _load_dispatch_by_id(
+    dispatch_id: str,
+    paths: HarnessPaths,
+) -> SubjectDispatch:
+    index = _read_json(_dispatch_index_path(dispatch_id, paths))
     if index.get("schema_version") != DISPATCH_INDEX_SCHEMA_VERSION:
         raise ValueError("desktop dispatch index schema is unsupported; v2 is required")
     if index.get("dispatch_id") != dispatch_id:
@@ -872,8 +1009,10 @@ def _load_dispatch_by_id(dispatch_id: str) -> SubjectDispatch:
     dispatch_path = index.get("dispatch_path")
     if not isinstance(dispatch_path, str):
         raise ValueError("desktop dispatch index path is invalid")
-    expected_dispatch = _controller_dispatch_path(dispatch_id)
-    expected_relative_path = str(expected_dispatch.relative_to(RUNS_ROOT)).replace(
+    expected_dispatch = _controller_dispatch_path(dispatch_id, paths)
+    expected_relative_path = str(
+        expected_dispatch.relative_to(paths.runs_root)
+    ).replace(
         "\\", "/"
     )
     if dispatch_path != expected_relative_path:
@@ -888,8 +1027,8 @@ def _load_dispatch_by_id(dispatch_id: str) -> SubjectDispatch:
         raise ValueError("desktop dispatch ID mismatch")
     if index.get("dispatch_sha256") != dispatch.dispatch_sha256:
         raise ValueError("desktop dispatch index hash mismatch")
-    expected_workspace = RUNS_ROOT / "workspaces" / dispatch.physical_run_id
-    expected_artifact = RUNS_ROOT / "artifacts" / dispatch.physical_run_id
+    expected_workspace = paths.workspaces_root / dispatch.physical_run_id
+    expected_artifact = paths.artifacts_root / dispatch.physical_run_id
     if (
         dispatch.workspace.root.resolve() != expected_workspace.resolve()
         or dispatch.workspace.artifact_dir.resolve() != expected_artifact.resolve()
@@ -917,7 +1056,7 @@ def _run_slots(
     for index, slot in enumerate(slots, start=1):
         if contract_sha256 != _canonical_sha256(_freeze_document(manifest, paths)):
             raise RuntimeError("benchmark contract changed during execution")
-        generation = _active_generation(slot.scenario_id)
+        generation = _active_generation(slot.scenario_id, paths)
         scenario_contract_sha256 = _scenario_contract_sha256(
             manifest,
             paths,
@@ -926,8 +1065,9 @@ def _run_slots(
         _require_generation_contract_change(
             slot.scenario_id,
             scenario_contract_sha256,
+            paths,
         )
-        document_path = _run_document_path(slot, generation)
+        document_path = _run_document_path(slot, generation, paths)
         if document_path.is_file():
             document = _read_json(document_path)
             _validate_terminal_document(
@@ -998,6 +1138,7 @@ def _execute_slot(
                 "subject": _serialize_command(
                     observation.command,
                     workspace.root,
+                    paths,
                 ),
             }
             attempts.append(attempt_document)
@@ -1067,7 +1208,9 @@ def _execute_slot(
                     else "passed"
                 ),
                 reasons=reasons,
-                oracle_results=_serialize_oracles(oracle, workspace.root),
+                oracle_results=_serialize_oracles(
+                    oracle, workspace.root, paths
+                ),
                 telemetry=_read_subject_telemetry(subject_evidence),
             )
         except FileExistsError:
@@ -1130,7 +1273,9 @@ def _run_document(
         "scenario_contract_sha256": scenario_contract_sha256,
         "generation": generation,
         "evidence_id": f"{slot.run_id}--g{generation:02d}",
-        "prompt_sha256": _sha256_text(build_prompt(scenario, slot.arm_id)),
+        "prompt_sha256": _sha256_text(
+            build_prompt(scenario, slot.arm_id, manifest)
+        ),
         "task": scenario["task"],
         "must_preserve": scenario["must_preserve"],
         "prohibited_changes": scenario["prohibited_changes"],
@@ -1176,7 +1321,9 @@ def _infrastructure_document(
         "scenario_contract_sha256": scenario_contract_sha256,
         "generation": generation,
         "evidence_id": f"{slot.run_id}--g{generation:02d}",
-        "prompt_sha256": _sha256_text(build_prompt(scenario, slot.arm_id)),
+        "prompt_sha256": _sha256_text(
+            build_prompt(scenario, slot.arm_id, manifest)
+        ),
         "task": scenario["task"],
         "must_preserve": scenario["must_preserve"],
         "prohibited_changes": scenario["prohibited_changes"],
@@ -1203,13 +1350,13 @@ def _write_review_packets(
     randomized_slots = list(slots)
     secrets.SystemRandom().shuffle(randomized_slots)
     for slot in randomized_slots:
-        document = _read_run_document(slot)
+        document = _read_run_document(slot, paths)
         _validate_terminal_document(
             slot,
             document,
             _scenario_contract_sha256(manifest, paths, slot.scenario_id),
         )
-        packet = write_review_packet(document, RUNS_ROOT)
+        packet = write_review_packet(document, paths.runs_root, manifest)
         if not packet.is_file():  # pragma: no cover - writer guarantees this
             raise FileNotFoundError("review packet was not written")
     print(f"review packets: {len(slots)}")
@@ -1223,7 +1370,7 @@ def _verify_runs(
     slots = _phase_slots(manifest, phase)
     states: dict[str, int] = {}
     for slot in slots:
-        document = _read_run_document(slot)
+        document = _read_run_document(slot, paths)
         _validate_terminal_document(
             slot,
             document,
@@ -1244,60 +1391,194 @@ def _write_result(
     output: Path,
 ) -> None:
     _verify_runs(manifest, paths, "all")
-    _verify_reviews(manifest)
     slots = build_run_slots(manifest)
-    documents = [_read_run_document(slot) for slot in slots]
-    reviews = _reviews_by_run(manifest)
-    for document in documents:
-        document["review"] = reviews[str(document["run_id"])]
-    result = build_public_result(
-        slots,
-        documents,
-        benchmark_version=manifest.benchmark_version,
+    documents = [_read_run_document(slot, paths) for slot in slots]
+    reviews = _reviews_by_run(manifest, paths)
+    is_profile_campaign = all(
+        "profile_under_test" in scenario for scenario in manifest.scenarios
     )
+    if not is_profile_campaign:
+        _verify_reviews(manifest, paths)
+        for document in documents:
+            document["review"] = reviews[str(document["run_id"])]
+        result = build_public_result(
+            slots,
+            documents,
+            benchmark_version=manifest.benchmark_version,
+        )
+    else:
+        public_documents = []
+        complete_review_count = 0
+        slots_by_id = {slot.run_id: slot for slot in slots}
+        for document in documents:
+            updated = dict(document)
+            review = reviews.get(str(document["run_id"]), "not_available")
+            try:
+                if not isinstance(review, dict):
+                    raise ValueError("review is unavailable")
+                _validate_review(
+                    manifest,
+                    slots_by_id[str(document["run_id"])],
+                    review,
+                )
+            except ValueError:
+                updated["review"] = "not_available"
+            else:
+                updated["review"] = review
+                complete_review_count += 1
+            public_documents.append(updated)
+        outcomes = build_profile_outcomes(manifest, public_documents)
+
+        contract = _freeze_document(manifest, paths)
+        contract_sha256 = _canonical_sha256(contract)
+        if paths.manifest_path is None:
+            raise ValueError("campaign manifest path is missing")
+        source_revisions = {
+            "fixture_tag": manifest.fixture_tag,
+            "fixture_commit": manifest.fixture_commit,
+            "skill_tag": manifest.skill_tag,
+            "skill_commit": manifest.skill_commit,
+            "manifest_path": str(
+                paths.manifest_path.relative_to(paths.repository_root)
+            ).replace("\\", "/"),
+            "manifest_sha256": contract["manifest_sha256"],
+            "harness_sha256": contract["harness_sha256"],
+            "contract_sha256": contract_sha256,
+            "prompts": contract["prompts"],
+            "evaluators": contract["evaluators"],
+            "rubrics": contract["rubrics"],
+        }
+        result = build_public_result(
+            slots,
+            public_documents,
+            benchmark_version=manifest.benchmark_version,
+            source_revisions=source_revisions,
+            execution={
+                "model": manifest.model,
+                "reasoning_effort": manifest.reasoning_effort,
+                "client": manifest.client,
+                "subject_executor": manifest.subject_executor,
+                "subject_timeout_seconds": manifest.subject_timeout_seconds,
+                "fixture_timeout_seconds": manifest.fixture_timeout_seconds,
+                "oracle_timeout_seconds": manifest.oracle_timeout_seconds,
+                "repetitions": manifest.repetitions,
+                "random_seed": manifest.random_seed,
+            },
+            review_metadata={
+                "anonymization": "single-candidate",
+                "reviewer_model": "gpt-5.6-terra",
+                "reviewer_reasoning_effort": "max",
+                "expected_candidates": len(slots),
+                "completed_candidates": complete_review_count,
+                "rubric_ids": list(RUBRIC_IDS),
+                "incremental_criteria_scored": complete_review_count == len(slots),
+            },
+            profile_outcomes=outcomes,
+        )
+        schema = _read_json(ROOT / "evals" / "profile-pilot-result.schema.json")
+        expected_scenario_contracts = {
+            str(scenario["id"]): _scenario_contract_sha256(
+                manifest,
+                paths,
+                str(scenario["id"]),
+            )
+            for scenario in manifest.scenarios
+        }
+        validate_profile_pilot_result(
+            result,
+            manifest,
+            schema,
+            expected_source_revisions=source_revisions,
+            expected_scenario_contracts=expected_scenario_contracts,
+        )
     _write_json(output, result)
     print(output)
 
 
-def _verify_reviews(manifest: BenchmarkManifest) -> None:
+def _verify_reviews(
+    manifest: BenchmarkManifest,
+    paths: HarnessPaths,
+) -> None:
     slots = build_run_slots(manifest)
-    reviews = _reviews_by_run(manifest)
+    reviews = _reviews_by_run(manifest, paths)
     expected = {slot.run_id for slot in slots}
     if set(reviews) != expected:
         missing = sorted(expected - set(reviews))
         extra = sorted(set(reviews) - expected)
         raise ValueError(f"reviews mismatch; missing={missing}, extra={extra}")
+    slots_by_id = {slot.run_id: slot for slot in slots}
     for run_id, review in reviews.items():
-        rubrics = review.get("rubrics")
-        if not isinstance(rubrics, dict) or set(rubrics) != set(RUBRIC_IDS):
-            raise ValueError(f"invalid rubrics for {run_id}")
-        for rubric_id, value in rubrics.items():
-            if not isinstance(value, dict):
-                raise ValueError(f"invalid rubric {rubric_id} for {run_id}")
-            if value.get("score") not in {0, 1, 2}:
-                raise ValueError(f"invalid score for {run_id}/{rubric_id}")
-            reason = value.get("reason")
-            if not isinstance(reason, str) or not reason.strip():
-                raise ValueError(f"empty reason for {run_id}/{rubric_id}")
-        if any("aggregate" in key or "total" in key for key in review):
-            raise ValueError(f"aggregate score is not allowed for {run_id}")
+        _validate_review(manifest, slots_by_id[run_id], review)
     print(f"reviews verified: {len(reviews)}")
+
+
+def _validate_review(
+    manifest: BenchmarkManifest,
+    slot: RunSlot,
+    review: dict[str, object],
+) -> None:
+    scenario = next(
+        item for item in manifest.scenarios if item["id"] == slot.scenario_id
+    )
+    requires_incremental_review = "incremental_criteria" in scenario
+    expected_fields = {"rubrics"}
+    if requires_incremental_review:
+        expected_fields.add("incremental_criteria")
+    if set(review) != expected_fields:
+        raise ValueError(f"invalid review fields for {slot.run_id}")
+    rubrics = review.get("rubrics")
+    if not isinstance(rubrics, dict) or set(rubrics) != set(RUBRIC_IDS):
+        raise ValueError(f"invalid rubrics for {slot.run_id}")
+    for rubric_id, value in rubrics.items():
+        if not isinstance(value, dict) or set(value) != {"score", "reason"}:
+            raise ValueError(f"invalid rubric {rubric_id} for {slot.run_id}")
+        score = value.get("score")
+        if not isinstance(score, int) or isinstance(score, bool) or score not in {0, 1, 2}:
+            raise ValueError(f"invalid score for {slot.run_id}/{rubric_id}")
+        reason = value.get("reason")
+        if not isinstance(reason, str) or not reason.strip():
+            raise ValueError(f"empty reason for {slot.run_id}/{rubric_id}")
+    if not requires_incremental_review:
+        return
+    expected_criteria = list(scenario["incremental_criteria"])
+    criteria = review.get("incremental_criteria")
+    if not isinstance(criteria, list) or len(criteria) != len(expected_criteria):
+        raise ValueError(f"invalid incremental criteria for {slot.run_id}")
+    for index, value in enumerate(criteria):
+        if not isinstance(value, dict) or set(value) != {
+            "criterion",
+            "score",
+            "reason",
+        }:
+            raise ValueError(f"invalid incremental criterion for {slot.run_id}")
+        if value.get("criterion") != expected_criteria[index]:
+            raise ValueError(f"incremental criterion drift for {slot.run_id}")
+        score = value.get("score")
+        if not isinstance(score, int) or isinstance(score, bool) or score not in {0, 1, 2}:
+            raise ValueError(f"invalid incremental score for {slot.run_id}")
+        reason = value.get("reason")
+        if not isinstance(reason, str) or not reason.strip():
+            raise ValueError(f"empty incremental reason for {slot.run_id}")
 
 
 def _reviews_by_run(
     manifest: BenchmarkManifest,
+    paths: HarnessPaths,
 ) -> dict[str, dict[str, object]]:
-    current_evidence = {
-        str(document["evidence_id"]): slot.run_id
-        for slot in build_run_slots(manifest)
-        for document in [_read_run_document(slot)]
-    }
-    mapping = _read_json(RUNS_ROOT / "review-key.json")
+    current_evidence: dict[str, str] = {}
+    for slot in build_run_slots(manifest):
+        document = _read_run_document(slot, paths)
+        evidence_id = str(document["evidence_id"])
+        if evidence_id in current_evidence:
+            raise ValueError(f"duplicate run evidence ID: {evidence_id}")
+        current_evidence[evidence_id] = slot.run_id
+    mapping = _read_json(paths.review_key_path)
     candidates = mapping.get("candidates")
     if not isinstance(candidates, dict):
         raise ValueError("invalid private review mapping")
-    reviews_root = RUNS_ROOT / "reviews"
+    reviews_root = paths.reviews_root
     reviews: dict[str, dict[str, object]] = {}
+    claimed_evidence: dict[str, str] = {}
     for candidate_id, identity in candidates.items():
         if not isinstance(identity, dict):
             raise ValueError("invalid private review identity")
@@ -1306,6 +1587,12 @@ def _reviews_by_run(
         )
         if evidence_id not in current_evidence:
             continue
+        if evidence_id in claimed_evidence:
+            raise ValueError(
+                "duplicate review candidate for evidence ID: "
+                f"{evidence_id} ({claimed_evidence[evidence_id]}, {candidate_id})"
+            )
+        claimed_evidence[evidence_id] = str(candidate_id)
         path = reviews_root / f"{candidate_id}.json"
         if not path.is_file():
             continue
@@ -1341,7 +1628,7 @@ def _invalidate_pilot(
         paths,
         scenario_id,
     )
-    generation = _active_generation(scenario_id)
+    generation = _active_generation(scenario_id, paths)
     slots = tuple(
         slot
         for slot in pilot_slots(build_run_slots(manifest))
@@ -1351,11 +1638,11 @@ def _invalidate_pilot(
     prior_contract_sha256: str | None = None
     prior_scenario_contract_sha256: str | None = None
     for slot in slots:
-        _require_no_inflight_desktop_attempts(slot, generation)
-        path = _run_document_path(slot, generation)
+        _require_no_inflight_desktop_attempts(slot, generation, paths)
+        path = _run_document_path(slot, generation, paths)
         if not path.is_file():
             continue
-        document = _read_run_document(slot)
+        document = _read_run_document(slot, paths)
         document_contract_sha256 = document.get("contract_sha256")
         document_scenario_contract_sha256 = document.get("scenario_contract_sha256")
         if not isinstance(document_contract_sha256, str) or not isinstance(
@@ -1379,7 +1666,9 @@ def _invalidate_pilot(
             {
                 "run_id": slot.run_id,
                 "generation": generation,
-                "path": str(path.relative_to(RUNS_ROOT)).replace("\\", "/"),
+                "path": str(path.relative_to(paths.runs_root)).replace(
+                    "\\", "/"
+                ),
                 "sha256": _file_sha256(path),
             }
         )
@@ -1389,7 +1678,7 @@ def _invalidate_pilot(
         )
     if prior_contract_sha256 is None or prior_scenario_contract_sha256 is None:
         raise RuntimeError("pilot invalidation lost prior contract provenance")
-    if _freeze_path(prior_contract_sha256).exists():
+    if _freeze_path(prior_contract_sha256, paths).exists():
         raise RuntimeError("cannot invalidate a frozen contract")
     invalidation = {
         "schema_version": "1.0",
@@ -1404,23 +1693,23 @@ def _invalidate_pilot(
         "runs": evidence,
     }
     invalidation_path = (
-        INVALIDATIONS_ROOT
+        paths.invalidations_root
         / f"{scenario_id}--g{generation:02d}--{secrets.token_hex(4)}.json"
     )
     _write_json(invalidation_path, invalidation)
 
-    state = _campaign_state()
+    state = _campaign_state(paths)
     scenarios = state.setdefault("scenarios", {})
     if not isinstance(scenarios, dict):
         raise ValueError("invalid campaign state")
     scenarios[scenario_id] = {
         "generation": generation + 1,
         "must_change_from": prior_scenario_contract_sha256,
-        "invalidation": str(invalidation_path.relative_to(RUNS_ROOT)).replace(
+        "invalidation": str(invalidation_path.relative_to(paths.runs_root)).replace(
             "\\", "/"
         ),
     }
-    _replace_json(CAMPAIGN_STATE_PATH, state)
+    _replace_json(paths.campaign_state_path, state)
     print(f"invalidated {scenario_id} generation {generation}")
 
 
@@ -1440,10 +1729,10 @@ def _invalidate_legacy_pending_newline_defect(
         )
     contract = _freeze_document(manifest, paths)
     contract_sha256 = _canonical_sha256(contract)
-    if _freeze_path(contract_sha256).exists():
+    if _freeze_path(contract_sha256, paths).exists():
         raise RuntimeError("cannot invalidate a frozen contract")
-    generation = _active_generation(scenario_id)
-    defect = _load_legacy_pending_newline_defect(dispatch_id)
+    generation = _active_generation(scenario_id, paths)
+    defect = _load_legacy_pending_newline_defect(dispatch_id, paths)
     slots = tuple(
         slot
         for slot in pilot_slots(build_run_slots(manifest))
@@ -1462,7 +1751,7 @@ def _invalidate_legacy_pending_newline_defect(
         or defect.dispatch_id != _desktop_dispatch_id(slot, generation, 1)
     ):
         raise ValueError("legacy dispatch does not match the active pilot slot")
-    workspace_head = _require_legacy_pending_invariants(slot, defect)
+    workspace_head = _require_legacy_pending_invariants(slot, defect, paths)
     replacement_scenario_contract_sha256 = _scenario_contract_sha256(
         manifest,
         paths,
@@ -1475,10 +1764,10 @@ def _invalidate_legacy_pending_newline_defect(
     for candidate_slot in slots:
         if candidate_slot.run_id == slot.run_id:
             continue
-        _require_no_other_pilot_evidence(candidate_slot, generation)
+        _require_no_other_pilot_evidence(candidate_slot, generation, paths)
 
     invalidation_path = (
-        INVALIDATIONS_ROOT
+        paths.invalidations_root
         / (
             f"{scenario_id}--g{generation:02d}--pre-collection--"
             f"{defect.dispatch_sha256[:12]}.json"
@@ -1508,25 +1797,26 @@ def _invalidate_legacy_pending_newline_defect(
     }
     _write_json(invalidation_path, invalidation)
 
-    state = _campaign_state()
+    state = _campaign_state(paths)
     scenarios = state.setdefault("scenarios", {})
     if not isinstance(scenarios, dict):
         raise ValueError("invalid campaign state")
     scenarios[scenario_id] = {
         "generation": generation + 1,
         "must_change_from": defect.scenario_contract_sha256,
-        "invalidation": str(invalidation_path.relative_to(RUNS_ROOT)).replace(
+        "invalidation": str(invalidation_path.relative_to(paths.runs_root)).replace(
             "\\", "/"
         ),
     }
-    _replace_json(CAMPAIGN_STATE_PATH, state)
+    _replace_json(paths.campaign_state_path, state)
     print(f"invalidated legacy pending dispatch: {dispatch_id}")
 
 
 def _load_legacy_pending_newline_defect(
     dispatch_id: str,
+    paths: HarnessPaths,
 ) -> LegacyPendingNewlineDefect:
-    index = _read_json(_dispatch_index_path(dispatch_id))
+    index = _read_json(_dispatch_index_path(dispatch_id, paths))
     if (
         index.get("schema_version") != "desktop-dispatch-index/v1"
         or index.get("dispatch_id") != dispatch_id
@@ -1538,19 +1828,17 @@ def _load_legacy_pending_newline_defect(
     relative_path = PurePosixPath(dispatch_path.replace("\\", "/"))
     if relative_path.is_absolute() or ".." in relative_path.parts:
         raise ValueError("legacy desktop dispatch index path must be relative")
-    defect = inspect_legacy_pending_newline_defect(
-        RUNS_ROOT.joinpath(*relative_path.parts)
-    )
+    defect_path = paths.runs_root.joinpath(*relative_path.parts)
+    defect = inspect_legacy_pending_newline_defect(defect_path)
     if index.get("dispatch_sha256") != defect.dispatch_sha256:
         raise ValueError("legacy desktop dispatch index hash mismatch")
-    expected_workspace = RUNS_ROOT / "workspaces" / defect.physical_run_id
-    expected_artifact = RUNS_ROOT / "artifacts" / defect.physical_run_id
+    expected_workspace = paths.workspaces_root / defect.physical_run_id
+    expected_artifact = paths.artifacts_root / defect.physical_run_id
     expected_dispatch = expected_artifact / "desktop-dispatch.json"
     if (
         defect.workspace_root.resolve() != expected_workspace.resolve()
         or defect.artifact_directory.resolve() != expected_artifact.resolve()
-        or RUNS_ROOT.joinpath(*relative_path.parts).resolve()
-        != expected_dispatch.resolve()
+        or defect_path.resolve() != expected_dispatch.resolve()
     ):
         raise ValueError("legacy desktop dispatch path does not match its physical run")
     return defect
@@ -1559,6 +1847,7 @@ def _load_legacy_pending_newline_defect(
 def _require_legacy_pending_invariants(
     slot: RunSlot,
     defect: LegacyPendingNewlineDefect,
+    paths: HarnessPaths,
 ) -> str:
     """確認這筆 v1 dispatch 從未被收集，也沒有任何可重試分支。"""
 
@@ -1567,20 +1856,20 @@ def _require_legacy_pending_invariants(
     )
     if head.exit_code != 0 or head.stdout.strip() != defect.baseline_commit:
         raise RuntimeError("legacy pending dispatch workspace baseline mismatch")
-    terminal = _run_document_path(slot, defect.generation)
+    terminal = _run_document_path(slot, defect.generation, paths)
     if terminal.is_file():
         raise RuntimeError(
             "legacy pending dispatch already has a terminal run document"
         )
     for attempt in (1, 2):
         index_path = _dispatch_index_path(
-            _desktop_dispatch_id(slot, defect.generation, attempt)
+            _desktop_dispatch_id(slot, defect.generation, attempt), paths
         )
         receipt_path = _attempt_receipt_path(
             slot,
             defect.generation,
             attempt,
-            ATTEMPT_RECEIPTS_ROOT,
+            paths,
         )
         if attempt == defect.attempt:
             if not index_path.is_file() or receipt_path.is_file():
@@ -1591,19 +1880,23 @@ def _require_legacy_pending_invariants(
     return head.stdout.strip()
 
 
-def _require_no_other_pilot_evidence(slot: RunSlot, generation: int) -> None:
-    terminal = _run_document_path(slot, generation)
+def _require_no_other_pilot_evidence(
+    slot: RunSlot,
+    generation: int,
+    paths: HarnessPaths,
+) -> None:
+    terminal = _run_document_path(slot, generation, paths)
     if terminal.is_file():
         raise RuntimeError("legacy recovery found evidence for another pilot slot")
     for attempt in (1, 2):
         dispatch = _dispatch_index_path(
-            _desktop_dispatch_id(slot, generation, attempt)
+            _desktop_dispatch_id(slot, generation, attempt), paths
         )
         receipt = _attempt_receipt_path(
             slot,
             generation,
             attempt,
-            ATTEMPT_RECEIPTS_ROOT,
+            paths,
         )
         if dispatch.is_file() or receipt.is_file():
             raise RuntimeError("legacy recovery found evidence for another pilot slot")
@@ -1624,8 +1917,8 @@ def _adjudicate_timeout(
         )
     except StopIteration as error:
         raise ValueError(f"unknown run ID: {run_id}") from error
-    generation = _active_generation(slot.scenario_id)
-    path = _run_document_path(slot, generation)
+    generation = _active_generation(slot.scenario_id, paths)
+    path = _run_document_path(slot, generation, paths)
     document = _read_json(path)
     _validate_terminal_document(
         slot,
@@ -1644,19 +1937,20 @@ def _adjudicate_timeout(
         "reason": reason.strip(),
         "run_document_sha256": _file_sha256(path),
     }
-    adjudication_path = TIMEOUT_ADJUDICATIONS_ROOT / f"{evidence_id}.json"
+    adjudication_path = paths.timeout_adjudications_root / f"{evidence_id}.json"
     _write_json(adjudication_path, adjudication)
     print(f"timeout adjudicated: {run_id} -> {source}")
 
 
 def _apply_timeout_adjudication(
     document: dict[str, object],
+    paths: HarnessPaths,
 ) -> dict[str, object]:
     reasons = document.get("automatic_failure_reasons", [])
     if "oracle_timeout_unclassified" not in reasons:
         return document
     evidence_id = str(document.get("evidence_id", ""))
-    path = TIMEOUT_ADJUDICATIONS_ROOT / f"{evidence_id}.json"
+    path = paths.timeout_adjudications_root / f"{evidence_id}.json"
     if not path.is_file():
         return document
     adjudication = _read_json(path)
@@ -1685,19 +1979,25 @@ def _write_freeze(
     manifest: BenchmarkManifest,
     paths: HarnessPaths,
     decision_note: str,
+    phase: str,
 ) -> None:
     if not decision_note.strip():
         raise ValueError("freeze decision note must not be empty")
+    if phase != "pilot":
+        raise ValueError("freeze phase is invalid")
     _require_preflight(manifest, paths)
-    _verify_runs(manifest, paths, "pilot")
+    if manifest.freeze_policy == "post_pilot":
+        _verify_runs(manifest, paths, phase)
     contract = _freeze_document(manifest, paths)
     freeze = {
         "schema_version": "1.0",
         "contract_sha256": _canonical_sha256(contract),
         "contract": contract,
+        "freeze_policy": manifest.freeze_policy,
+        "phase": phase,
         "decision_note": decision_note.strip(),
     }
-    freeze_path = _freeze_path(str(freeze["contract_sha256"]))
+    freeze_path = _freeze_path(str(freeze["contract_sha256"]), paths)
     if freeze_path.is_file():
         existing = _read_json(freeze_path)
         if existing != freeze:
@@ -1707,11 +2007,17 @@ def _write_freeze(
     print(f"contract freeze: {freeze_path}")
 
 
-def _verify_freeze(manifest: BenchmarkManifest, paths: HarnessPaths) -> None:
+def _verify_freeze(
+    manifest: BenchmarkManifest,
+    paths: HarnessPaths,
+    phase: str = "pilot",
+) -> None:
     actual = _freeze_document(manifest, paths)
     contract_sha256 = _canonical_sha256(actual)
-    freeze_path = _freeze_path(contract_sha256)
+    freeze_path = _freeze_path(contract_sha256, paths)
     if not freeze_path.is_file():
+        if manifest.freeze_policy == "pre_execution":
+            _record_pre_execution_drift(paths, phase, contract_sha256)
         raise FileNotFoundError("contract freeze is missing")
     freeze = _read_json(freeze_path)
     if (
@@ -1719,7 +2025,49 @@ def _verify_freeze(manifest: BenchmarkManifest, paths: HarnessPaths) -> None:
         or freeze.get("contract_sha256") != _canonical_sha256(actual)
     ):
         raise ValueError("contract freeze verification failed")
+    if manifest.freeze_policy == "pre_execution" and (
+        freeze.get("freeze_policy") != manifest.freeze_policy
+        or freeze.get("phase") != phase
+    ):
+        raise ValueError("pre-execution contract freeze policy is invalid")
     print("contract freeze verified")
+
+
+def _record_pre_execution_drift(
+    paths: HarnessPaths,
+    phase: str,
+    replacement_contract_sha256: str,
+) -> None:
+    freeze_root = paths.contract_freezes_root
+    prior_freezes = []
+    for candidate in freeze_root.glob("*.json"):
+        freeze = _read_json(candidate)
+        if (
+            freeze.get("freeze_policy") == "pre_execution"
+            and freeze.get("phase") == phase
+        ):
+            prior_freezes.append((candidate, freeze))
+    for prior_path, prior_freeze in prior_freezes:
+        prior_contract_sha256 = prior_freeze.get("contract_sha256")
+        if not isinstance(prior_contract_sha256, str):
+            raise ValueError("pre-execution contract freeze is invalid")
+        _write_json(
+            paths.invalidations_root
+            / (
+                f"pre-execution--{prior_contract_sha256[:12]}"
+                f"--{secrets.token_hex(4)}.json"
+            ),
+            {
+                "schema_version": "1.0",
+                "phase": phase,
+                "reason": "contract_hash_drift",
+                "prior_freeze": str(prior_path.relative_to(paths.runs_root)).replace(
+                    "\\", "/"
+                ),
+                "prior_contract_sha256": prior_contract_sha256,
+                "replacement_contract_sha256": replacement_contract_sha256,
+            },
+        )
 
 
 def _freeze_document(
@@ -1728,27 +2076,36 @@ def _freeze_document(
 ) -> dict[str, object]:
     prompts: dict[str, str] = {}
     evaluators: dict[str, str] = {}
+    if paths.manifest_path is None:
+        raise ValueError("campaign manifest path is missing")
+    manifest_path = paths.manifest_path
     for scenario in manifest.scenarios:
         scenario_id = str(scenario["id"])
-        for arm in manifest.arms:
-            arm_id = str(arm["id"])
-            prompt = build_prompt(scenario, arm_id)
+        for arm_id in scenario["comparison_arms"]:
+            arm_id = str(arm_id)
+            prompt = build_prompt(scenario, arm_id, manifest)
             prompts[f"{scenario_id}/{arm_id}"] = canonical_prompt_sha256(prompt)
         evaluators[scenario_id] = _tree_sha256(
             paths.fixture_clone / str(scenario["evaluator_path"])
         )
     return {
         "schema_version": "1.0",
-        "manifest_sha256": _file_sha256(MANIFEST_PATH),
-        "harness_sha256": _source_tree_sha256(ROOT / "evals" / "harness"),
+        "manifest_sha256": _file_sha256(manifest_path),
+        "harness_sha256": _source_tree_sha256(
+            paths.repository_root / "evals" / "harness"
+        ),
         **_subject_client_contract(manifest),
         "fixture_commit": manifest.fixture_commit,
         "skill_commit": manifest.skill_commit,
         "prompts": prompts,
         "evaluators": evaluators,
         "rubrics": {
-            str(path.relative_to(ROOT)).replace("\\", "/"): _file_sha256(path)
-            for path in sorted((ROOT / "evals" / "rubrics").glob("*.md"))
+            str(path.relative_to(paths.repository_root)).replace(
+                "\\", "/"
+            ): _file_sha256(path)
+            for path in sorted(
+                (paths.repository_root / "evals" / "rubrics").glob("*.md")
+            )
         },
     }
 
@@ -1806,7 +2163,7 @@ def _ensure_fixture_clone(
                 manifest.fixture_url,
                 str(paths.fixture_clone),
             ],
-            ROOT,
+            paths.repository_root,
             manifest.fixture_timeout_seconds,
         )
     fixture_tag_ref = f"refs/tags/{manifest.fixture_tag}"
@@ -1856,6 +2213,7 @@ def _verify_skill_revision(
 def _serialize_oracles(
     evidence: Any,
     workspace_root: Path,
+    paths: HarnessPaths,
 ) -> list[dict[str, object]]:
     groups = (
         ("public", evidence.public),
@@ -1869,6 +2227,7 @@ def _serialize_oracles(
                 _serialize_command(
                     command,
                     workspace_root,
+                    paths,
                     include_output=True,
                 )
                 for command in commands
@@ -1881,11 +2240,12 @@ def _serialize_oracles(
 def _serialize_command(
     command: CommandResult,
     workspace_root: Path,
+    paths: HarnessPaths,
     include_output: bool = False,
 ) -> dict[str, object]:
     document: dict[str, object] = {
         "args": [
-            _sanitize_persisted_text(argument, workspace_root)
+            _sanitize_persisted_text(argument, workspace_root, paths)
             for argument in command.args
         ],
         "exit_code": command.exit_code,
@@ -1900,10 +2260,12 @@ def _serialize_command(
         document["stdout"] = _sanitize_persisted_text(
             command.stdout,
             workspace_root,
+            paths,
         )
         document["stderr"] = _sanitize_persisted_text(
             command.stderr,
             workspace_root,
+            paths,
         )
     return document
 
@@ -1945,12 +2307,16 @@ def _save_oracle_evidence(evidence: Any, artifact_dir: Path) -> Path:
     return index_path
 
 
-def _sanitize_persisted_text(value: str, workspace_root: Path) -> str:
+def _sanitize_persisted_text(
+    value: str,
+    workspace_root: Path,
+    paths: HarnessPaths,
+) -> str:
     redacted = value
     replacements = (
         (workspace_root, "{workspace}"),
-        (RUNS_ROOT, "{runs_root}"),
-        (ROOT, "{repository_root}"),
+        (paths.runs_root, "{runs_root}"),
+        (paths.repository_root, "{repository_root}"),
     )
     for path, placeholder in replacements:
         variants = {str(path), str(path).replace("\\", "/")}
@@ -1977,18 +2343,25 @@ def _phase_slots(
     return pilot_slots(slots) if phase == "pilot" else slots
 
 
-def _read_run_document(slot: RunSlot) -> dict[str, object]:
-    generation = _active_generation(slot.scenario_id)
-    path = _run_document_path(slot, generation)
+def _read_run_document(
+    slot: RunSlot,
+    paths: HarnessPaths,
+) -> dict[str, object]:
+    generation = _active_generation(slot.scenario_id, paths)
+    path = _run_document_path(slot, generation, paths)
     if not path.is_file():
         raise FileNotFoundError(f"missing run document: {slot.run_id}")
     document = _read_json(path)
-    return _apply_timeout_adjudication(document)
+    return _apply_timeout_adjudication(document, paths)
 
 
-def _run_document_path(slot: RunSlot, generation: int) -> Path:
+def _run_document_path(
+    slot: RunSlot,
+    generation: int,
+    paths: HarnessPaths,
+) -> Path:
     return (
-        RUN_DOCUMENTS
+        paths.run_documents_root
         / slot.scenario_id
         / f"{slot.run_id}--g{generation:02d}.json"
     )
@@ -2006,8 +2379,8 @@ def _physical_run_id(
     return f"run-{_sha256_text(identity)[:16]}"
 
 
-def _active_generation(scenario_id: str) -> int:
-    state = _campaign_state()
+def _active_generation(scenario_id: str, paths: HarnessPaths) -> int:
+    state = _campaign_state(paths)
     scenarios = state.get("scenarios", {})
     if not isinstance(scenarios, dict):
         raise ValueError("invalid campaign state")
@@ -2020,17 +2393,18 @@ def _active_generation(scenario_id: str) -> int:
     return generation
 
 
-def _campaign_state() -> dict[str, object]:
-    if not CAMPAIGN_STATE_PATH.is_file():
+def _campaign_state(paths: HarnessPaths) -> dict[str, object]:
+    if not paths.campaign_state_path.is_file():
         return {"schema_version": "1.0", "scenarios": {}}
-    return _read_json(CAMPAIGN_STATE_PATH)
+    return _read_json(paths.campaign_state_path)
 
 
 def _require_generation_contract_change(
     scenario_id: str,
     scenario_contract_sha256: str,
+    paths: HarnessPaths,
 ) -> None:
-    state = _campaign_state()
+    state = _campaign_state(paths)
     scenarios = state.get("scenarios", {})
     if not isinstance(scenarios, dict):
         raise ValueError("invalid campaign state")
@@ -2066,7 +2440,7 @@ def _require_preflight(
     paths: HarnessPaths,
 ) -> None:
     contract_sha256 = _canonical_sha256(_freeze_document(manifest, paths))
-    preflight_path = _preflight_path(contract_sha256)
+    preflight_path = _preflight_path(contract_sha256, paths)
     if not preflight_path.is_file():
         raise FileNotFoundError("run prepare before pilot")
     preflight = _read_json(preflight_path)
@@ -2087,12 +2461,12 @@ def _scenario_for(
     )
 
 
-def _preflight_path(contract_sha256: str) -> Path:
-    return PREFLIGHT_ROOT / f"{contract_sha256}.json"
+def _preflight_path(contract_sha256: str, paths: HarnessPaths) -> Path:
+    return paths.preflights_root / f"{contract_sha256}.json"
 
 
-def _freeze_path(contract_sha256: str) -> Path:
-    return FREEZE_ROOT / f"{contract_sha256}.json"
+def _freeze_path(contract_sha256: str, paths: HarnessPaths) -> Path:
+    return paths.contract_freezes_root / f"{contract_sha256}.json"
 
 
 def _subject_client_contract(manifest: BenchmarkManifest) -> dict[str, object]:
