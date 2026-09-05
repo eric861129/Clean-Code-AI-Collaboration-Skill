@@ -4,11 +4,41 @@ from __future__ import annotations
 
 import hashlib
 import re
+import subprocess
+import yaml
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
 from evals.harness.models import SubjectDispatch
 
 POLICY = "required-subset/v1"
+
+
+def materialize_inspection_paths(repository: Path, revision: str, skill: str, profiles: list[str]) -> list[str]:
+    """Freeze 前由固定 Git 來源的 Metadata 展開清單，不依目前工作樹推定。"""
+    if re.fullmatch(r"[0-9a-f]{40}", revision) is None or re.fullmatch(r"[a-z0-9.-]+", skill) is None:
+        raise ValueError("inspection materialization requires pinned source")
+
+    def git(*args: str) -> bytes:
+        return subprocess.run(["git", *args], cwd=repository, check=True, capture_output=True, timeout=30).stdout
+
+    files = git("ls-tree", "-r", "--name-only", revision).decode("utf-8").splitlines()
+    profile_references = {}
+    for path in files:
+        if PurePosixPath(path).parent == PurePosixPath("profiles") and path.endswith(".yaml") and path != "profiles/catalog.yaml":
+            metadata = yaml.safe_load(git("show", f"{revision}:{path}").decode("utf-8"))
+            if metadata["kind"] in {"language", "framework"} and metadata.get("reference"):
+                profile_references[metadata["id"]] = metadata["reference"]
+    if set(profiles) - profile_references.keys():
+        raise ValueError("applied profile has no reference in the pinned source")
+    references = {p for p in files if p.startswith(f"{skill}/references/") and p.endswith(".md")}
+    classified = set(profile_references.values())
+    if not classified.issubset(references):
+        raise ValueError("pinned Profile metadata references missing files")
+    unclassified = {p for p in references if PurePosixPath(p).name.lower().startswith(("language-", "framework-"))} - classified
+    if unclassified:
+        raise ValueError("pinned source has unclassified Profile references")
+    allowed = (references - classified) | {profile_references[p] for p in profiles} | {f"{skill}/SKILL.md"}
+    return sorted(f".agents/skills/{path}" for path in allowed)
 
 
 def resolve_skill_file(workspace: Path, skill_root: str | None, value: str) -> Path:
@@ -71,7 +101,20 @@ def inspection_diagnostics(report: dict[str, object], dispatch: SubjectDispatch)
     if not isinstance(inspected_raw, list) or not all(isinstance(p, str) for p in inspected_raw):
         add("inspection_record_mismatch")
         inspected_raw = []
-    inspected = {p for p in inspected_raw if p.startswith(".agents/skills/")}
+    inspected = set()
+    for path in inspected_raw:
+        canonical = PurePosixPath(path).as_posix()
+        if canonical.casefold().startswith(".agents/skills/"):
+            inspected.add(canonical)
+            if path != canonical:
+                add("invalid_skill_path")
+        try:
+            resolved = (dispatch.workspace.root / path).resolve().relative_to(dispatch.workspace.root.resolve()).as_posix()
+        except (ValueError, OSError):
+            continue
+        if resolved.startswith(".agents/skills/") and resolved != canonical:
+            inspected.add(resolved)
+            add("invalid_skill_path")
     if len(inspected_raw) != len(set(inspected_raw)) or inspected != set(claims):
         add("inspection_record_mismatch")
     for path in sorted(set(claims) | inspected):

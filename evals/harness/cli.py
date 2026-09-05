@@ -41,10 +41,12 @@ from evals.harness.result_builder import (
     build_public_result,
     can_retry,
     validate_profile_pilot_result,
+    PROFILE_RESULT_SCHEMA_PATHS,
 )
 from evals.harness.subject_runner import build_prompt, run_subject
-from evals.harness.skill_inspection import inspect_skill
+from evals.harness.skill_inspection import inspect_skill, materialize_inspection_paths
 from evals.harness.protocol_canary import validate_protocol_canary
+from evals.harness.execution_provenance import build_execution_provenance, verify_execution_provenance, canonical_tree_sha256, verify_staged_tree
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_MANIFEST_RELATIVE_PATH = Path("evals/manifests/v0.3.0-cross-language.json")
@@ -1366,6 +1368,8 @@ def _infrastructure_document(
         "renamed_paths": [],
         "outside_boundary": [],
         "oracle_results": [],
+        **({"inspection_diagnostics": [], "oracle_skipped_reason": "not_run_due_to_execution_failure"}
+           if manifest.subject_executor.get("protocol_version") == "desktop-subject-v5" else {}),
         "telemetry": "not_available",
         "blind_spots": ["Subject 未完成，因此無法評估候選實作。"],
         "attempts": attempts,
@@ -1478,6 +1482,8 @@ def _write_result(
             "prompts": contract["prompts"],
             "evaluators": contract["evaluators"],
             "rubrics": contract["rubrics"],
+            **({"execution_commit": contract["execution_commit"], "execution_inputs": contract["execution_inputs"]}
+               if manifest.subject_executor.get("protocol_version") == "desktop-subject-v5" else {}),
         }
         result = build_public_result(
             slots,
@@ -1506,7 +1512,7 @@ def _write_result(
             },
             profile_outcomes=outcomes,
         )
-        schema = _read_json(ROOT / "evals" / "profile-pilot-result.schema.json")
+        schema = _read_json(ROOT / PROFILE_RESULT_SCHEMA_PATHS[result["schema_version"]])
         expected_scenario_contracts = {
             str(scenario["id"]): _scenario_contract_sha256(
                 manifest,
@@ -2019,6 +2025,8 @@ def _write_freeze(
     _require_preflight(manifest, paths)
     if manifest.freeze_policy == "post_pilot":
         _verify_runs(manifest, paths, phase)
+    if manifest.benchmark_version == "0.5.2-profile-pilot":
+        _require_protocol_canary_passed(paths)
     contract = _freeze_document(manifest, paths)
     freeze = {
         "schema_version": "1.0",
@@ -2110,19 +2118,31 @@ def _freeze_document(
     if paths.manifest_path is None:
         raise ValueError("campaign manifest path is missing")
     manifest_path = paths.manifest_path
+    is_v5 = manifest.subject_executor.get("protocol_version") == "desktop-subject-v5"
+    provenance = _execution_provenance(paths) if is_v5 else None
+    if is_v5:
+        for arm in manifest.arms:
+            expected = materialize_inspection_paths(paths.skill_repository, manifest.skill_commit, arm.skill, list(arm.applied_profiles)) if arm.skill else []
+            if list(arm.allowed_skill_inspection_paths) != expected:
+                raise ValueError("Arm allowed paths differ from pinned Skill metadata")
     for scenario in manifest.scenarios:
         scenario_id = str(scenario["id"])
         for arm_id in scenario["comparison_arms"]:
             arm_id = str(arm_id)
             prompt = build_prompt(scenario, arm_id, manifest)
             prompts[f"{scenario_id}/{arm_id}"] = canonical_prompt_sha256(prompt)
-        evaluators[scenario_id] = _tree_sha256(
-            paths.fixture_clone / str(scenario["evaluator_path"])
-        )
+        evaluator_root = paths.fixture_clone / str(scenario["evaluator_path"])
+        if is_v5:
+            verified = verify_staged_tree(paths.fixture_clone, manifest.fixture_commit, str(scenario["evaluator_path"]), evaluator_root)
+            evaluators[scenario_id] = canonical_tree_sha256(evaluator_root)
+            if verified["tree_sha256"] != evaluators[scenario_id]:
+                raise ValueError("evaluator contains unpinned files")
+        else:
+            evaluators[scenario_id] = _tree_sha256(evaluator_root)
     return {
         "schema_version": "1.0",
         "manifest_sha256": _file_sha256(manifest_path),
-        "harness_sha256": _source_tree_sha256(
+        "harness_sha256": provenance["inputs_sha256"] if is_v5 else _source_tree_sha256(
             paths.repository_root / "evals" / "harness"
         ),
         **_subject_client_contract(manifest),
@@ -2138,7 +2158,50 @@ def _freeze_document(
                 (paths.repository_root / "evals" / "rubrics").glob("*.md")
             )
         },
+        **({"execution_provenance": provenance,
+            "execution_commit": provenance["execution_commit"],
+            "execution_inputs": provenance["input_sha256"]} if is_v5 else {}),
     }
+
+
+def _execution_provenance(paths: HarnessPaths) -> dict[str, object]:
+    freezes = [_read_json(path) for path in sorted(paths.contract_freezes_root.glob("*.json"))]
+    if list(paths.invalidations_root.glob("execution-input-drift--*.json")):
+        raise ValueError("campaign execution source was invalidated; use a separate campaign")
+    if len(freezes) > 1:
+        raise ValueError("v5 campaign must have exactly one execution freeze")
+    if not freezes:
+        return build_execution_provenance(paths.repository_root, paths.manifest_path)
+    freeze = freezes[0]
+    provenance = freeze["contract"]["execution_provenance"]
+    try:
+        verify_execution_provenance(paths.repository_root, provenance)
+    except (ValueError, OSError):
+        _write_json(paths.invalidations_root / f"execution-input-drift--{freeze['contract_sha256']}.json", {
+            "schema_version": "execution-input-invalidation/v1",
+            "prior_contract_sha256": freeze["contract_sha256"],
+            "reason": "execution_input_drift",
+        })
+        raise
+    return provenance
+
+
+def _require_protocol_canary_passed(paths: HarnessPaths) -> None:
+    """正式 Freeze 僅接受兩個事先允許的獨立 Canary 批次之一。"""
+    for name in ("v0.5.2-profile-protocol-canary", "v0.5.2-profile-protocol-canary-02"):
+        canary_root = paths.repository_root / ".benchmark-runs" / name
+        receipt_path = canary_root / "protocol-canary-receipt.json"
+        if not receipt_path.is_file():
+            continue
+        receipt = _read_json(receipt_path)
+        if receipt.get("status") != "passed":
+            continue
+        freeze = _read_json(canary_root / "contract-freezes" / f"{receipt['contract_sha256']}.json")
+        verify_execution_provenance(paths.repository_root, freeze["contract"]["execution_provenance"])
+        documents = [_read_json(path) for path in sorted((canary_root / "run-documents").glob("*/*.json"))]
+        if validate_protocol_canary(documents)["status"] == "passed":
+            return
+    raise ValueError("formal pilot requires a passed separate protocol canary")
 
 
 def _scenario_contract_sha256(
@@ -2176,6 +2239,8 @@ def _scenario_contract_sha256(
         },
         "evaluator_sha256": evaluators[scenario_id],
         "rubrics": contract["rubrics"],
+        **({"execution_commit": contract["execution_commit"], "execution_inputs": contract["execution_inputs"]}
+           if manifest.subject_executor.get("protocol_version") == "desktop-subject-v5" else {}),
     }
     return _canonical_sha256(scenario_contract)
 

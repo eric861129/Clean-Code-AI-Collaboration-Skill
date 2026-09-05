@@ -329,32 +329,34 @@ def validate_desktop_report(dispatch: SubjectDispatch) -> dict[str, object]:
     is_v5 = dispatch.schema_version == V5_DISPATCH_SCHEMA_VERSION
     if is_v5:
         required.add("applied_profiles")
+    diagnostics = inspection_diagnostics(report, dispatch) if is_v5 else []
     missing = required - set(report)
     if missing:
         raise DesktopSubjectValidationError(
             "candidate_incomplete",
             f"desktop subject report missing fields: {sorted(missing)}",
+            diagnostics,
         )
     extra = set(report) - required
     if extra:
         raise DesktopSubjectValidationError(
             "invalid_claim",
             f"desktop subject result contains controller-owned fields: {sorted(extra)}",
+            diagnostics,
         )
     if report["schema_version"] != (V5_RESULT_SCHEMA_VERSION if is_v5 else SUBJECT_RESULT_SCHEMA_VERSION):
         raise DesktopSubjectValidationError(
-            "invalid_claim", "desktop subject result schema is invalid"
+            "invalid_claim", "desktop subject result schema is invalid", diagnostics
         )
     if report["completion"] != "completed":
         raise DesktopSubjectValidationError(
-            "invalid_claim", "desktop subject report completion is invalid"
+            "invalid_claim", "desktop subject report completion is invalid", diagnostics
         )
     if not isinstance(report["summary"], str):
         raise DesktopSubjectValidationError(
-            "candidate_incomplete", "desktop subject report summary must be text"
+            "candidate_incomplete", "desktop subject report summary must be text", diagnostics
         )
     if is_v5:
-        diagnostics = inspection_diagnostics(report, dispatch)
         if diagnostics:
             reason = "skill_not_used" if all(d["code"] == "missing_required_skill_file" for d in diagnostics) else "invalid_claim"
             raise DesktopSubjectValidationError(reason, "desktop subject inspection evidence gate failed", diagnostics)

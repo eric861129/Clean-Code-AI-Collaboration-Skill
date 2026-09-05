@@ -18,6 +18,7 @@ from evals.harness.desktop_subject import (
 from evals.harness.manifest import load_manifest
 from evals.harness.models import RunSlot, Workspace
 from evals.harness.cli import main as harness_main
+from evals.harness.skill_inspection import materialize_inspection_paths
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILL_ROOT = ".agents/skills/clean-code-ai-collaboration"
@@ -97,6 +98,29 @@ class InspectionProtocolTests(unittest.TestCase):
             self.collect(report)
         self.assertIn("profile_contamination", {d["code"] for d in rejected.exception.diagnostics})
 
+    def test_v5_catches_profile_aliases_and_keeps_diagnostics_when_fields_missing(self):
+        for alias in (f"./{PYTHON_PROFILE}", PYTHON_PROFILE.replace(".agents/", ".agents//"), PYTHON_PROFILE.replace(".agents/", ".agents/./")):
+            for omit_profiles in (False, True):
+                with self.subTest(alias=alias, missing=omit_profiles):
+                    report = self.report()
+                    report["files_inspected"].append(alias)
+                    if omit_profiles:
+                        del report["applied_profiles"]
+                    with self.assertRaises(DesktopSubjectValidationError) as rejected:
+                        self.collect(report)
+                    codes = {d["code"] for d in rejected.exception.diagnostics}
+                    self.assertIn("profile_contamination", codes)
+                    self.assertIn("invalid_skill_path", codes)
+                    if omit_profiles:
+                        self.assertIn("applied_profiles_mismatch", codes)
+
+    def test_v5_rejects_case_aliases_even_on_case_insensitive_hosts(self):
+        report = self.report()
+        report["files_inspected"].append(PYTHON_PROFILE.replace(".agents", ".Agents"))
+        with self.assertRaises(DesktopSubjectValidationError) as rejected:
+            self.collect(report)
+        self.assertIn("invalid_skill_path", {d["code"] for d in rejected.exception.diagnostics})
+
     def test_v5_rejects_noncanonical_and_escaping_claim_paths(self):
         for invalid in ("../outside.md", "C:/secret.md", f"{SKILL_ROOT}/references/../SKILL.md", f"{SKILL_ROOT}//SKILL.md", ".agents/skills/other/SKILL.md"):
             with self.subTest(path=invalid):
@@ -138,6 +162,17 @@ class InspectionProtocolTests(unittest.TestCase):
 
 
 class LegacyInspectionBoundaryTests(unittest.TestCase):
+    def test_allowed_materialization_uses_pinned_metadata_and_keeps_profiles_separate(self):
+        revision = "4ce3a697eb7eea36ecddd937ffa915f931e9524a"
+        core = materialize_inspection_paths(ROOT, revision, "clean-code-ai-collaboration", [])
+        python = materialize_inspection_paths(ROOT, revision, "clean-code-ai-collaboration", ["python"])
+        self.assertIn(CORE_EXTRA, core)
+        self.assertNotIn(PYTHON_PROFILE, core)
+        self.assertEqual(set(core) | {PYTHON_PROFILE}, set(python))
+        self.assertEqual(core, sorted(set(core)))
+        with self.assertRaises(ValueError):
+            materialize_inspection_paths(ROOT, revision, "clean-code-ai-collaboration", ["go"])
+
     def test_v4_rejects_both_honest_core_extra_and_profile_contamination(self):
         manifest = load_manifest(ROOT / "evals/manifests/v0.5.1-profile-pilot.json")
         arm = next(arm for arm in manifest.arms if arm.id == "core-only")

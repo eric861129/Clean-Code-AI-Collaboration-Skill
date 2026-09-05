@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import shutil
 import sys
 import tarfile
@@ -15,6 +16,7 @@ from evals.harness.models import (
     Workspace,
 )
 from evals.harness.process import run_process
+from evals.harness.execution_provenance import verify_staged_tree
 
 
 def build_workspace(
@@ -24,6 +26,8 @@ def build_workspace(
 ) -> Workspace:
     scenario = _scenario_for(manifest, slot.scenario_id)
     arm = _arm_for(manifest, slot.arm_id)
+    canonical_staging = manifest.subject_executor.get("protocol_version") == "desktop-subject-v5"
+    staging_provenance: dict[str, object] = {}
     workspace_root = paths.runs_root / "workspaces" / slot.run_id
     artifact_dir = paths.runs_root / "artifacts" / slot.run_id
     if workspace_root.exists() or artifact_dir.exists():
@@ -51,7 +55,12 @@ def build_workspace(
         cache_root=paths.runs_root / "cache" / "archives",
         timeout_seconds=manifest.fixture_timeout_seconds,
     )
-    _write_workspace_gitignore(workspace_root)
+    if canonical_staging:
+        staging_provenance["fixture"] = verify_staged_tree(
+            paths.fixture_clone, manifest.fixture_commit,
+            str(scenario["fixture_path"]), workspace_root,
+        )
+    _write_workspace_gitignore(workspace_root, canonical_lf=canonical_staging)
 
     if arm.skill is not None:
         skill_root = workspace_root / ".agents" / "skills" / arm.skill
@@ -63,6 +72,10 @@ def build_workspace(
             cache_root=paths.runs_root / "cache" / "archives",
             timeout_seconds=manifest.fixture_timeout_seconds,
         )
+        if canonical_staging:
+            staging_provenance["skill"] = verify_staged_tree(
+                paths.skill_repository, manifest.skill_commit, arm.skill, skill_root,
+            )
 
     _install_dependencies(
         workspace_root,
@@ -70,11 +83,26 @@ def build_workspace(
         paths.runs_root,
         manifest.fixture_timeout_seconds,
     )
+    if canonical_staging:
+        # 安裝依賴後再驗證原始檔案，避免把安裝程序的修改當成固定基線。
+        verify_staged_tree(
+            paths.fixture_clone, manifest.fixture_commit,
+            str(scenario["fixture_path"]), workspace_root, allow_extra=True,
+        )
+        if arm.skill is not None:
+            verify_staged_tree(
+                paths.skill_repository, manifest.skill_commit, arm.skill, skill_root,
+            )
     _run_checked(
         ["git", "init", "--initial-branch=main"],
         workspace_root,
         manifest.fixture_timeout_seconds,
     )
+    if canonical_staging:
+        _run_checked(
+            ["git", "config", "core.autocrlf", "false"],
+            workspace_root, manifest.fixture_timeout_seconds,
+        )
     _run_checked(
         ["git", "config", "user.name", "Benchmark Runner"],
         workspace_root,
@@ -107,6 +135,17 @@ def build_workspace(
     )
     if status.stdout.strip():
         raise RuntimeError(f"baseline workspace is not clean: {status.stdout}")
+    if canonical_staging:
+        (artifact_dir / "staging-provenance.json").write_text(
+            json.dumps({
+                "schema_version": "staging-provenance/v1",
+                "fixture_commit": manifest.fixture_commit,
+                "skill_commit": manifest.skill_commit,
+                "baseline_commit": baseline_commit,
+                **staging_provenance,
+            }, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8", newline="\n",
+        )
     return Workspace(workspace_root, artifact_dir, baseline_commit)
 
 
@@ -169,7 +208,7 @@ def _export_tree(
         archive.unlink(missing_ok=True)
 
 
-def _write_workspace_gitignore(workspace_root: Path) -> None:
+def _write_workspace_gitignore(workspace_root: Path, *, canonical_lf: bool = False) -> None:
     (workspace_root / ".gitignore").write_text(
         "node_modules/\n"
         ".venv/\n"
@@ -182,6 +221,7 @@ def _write_workspace_gitignore(workspace_root: Path) -> None:
         ".benchmark-oracle/\n"
         ".benchmark-subject-report.json\n",
         encoding="utf-8",
+        newline="\n" if canonical_lf else None,
     )
 
 
