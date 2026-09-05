@@ -66,6 +66,7 @@ class ProfilePackagingTests(unittest.TestCase):
             source / "scripts" / "package-manifest.schema.json",
         )
         for relative_path in (
+            Path("evals/profile-pilot-result.schema.json"),
             Path("evals/manifests/v0.5.1-profile-pilot.json"),
             Path("evals/results/v0.5.1-profile-pilot.json"),
         ):
@@ -363,6 +364,27 @@ class ProfilePackagingTests(unittest.TestCase):
         self.assertEqual(
             hashlib.sha256(committed).hexdigest(),
             input_hashes["profiles/csharp.yaml"],
+        )
+
+    def test_release_evidence_schema_uses_and_records_committed_bytes(self) -> None:
+        source = self.create_git_source()
+        schema_path = "evals/profile-pilot-result.schema.json"
+        committed = (source / schema_path).read_bytes()
+        subprocess.run(
+            ["git", "-C", str(source), "update-index", "--assume-unchanged", schema_path],
+            check=True,
+        )
+        (source / schema_path).write_text("false\n", encoding="utf-8")
+
+        manifest = packager.build_package(
+            source, self.output, "release", ["csharp"]
+        )
+
+        input_hashes = {
+            entry["path"]: entry["sha256"] for entry in manifest["inputs"]
+        }
+        self.assertEqual(
+            hashlib.sha256(committed).hexdigest(), input_hashes.get(schema_path)
         )
 
     def test_same_release_commit_produces_byte_identical_packages(self) -> None:

@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import redirect_stderr, redirect_stdout
 import hashlib
 import io
+import json
 from pathlib import Path
 import shutil
 import tempfile
@@ -19,7 +20,12 @@ from scripts.generate_profile_matrix import (
     replace_generated_region,
     synchronize_generated_regions,
 )
-from scripts.validate_profiles import load_registry, main, validate_repository
+from scripts.validate_profiles import (
+    load_registry,
+    main,
+    validate_loaded_profiles,
+    validate_repository,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -55,6 +61,7 @@ class ProfileContractTests(unittest.TestCase):
         self.fixture_root = Path(self.temporary_directory.name)
         shutil.copytree(ROOT / "profiles", self.fixture_root / "profiles")
         for relative_path in (
+            Path("evals/profile-pilot-result.schema.json"),
             Path("evals/manifests/v0.5.1-profile-pilot.json"),
             Path("evals/results/v0.5.1-profile-pilot.json"),
         ):
@@ -748,11 +755,15 @@ class ProfileContractTests(unittest.TestCase):
                     self.fixture_root / "profiles",
                     dirs_exist_ok=True,
                 )
-                payload = (
-                    '{"status":"complete","profile_outcomes":['
-                    f'{{"profile_id":"csharp","stage":"{result_stage}",'
-                    f'"outcome":"{result_outcome}"}}]}}\n'
+                result = json.loads(
+                    (ROOT / "evals/results/v0.5.1-profile-pilot.json").read_text(
+                        encoding="utf-8"
+                    )
                 )
+                result["profile_outcomes"][0].update(
+                    stage=result_stage, outcome=result_outcome
+                )
+                payload = json.dumps(result)
                 evidence_path.write_text(payload, encoding="utf-8")
                 digest = hashlib.sha256(evidence_path.read_bytes()).hexdigest()
                 self._set_evidence_profile(
@@ -794,6 +805,55 @@ class ProfileContractTests(unittest.TestCase):
         )
         self.assertIn("evidence-profile-mismatch", self.diagnostic_codes())
 
+    def test_evidence_requires_complete_public_result_schema(self) -> None:
+        result_path = self.fixture_root / "evals/results/v0.5.1-profile-pilot.json"
+        result = json.loads(result_path.read_text(encoding="utf-8"))
+        del result["runs"]
+        result_path.write_text(json.dumps(result), encoding="utf-8")
+        digest = hashlib.sha256(result_path.read_bytes()).hexdigest()
+        for profile_id in ("csharp", "python", "typescript", "react"):
+            self.update_profile(
+                profile_id,
+                lambda profile: profile["evidence"]["results"][0].update(
+                    sha256=digest
+                ),
+            )
+
+        self.assertIn("evidence-result-schema-invalid", self.diagnostic_codes())
+
+    def test_evidence_schema_must_be_available_and_valid(self) -> None:
+        entries = [
+            (f"profiles/{profile['id']}.yaml", profile)
+            for profile in load_registry(ROOT)
+        ]
+        for schema_bytes in (None, b"{", b'{"type":123}'):
+            with self.subTest(schema=schema_bytes):
+                def read_source(relative_path: str) -> bytes:
+                    if relative_path == "evals/profile-pilot-result.schema.json":
+                        if schema_bytes is None:
+                            raise FileNotFoundError(relative_path)
+                        return schema_bytes
+                    return (ROOT / relative_path).read_bytes()
+
+                codes = [
+                    item.code for item in validate_loaded_profiles(entries, read_source)
+                ]
+                self.assertIn("evidence-result-schema-invalid", codes)
+
+    def test_public_evidence_rejects_non_object_result(self) -> None:
+        result_path = self.fixture_root / "evals/results/v0.5.1-profile-pilot.json"
+        result_path.write_text("[]\n", encoding="utf-8")
+        digest = hashlib.sha256(result_path.read_bytes()).hexdigest()
+        for profile_id in ("csharp", "python", "typescript", "react"):
+            self.update_profile(
+                profile_id,
+                lambda profile: profile["evidence"]["results"][0].update(
+                    sha256=digest
+                ),
+            )
+
+        self.assertIn("evidence-result-invalid", self.diagnostic_codes())
+
     def test_beta_and_stable_require_public_passed_stage_evidence(self) -> None:
         evidence_path = self.fixture_root / "evidence" / "result.json"
         evidence_path.parent.mkdir()
@@ -801,12 +861,14 @@ class ProfileContractTests(unittest.TestCase):
         reference.write_text("# Profile\n", encoding="utf-8")
 
         def write_result(stage: str, outcome: str) -> str:
+            result = json.loads(
+                (ROOT / "evals/results/v0.5.1-profile-pilot.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            result["profile_outcomes"][0].update(stage=stage, outcome=outcome)
             evidence_path.write_text(
-                (
-                    '{"status":"complete","profile_outcomes":['
-                    f'{{"profile_id":"csharp","stage":"{stage}",'
-                    f'"outcome":"{outcome}"}}]}}\n'
-                ),
+                json.dumps(result),
                 encoding="utf-8",
             )
             return hashlib.sha256(evidence_path.read_bytes()).hexdigest()
@@ -832,7 +894,12 @@ class ProfileContractTests(unittest.TestCase):
                     public=True,
                 )
 
-                self.assertEqual([], self.diagnostic_codes())
+                codes = self.diagnostic_codes()
+                self.assertNotIn("maturity-evidence-missing", codes)
+                if stage == "pilot":
+                    self.assertEqual([], codes)
+                else:
+                    self.assertEqual(["evidence-result-schema-invalid"], codes)
 
         for outcome in ("failed", "no_difference", "inconclusive"):
             with self.subTest(outcome=outcome):

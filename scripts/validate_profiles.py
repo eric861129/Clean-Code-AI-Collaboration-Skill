@@ -16,6 +16,7 @@ import yaml
 
 CATALOG_PATH = Path("profiles/catalog.yaml")
 SCHEMA_PATH = Path("profiles/profile.schema.json")
+EVIDENCE_SCHEMA_PATH = "evals/profile-pilot-result.schema.json"
 
 
 @dataclass(frozen=True, order=True)
@@ -733,6 +734,7 @@ def _cross_file_diagnostics(
                         index,
                         result,
                         result_bytes,
+                        read_repository_file,
                     )
                 )
 
@@ -813,6 +815,7 @@ def _evidence_result_diagnostics(
     index: int,
     metadata: Mapping[str, Any],
     result_bytes: bytes,
+    read_repository_file: Callable[[str], bytes],
 ) -> list[Diagnostic]:
     field = f"evidence.results.{index}"
     try:
@@ -835,6 +838,33 @@ def _evidence_result_diagnostics(
                 "public result must be a complete result object",
             )
         ]
+    diagnostics: list[Diagnostic] = []
+    try:
+        schema = json.loads(read_repository_file(EVIDENCE_SCHEMA_PATH).decode("utf-8"))
+        Draft202012Validator.check_schema(schema)
+        errors = sorted(
+            Draft202012Validator(schema).iter_errors(result),
+            key=lambda error: tuple(str(part) for part in error.absolute_path),
+        )
+        if errors:
+            diagnostics.append(
+                Diagnostic(
+                    profile_path,
+                    f"{field}.path",
+                    "evidence-result-schema-invalid",
+                    f"public result does not match {EVIDENCE_SCHEMA_PATH}: "
+                    f"{errors[0].message}",
+                )
+            )
+    except (OSError, ValueError, SchemaError) as error:
+        diagnostics.append(
+            Diagnostic(
+                profile_path,
+                f"{field}.path",
+                "evidence-result-schema-invalid",
+                f"public result schema is unavailable or invalid: {error}",
+            )
+        )
     outcomes = result.get("profile_outcomes")
     if not isinstance(outcomes, list):
         return [
@@ -850,7 +880,6 @@ def _evidence_result_diagnostics(
         for item in outcomes
         if isinstance(item, Mapping) and item.get("profile_id") == profile_id
     ]
-    diagnostics: list[Diagnostic] = []
     if len(matches) != 1:
         diagnostics.append(
             Diagnostic(
