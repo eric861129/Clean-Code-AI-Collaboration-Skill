@@ -323,7 +323,7 @@ Profile 貢獻入口只有 [Profile Authoring Guide](docs/profile-authoring.md)�
 
 ## 安裝
 
-目前開發分支內容為 `0.5.1` Candidate；最新正式安裝 Tag 仍為 `v0.5.0`。在正式建立 `v0.5.1` Tag 前，固定版本安裝與下列版本檢查都應以 `v0.5.0` 為準，不能把開發分支版本當成已發布版本。
+此版本的固定安裝 Tag 為 `v0.5.1`，Skill 版本為 `0.5.1`。M2 Pilot 已記錄 C#、Python、TypeScript 與 React 的實證；四個 Profile 的 Outcome 皆為 `inconclusive`，成熟度維持 `experimental`。詳見[公開 Pilot 結果](evals/results/v0.5.1-profile-pilot.json)。
 
 先取得 Repository：
 
@@ -339,11 +339,11 @@ git clone https://github.com/eric861129/Clean-Code-AI-Collaboration-Skill.git
 cd Clean-Code-AI-Collaboration-Skill
 ```
 
-如果要安裝目前最新正式版本 `v0.5.0`，請先切換到對應 Tag，避免日後 `main` 更新時安裝到不同版本：
+如果要安裝此正式版本 `v0.5.1`，請先切換到對應 Tag，避免日後 `main` 更新時安裝到不同版本：
 
 ```shell
 git fetch --tags
-git checkout v0.5.0
+git checkout v0.5.1
 ```
 
 接著確認 Skill Frontmatter 的版本：
@@ -351,13 +351,13 @@ git checkout v0.5.0
 Windows PowerShell：
 
 ```powershell
-Select-String -LiteralPath ".\clean-code-ai-collaboration\SKILL.md" -Pattern 'version: "0.5.0"'
+Select-String -LiteralPath ".\clean-code-ai-collaboration\SKILL.md" -Pattern 'version: "0.5.1"'
 ```
 
 macOS／Linux：
 
 ```bash
-grep 'version: "0.5.0"' ./clean-code-ai-collaboration/SKILL.md
+grep 'version: "0.5.1"' ./clean-code-ai-collaboration/SKILL.md
 ```
 
 真正需要安裝的只有 `clean-code-ai-collaboration` 資料夾；`evals`、`tests`、`docs` 與 `.github` 是評測、驗證與維護資料。

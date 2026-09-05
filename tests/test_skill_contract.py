@@ -589,7 +589,7 @@ class SkillContractTests(unittest.TestCase):
             with self.subTest(term=term):
                 self.assertIn(term, content)
 
-    def test_readme_distinguishes_candidate_from_latest_release(self) -> None:
+    def test_readme_installation_matches_released_source_version(self) -> None:
         skill = SKILL_PATH.read_text(encoding="utf-8")
         readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
         source_version = re.search(
@@ -597,10 +597,10 @@ class SkillContractTests(unittest.TestCase):
         ).group(1)
 
         self.assertEqual("0.5.1", source_version)
-        self.assertIn("開發分支內容為 `0.5.1` Candidate", readme)
-        self.assertIn("最新正式安裝 Tag 仍為 `v0.5.0`", readme)
-        self.assertIn("git checkout v0.5.0", readme)
-        self.assertIn('version: "0.5.0"', readme)
+        self.assertIn(f"固定安裝 Tag 為 `v{source_version}`", readme)
+        self.assertIn(f"git checkout v{source_version}", readme)
+        self.assertIn(f'version: "{source_version}"', readme)
+        self.assertNotIn("0.5.1` Candidate", readme)
 
     def test_v040_readme_documents_strategy_configuration(self) -> None:
         readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
