@@ -8,13 +8,15 @@ CANARY_ARMS = {
 }
 
 
-def validate_protocol_canary(documents: list[dict[str, object]]) -> dict[str, object]:
+def validate_protocol_canary(documents: list[dict[str, object]], *, expected_contract_sha256: str | None = None) -> dict[str, object]:
     expected = {f"{scenario}--{arm}--r01": (scenario, arm) for scenario, arms in CANARY_ARMS.items() for arm in arms}
     if len(documents) != 11 or {d.get("run_id") for d in documents} != set(expected):
         raise ValueError("protocol canary requires exactly the eleven fixed slots")
     failed = []
     for document in documents:
         run_id = str(document["run_id"])
+        if expected_contract_sha256 is not None and document.get("contract_sha256") != expected_contract_sha256:
+            raise ValueError("protocol canary run contract differs from its freeze")
         if (document.get("scenario_id"), document.get("arm_id")) != expected[run_id] or document.get("repetition") != 1:
             raise ValueError("protocol canary identity mismatch")
         if (document.get("terminal_state") not in {"passed", "automatic_failure"}

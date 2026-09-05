@@ -20,6 +20,14 @@ def documents():
 
 
 class ProtocolCanaryTests(unittest.TestCase):
+    def test_canary_runs_must_belong_to_the_expected_freeze(self):
+        data = documents()
+        for document in data:
+            document["contract_sha256"] = "b" * 64
+        with self.assertRaisesRegex(ValueError, "contract"):
+            validate_protocol_canary(data, expected_contract_sha256="a" * 64)
+        self.assertEqual("passed", validate_protocol_canary(data, expected_contract_sha256="b" * 64)["status"])
+
     def test_behavior_failure_does_not_change_protocol_success(self):
         self.assertEqual("passed", validate_protocol_canary(documents())["status"])
 

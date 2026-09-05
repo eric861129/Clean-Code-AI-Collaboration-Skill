@@ -140,8 +140,9 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("verify-canary requires the separate protocol canary manifest")
         _verify_freeze(manifest, paths)
         documents = [_read_run_document(slot, paths) for slot in build_run_slots(manifest)]
-        receipt = validate_protocol_canary(documents)
-        receipt["contract_sha256"] = _canonical_sha256(_freeze_document(manifest, paths))
+        contract_sha256 = _canonical_sha256(_freeze_document(manifest, paths))
+        receipt = validate_protocol_canary(documents, expected_contract_sha256=contract_sha256)
+        receipt["contract_sha256"] = contract_sha256
         _write_json(paths.runs_root / "protocol-canary-receipt.json", receipt)
         print(_console_json(receipt))
         if receipt["status"] != "passed":
@@ -2190,6 +2191,8 @@ def _require_protocol_canary_passed(paths: HarnessPaths) -> None:
     """正式 Freeze 僅接受兩個事先允許的獨立 Canary 批次之一。"""
     for name in ("v0.5.2-profile-protocol-canary", "v0.5.2-profile-protocol-canary-02"):
         canary_root = paths.repository_root / ".benchmark-runs" / name
+        if list((canary_root / "invalidations").glob("execution-input-drift--*.json")):
+            continue
         receipt_path = canary_root / "protocol-canary-receipt.json"
         if not receipt_path.is_file():
             continue
@@ -2197,9 +2200,11 @@ def _require_protocol_canary_passed(paths: HarnessPaths) -> None:
         if receipt.get("status") != "passed":
             continue
         freeze = _read_json(canary_root / "contract-freezes" / f"{receipt['contract_sha256']}.json")
+        if _canonical_sha256(freeze["contract"]) != receipt["contract_sha256"] or freeze.get("contract_sha256") != receipt["contract_sha256"]:
+            raise ValueError("canary receipt does not match its freeze contract")
         verify_execution_provenance(paths.repository_root, freeze["contract"]["execution_provenance"])
         documents = [_read_json(path) for path in sorted((canary_root / "run-documents").glob("*/*.json"))]
-        if validate_protocol_canary(documents)["status"] == "passed":
+        if validate_protocol_canary(documents, expected_contract_sha256=receipt["contract_sha256"])["status"] == "passed":
             return
     raise ValueError("formal pilot requires a passed separate protocol canary")
 

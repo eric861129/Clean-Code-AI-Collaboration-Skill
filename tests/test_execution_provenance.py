@@ -160,9 +160,11 @@ class ExecutionProvenanceTests(unittest.TestCase):
 
     def test_v5_workspace_pins_git_newline_policy_and_records_blob_verification(self) -> None:
         self.write("fixture/source.ts", b"export const value = 1;\n")
+        self.write("clean-code-ai-collaboration/SKILL.md", b"# Test Skill\n")
         self.git("add", "-A")
         self.git("commit", "-m", "fixture")
         commit = self.git("rev-parse", "HEAD").strip()
+        self.git("config", "core.autocrlf", "true")
         manifest = load_manifest(Path(__file__).resolve().parents[1] / "evals/manifests/v0.5.1-profile-pilot.json")
         manifest = replace(
             manifest, fixture_commit=commit, skill_commit=commit, skill_tag=commit,
@@ -170,7 +172,7 @@ class ExecutionProvenanceTests(unittest.TestCase):
             scenarios=({"id": "fixture", "fixture_path": "fixture", "language": "typescript"},),
         )
         paths = HarnessPaths(self.root, self.root / "ignored/runs", self.root, self.root)
-        slot = RunSlot("fixture--control--r01", "fixture", "typescript", "control", 1, 0)
+        slot = RunSlot("fixture--core-only--r01", "fixture", "typescript", "core-only", 1, 0)
 
         def process(args, cwd, timeout):
             if args[0] == "npm":
@@ -186,7 +188,14 @@ class ExecutionProvenanceTests(unittest.TestCase):
         self.assertEqual("false", newline_policy.stdout.strip())
         self.assertTrue((workspace.artifact_dir / "staging-provenance.json").is_file())
         self.assertNotIn(b"\r", (workspace.root / ".gitignore").read_bytes())
-        drift_slot = replace(slot, run_id="fixture--control--drift")
+        self.assertEqual(b"# Test Skill\n", (workspace.root / ".agents/skills/clean-code-ai-collaboration/SKILL.md").read_bytes())
+        self.assertEqual("true", self.git("config", "--local", "--get", "core.autocrlf").strip())
+        legacy_manifest = replace(manifest, subject_executor={"protocol_version": "desktop-subject-v4"})
+        with patch("evals.harness.fixture_builder.run_process", side_effect=process):
+            legacy = build_workspace(replace(slot, run_id="fixture--core-only--legacy"), legacy_manifest, paths)
+        self.assertEqual(b"export const value = 1;\r\n", (legacy.root / "source.ts").read_bytes())
+        self.assertEqual(b"# Test Skill\r\n", (legacy.root / ".agents/skills/clean-code-ai-collaboration/SKILL.md").read_bytes())
+        drift_slot = replace(slot, run_id="fixture--core-only--drift")
 
         def dependency_with_drift(args, cwd, timeout):
             if args[0] == "npm":

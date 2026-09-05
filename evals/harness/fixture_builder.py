@@ -54,6 +54,7 @@ def build_workspace(
         destination=workspace_root,
         cache_root=paths.runs_root / "cache" / "archives",
         timeout_seconds=manifest.fixture_timeout_seconds,
+        canonical_lf=canonical_staging,
     )
     if canonical_staging:
         staging_provenance["fixture"] = verify_staged_tree(
@@ -71,6 +72,7 @@ def build_workspace(
             destination=skill_root,
             cache_root=paths.runs_root / "cache" / "archives",
             timeout_seconds=manifest.fixture_timeout_seconds,
+            canonical_lf=canonical_staging,
         )
         if canonical_staging:
             staging_provenance["skill"] = verify_staged_tree(
@@ -193,12 +195,16 @@ def _export_tree(
     destination: Path,
     cache_root: Path,
     timeout_seconds: int,
+    *,
+    canonical_lf: bool = False,
 ) -> None:
     cache_root.mkdir(parents=True, exist_ok=True)
     archive = cache_root / f"{uuid4().hex}.tar"
     try:
+        # 子樹匯出不繼承根目錄屬性；v5 明確停用 Host 的 CRLF 轉換。
+        git = ["git", "-c", "core.autocrlf=false"] if canonical_lf else ["git"]
         _run_checked(
-            ["git", "archive", "--format=tar", f"--output={archive}", treeish],
+            [*git, "archive", "--format=tar", f"--output={archive}", treeish],
             repository,
             timeout_seconds,
         )
