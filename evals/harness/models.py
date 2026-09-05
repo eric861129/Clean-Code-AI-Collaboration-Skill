@@ -12,6 +12,9 @@ class ArmDefinition(Mapping[str, object]):
     skill: str | None = None
     version: str | None = None
     required_skill_inspection_paths: tuple[str, ...] = ()
+    inspection_policy: str | None = None
+    allowed_skill_inspection_paths: tuple[str, ...] = ()
+    applied_profiles: tuple[str, ...] = ()
 
     def __getitem__(self, key: str) -> object:
         values: dict[str, object] = {
@@ -22,10 +25,16 @@ class ArmDefinition(Mapping[str, object]):
             values["skill"] = self.skill
         if self.version is not None:
             values["version"] = self.version
-        if self.required_skill_inspection_paths:
+        if self.required_skill_inspection_paths or self.inspection_policy is not None:
             values["required_skill_inspection_paths"] = list(
                 self.required_skill_inspection_paths
             )
+        if self.inspection_policy is not None:
+            values["inspection_policy"] = self.inspection_policy
+            values["allowed_skill_inspection_paths"] = list(
+                self.allowed_skill_inspection_paths
+            )
+            values["applied_profiles"] = list(self.applied_profiles)
         return values[key]
 
     def __iter__(self) -> Iterator[str]:
@@ -40,8 +49,10 @@ class ArmDefinition(Mapping[str, object]):
             keys.append("skill")
         if self.version is not None:
             keys.append("version")
-        if self.required_skill_inspection_paths:
+        if self.required_skill_inspection_paths or self.inspection_policy is not None:
             keys.append("required_skill_inspection_paths")
+        if self.inspection_policy is not None:
+            keys.extend(("inspection_policy", "allowed_skill_inspection_paths", "applied_profiles"))
         return tuple(keys)
 
 
@@ -119,6 +130,11 @@ class SubjectDispatch:
     scenario_contract_sha256: str
     required_skill_inspection_paths: tuple[str, ...]
     dispatch_sha256: str
+    schema_version: str = "desktop-subject-dispatch/v4"
+    inspection_policy: str | None = None
+    allowed_skill_inspection_paths: tuple[str, ...] = ()
+    applied_profiles: tuple[str, ...] = ()
+    skill_root: str | None = None
 
 
 @dataclass(frozen=True)
