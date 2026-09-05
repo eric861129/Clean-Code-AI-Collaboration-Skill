@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from pathlib import PurePosixPath, PureWindowsPath
+import json
+from pathlib import Path, PurePosixPath, PureWindowsPath
 import re
 
 from jsonschema import Draft202012Validator
@@ -22,6 +23,10 @@ TERMINAL_STATES = {
     "infrastructure_failure",
 }
 WINDOWS_ABSOLUTE_PATH = re.compile(r"^[A-Za-z]:[\\/]")
+PROFILE_RESULT_SCHEMA_PATHS = {
+    "profile-pilot-result/v1": "evals/profile-pilot-result.schema.json",
+    "profile-pilot-result/v2": "evals/profile-pilot-result-v2.schema.json",
+}
 
 
 def can_retry(reason: str, attempt: int) -> bool:
@@ -47,6 +52,14 @@ def build_public_result(
     is_profile_result = any(value is not None for value in profile_fields)
     if is_profile_result and any(value is None for value in profile_fields):
         raise ValueError("profile result metadata must be complete")
+    is_v2 = False
+    if is_profile_result:
+        executor = execution.get("subject_executor") if isinstance(execution, dict) else None
+        if not isinstance(executor, dict) or executor.get("protocol_version") not in (
+            "desktop-subject-v4", "desktop-subject-v5"
+        ):
+            raise ValueError("profile result execution protocol is unsupported")
+        is_v2 = executor["protocol_version"] == "desktop-subject-v5"
     expected_count = len(slots)
     if not slots or len(run_documents) != expected_count:
         raise ValueError(f"result requires {expected_count} terminal states")
@@ -106,6 +119,13 @@ def build_public_result(
                 "review": document.get("review", "not_available"),
             }
         )
+        if is_v2:
+            if not {"inspection_diagnostics", "oracle_skipped_reason"} <= document.keys():
+                raise ValueError("v2 run is missing inspection evidence fields")
+            public_runs[-1].update(
+                inspection_diagnostics=document["inspection_diagnostics"],
+                oracle_skipped_reason=document["oracle_skipped_reason"],
+            )
     result: dict[str, object] = {
         "schema_version": "1.0",
         "benchmark_version": benchmark_version,
@@ -128,14 +148,31 @@ def build_public_result(
             raise ValueError("profile result requires four unique outcomes")
         result.update(
             {
-                "schema_version": "profile-pilot-result/v1",
+                "schema_version": "profile-pilot-result/v2" if is_v2 else "profile-pilot-result/v1",
                 "source_revisions": source_revisions,
                 "execution": execution,
                 "review_metadata": review_metadata,
                 "profile_outcomes": profile_outcomes,
             }
         )
+    if is_v2:
+        schema_path = Path(__file__).resolve().parents[2] / PROFILE_RESULT_SCHEMA_PATHS["profile-pilot-result/v2"]
+        _validate_result_schema(result, json.loads(schema_path.read_text("utf-8")))
     return result
+
+
+def _validate_result_schema(result: dict[str, object], schema: dict[str, object]) -> None:
+    schema_version = result.get("schema_version")
+    if not isinstance(schema_version, str) or schema_version not in PROFILE_RESULT_SCHEMA_PATHS:
+        raise ValueError("profile result schema version is unsupported")
+    if schema.get("properties", {}).get("schema_version", {}).get("const") != schema_version:
+        raise ValueError("profile result schema does not match the selected version")
+    errors = sorted(
+        Draft202012Validator(schema).iter_errors(result),
+        key=lambda error: tuple(str(part) for part in error.absolute_path),
+    )
+    if errors:
+        raise ValueError(f"profile result schema validation failed: {errors[0].message}")
 
 
 def validate_profile_pilot_result(
@@ -146,12 +183,14 @@ def validate_profile_pilot_result(
     expected_source_revisions: dict[str, object],
     expected_scenario_contracts: dict[str, str],
 ) -> None:
-    errors = sorted(
-        Draft202012Validator(schema).iter_errors(result),
-        key=lambda error: tuple(str(part) for part in error.absolute_path),
+    _validate_result_schema(result, schema)
+    expected_schema = (
+        "profile-pilot-result/v2"
+        if manifest.subject_executor.get("protocol_version") == "desktop-subject-v5"
+        else "profile-pilot-result/v1"
     )
-    if errors:
-        raise ValueError(f"profile result schema validation failed: {errors[0].message}")
+    if result.get("schema_version") != expected_schema:
+        raise ValueError("profile result schema does not match the manifest protocol")
     if result.get("benchmark_version") != manifest.benchmark_version:
         raise ValueError("profile result benchmark version mismatch")
 
