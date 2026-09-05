@@ -3,7 +3,7 @@ id: python
 kind: language
 display_name: Python
 status: experimental
-suite_version: "0.5.1"
+suite_version: "0.5.2"
 reference: references/python.md
 detection:
   owning_manifests:

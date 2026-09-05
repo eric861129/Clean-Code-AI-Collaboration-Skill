@@ -5,7 +5,7 @@ license: MIT
 compatibility: Agent Skills-compatible coding agents.
 metadata:
   author: eric861129
-  version: "0.5.1"
+  version: "0.5.2"
 ---
 
 # Clean Code AI Collaboration

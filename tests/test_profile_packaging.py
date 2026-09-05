@@ -67,8 +67,11 @@ class ProfilePackagingTests(unittest.TestCase):
         )
         for relative_path in (
             Path("evals/profile-pilot-result.schema.json"),
+            Path("evals/profile-pilot-result-v2.schema.json"),
             Path("evals/manifests/v0.5.1-profile-pilot.json"),
             Path("evals/results/v0.5.1-profile-pilot.json"),
+            Path("evals/manifests/v0.5.2-profile-pilot.json"),
+            Path("evals/results/v0.5.2-profile-pilot.json"),
         ):
             target = source / relative_path
             target.parent.mkdir(parents=True, exist_ok=True)

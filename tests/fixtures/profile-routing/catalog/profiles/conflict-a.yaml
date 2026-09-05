@@ -3,7 +3,7 @@ id: conflict-a
 kind: language
 display_name: Conflict A
 status: experimental
-suite_version: "0.5.1"
+suite_version: "0.5.2"
 reference: references/conflict-a.md
 detection:
   owning_manifests: []

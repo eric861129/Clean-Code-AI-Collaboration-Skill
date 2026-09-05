@@ -64,10 +64,10 @@ def _historical_namespace(
     return namespace
 
 
-def _fixture_archive_files() -> dict[str, bytes]:
+def _fixture_archive_files(commit: str = FIXTURE_COMMIT) -> dict[str, bytes]:
     url = (
         f"https://codeload.github.com/eric861129/{FIXTURE_REPOSITORY}"
-        f"/zip/{FIXTURE_COMMIT}"
+        f"/zip/{commit}"
     )
     request = urllib.request.Request(url, headers={"User-Agent": "profile-pilot-replay"})
     maximum_bytes = 10 * 1024 * 1024
@@ -75,7 +75,7 @@ def _fixture_archive_files() -> dict[str, bytes]:
         payload = response.read(maximum_bytes + 1)
     if len(payload) > maximum_bytes:
         raise ValueError("pinned fixture archive exceeds replay size limit")
-    prefix = f"{FIXTURE_REPOSITORY}-{FIXTURE_COMMIT}/"
+    prefix = f"{FIXTURE_REPOSITORY}-{commit}/"
     files: dict[str, bytes] = {}
     with zipfile.ZipFile(io.BytesIO(payload)) as archive:
         for entry in archive.infolist():

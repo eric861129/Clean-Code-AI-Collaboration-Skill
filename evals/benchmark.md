@@ -75,7 +75,45 @@ M2 使用 [`v0.5.1-profile-pilot.json`](manifests/v0.5.1-profile-pilot.json) 固
 
 Language Profile 只比較 `core-only` 與對應的 Core + Language Treatment。React Profile 採階梯式歸因，只比較 `core-plus-typescript` 與 `core-plus-typescript-plus-react`；`control` 與 `generic-clean-code` 不參與成熟度 Outcome。匿名 Reviewer 依 [`profile-increment.md`](rubrics/profile-increment.md) 對單一 Candidate 的固定 Criteria 評分，不得看到 Arm Mapping 或比較其他 Candidate。
 
-四個 Profile Outcome 只能由完整 Terminal State、匿名 Review 與固定直接比較組重算為 `passed`、`failed`、`no_difference` 或 `inconclusive`。Pilot 尚未產生公開 Result 前，這一節只描述事前契約，不代表 Profile 已通過，也不改變 `v0.5.0` 的正式發布狀態。
+四個 Profile Outcome 只能由完整 Terminal State、匿名 Review 與固定直接比較組重算為 `passed`、`failed`、`no_difference` 或 `inconclusive`。[v0.5.1 公開 Result](results/v0.5.1-profile-pilot.json) 已保存 34 組結果：17 組 passed、17 組查閱證據失敗；四個 Profile 均為 inconclusive。舊協定將 required 當成完整允許集合，14 組合法額外 Core 查閱遭拒，另 3 組有跨 Profile 訊號；17 組均未執行 Controller Oracle。這些歷史結果與 Bytes 保持不變，不追溯改判。
+
+## v0.5.2 Profile Evidence Remediation Pilot
+
+[核准計畫](../docs/superpowers/plans/2026-09-05-v0.5.2-profile-evidence-remediation.md) 定義本輪協定；[正式 Manifest](manifests/v0.5.2-profile-pilot.json) 固定八個 Scenario、34 個全新單次 Slot、Seed `560502`、Subject `gpt-5.6-sol/high` 與匿名 Reviewer `gpt-5.6-terra/max`。本輪沿用相同的直接比較與成熟度門檻，不使用 Canary 或歷史候選填補結果。
+
+### Frozen Sources and Inspection Policy
+
+- 受測 Skill：已發布 v0.5.1／`4ce3a697eb7eea36ecddd937ffa915f931e9524a`，不使用 Candidate Working Tree。
+- 執行來源：`bbdfb0618dc65b0a56ead0e79d0929c1acc305f8`；Freeze 保存 28 個執行輸入 Hash，涵蓋 Harness、共用模組、Schema、Rubric、Manifest 與換行契約。
+- Fixture：公開 `profile-pilot-v2`／`133e2f739e5d943e853f4c9106d8965ecfac3018`。只固定換行，八個任務、Oracle、Criteria 與依賴版本未改；v1 Tag 保持不變。
+- `desktop-subject-v5` 採 `required-subset/v1`：必讀集合包含於允許集合，合法額外 Core 查閱仍要核對 SHA；禁止的 Profile、錯誤 Hash、路徑與 Applied Profiles 不符均保留診斷。Core Only 明確不套用 Profile。
+- 公開結果使用 `profile-pilot-result/v2`；匿名 Packet 隱藏 Arm、查閱 Profile 與私有路徑。Evidence Gate 失敗不補跑 Oracle，也不回填或修正 Subject Claim。
+
+### Protocol Canary and Observed Failures
+
+首批 11 組 Canary 全部通過協定 Gate；10 組行為通過，1 組 TypeScript 驗收失敗。沒有第二批 Canary，也未使用 Canary 分數決定成熟度。控制器一筆 Canary 經過秒數誤填 288 秒，時鐘紀錄核對為 316 秒；兩者皆低於 480 秒上限，私有 Ledger 保留更正說明，原 Receipt 未覆寫。
+
+正式 Pilot 的 34 組 Subject 均以單一 Attempt 終止，沒有 Timeout、基礎設施重試或選擇性重跑。31 組 passed，3 組 automatic_failure：
+
+- `fastapi-overdue-rule--core-only--r01` 的查閱 Hash 少一個字元，觸發 `skill_hash_mismatch`；Oracle 為 `not_run_due_to_evidence_gate`，不可視為行為已驗證。
+- `typescript-runtime-validation--core-plus-typescript--r01` 與 `--control--r01` 查閱證據有效，但缺少固定 Acceptance 所要求的 exhaustive `switch (result.kind)`；其餘 Native／Preservation Gates 通過。本輪不事後修改該 Criterion。
+
+### Claim Boundary
+
+34 份匿名 Review 齊備後，由 Controller 產生 [v0.5.2 公開 Result](results/v0.5.2-profile-pilot.json)。SHA-256：`df733b4e0f65d76a0f6027f07f277e1b491bc975cb3a8ea8da2b1289b28122fd`。
+
+Windows Builder 原始輸出的 SHA 為 `3dfee72bdbfe529e7cf5cd119201583a8ca355b0f5471671edfd7c12dc1077c9`，原始 Bytes 留在私有證據。公開前僅將 CRLF 轉為 LF 並補一個終端換行，解析後 JSON 完全相同；沒有改動分數、診斷或 Outcome。這項 publication transform 由同一 Evidence Commit 的公開重播測試固定為 UTF-8、兩格縮排、LF 與終端換行，執行 Harness 仍固定於原 Commit。
+
+| Profile | Outcome | 成熟度 | 可支持的結論 |
+| --- | --- | --- | --- |
+| C# | no_difference | Experimental | 固定 Criteria 未觀察到增益，兩個直接比較皆有完整證據 |
+| Python | inconclusive | Experimental | overdue 情境的 Core Only Hash Claim 不完整，直接比較仍有 Evidence Gap |
+| TypeScript | failed | Experimental | Runtime Validation Treatment 驗收未通過，exhaustive handling Criterion 較比較組退步 |
+| React | passed | Beta | State Retention 的舊請求覆寫防護由 1 分增至 2 分，其餘 Criteria 無退步、Treatment Gates 全通過 |
+
+每個 Scenario 只有一次執行；結果只支持固定模型要求、Fixture、Skill 與 Prompt 下的觀察。跨版本 Prompt、協定、Fixture Bytes 與 Skill Source 都不同，不能將 v0.5.1 與 v0.5.2 通過率差異當成 Profile 的因果增益。服務端實際模型、Client 版本、Thread UUID、Token 與網路隔離 Telemetry 未取得；所列模型是要求值，非服務端認證。React Beta 不等於 Full Run／Stable，Python 也尚未達成可判定比較的目標；工程驗收與實驗 Outcome 分開記錄。
+
+公開 Checkout 可執行 `python -m unittest tests.test_profile_pilot_v052_replay -v`，從完整 Git 歷史與固定公開 Fixture 下載內容重建來源、Prompt、Scenario Contract、Result 與 Outcome；不讀取私有 Review Mapping，也不重新執行 Subject。
 
 ## Initial v0.2.0 Results
 
@@ -119,8 +157,8 @@ Language Profile 只比較 `core-only` 與對應的 Core + Language Treatment。
 | --- | --- | --- |
 | public .NET Demo | 已驗證 | 固定 Repository、模型、Client 與明確載入條件；見 [v0.2.0 initial result](results/v0.2.0-initial.json) |
 | large .NET Legacy | 規劃中 | 需要可公開或經授權的固定 Fixture、Characterization Oracle 與小型／Migration 情境 |
-| TypeScript / React | 規劃中 | 需要固定 Lint、Type Check、Unit／Component／E2E Gate 與可重現 Diff Boundary |
-| Python | 規劃中 | 需要固定 Formatter、Linter、Type Check、Test 與 Package Boundary 情境 |
+| TypeScript / React | 已記錄 M2 Pilot | 見 [v0.5.2 結果](results/v0.5.2-profile-pilot.json)；固定 Native Gates 的小型情境，不代表 Full Run 或普遍效果 |
+| Python | 已記錄 M2 Pilot | 見 [v0.5.2 結果](results/v0.5.2-profile-pilot.json)；直接比較仍有 Evidence Gap，不代表效果已證實 |
 | Java / Spring | 尚未支持 | 前三種技術棧完成後，再依可維護 Fixture 與外部貢獻決定優先順序 |
 | with / without AGENTS.md | 規劃中 | 對照 Repository Instruction 是否改變 Context 定位、停止判斷與誤觸率 |
 | strong / weak test suite | 規劃中 | 對照可靠 Oracle、缺少測試與錯誤測試資料下的行為與 Blind Spot |

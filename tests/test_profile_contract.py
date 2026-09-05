@@ -62,8 +62,11 @@ class ProfileContractTests(unittest.TestCase):
         shutil.copytree(ROOT / "profiles", self.fixture_root / "profiles")
         for relative_path in (
             Path("evals/profile-pilot-result.schema.json"),
+            Path("evals/profile-pilot-result-v2.schema.json"),
             Path("evals/manifests/v0.5.1-profile-pilot.json"),
             Path("evals/results/v0.5.1-profile-pilot.json"),
+            Path("evals/manifests/v0.5.2-profile-pilot.json"),
+            Path("evals/results/v0.5.2-profile-pilot.json"),
         ):
             target = self.fixture_root / relative_path
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -125,10 +128,21 @@ class ProfileContractTests(unittest.TestCase):
 
         self.assertEqual(PROFILE_IDS, [profile["id"] for profile in profiles])
 
-    def test_registry_records_the_v051_profile_pilot_without_promotion(self) -> None:
+    def test_registry_preserves_v051_and_appends_v052_pilot_evidence(self) -> None:
         self.assertEqual([], list(validate_repository(ROOT)))
         result_path = ROOT / "evals" / "results" / "v0.5.1-profile-pilot.json"
         result_digest = hashlib.sha256(result_path.read_bytes()).hexdigest()
+        self.assertEqual(
+            "12637bf780a156fb3589c810d0c6deeae8ce3abba9d2a54b8a5a06f5aeecadc9",
+            result_digest,
+        )
+        new_result_path = ROOT / "evals/results/v0.5.2-profile-pilot.json"
+        new_result = json.loads(new_result_path.read_text(encoding="utf-8"))
+        new_digest = hashlib.sha256(new_result_path.read_bytes()).hexdigest()
+        outcomes = {
+            item["profile_id"]: item["outcome"]
+            for item in new_result["profile_outcomes"]
+        }
         expected_references = {
             "csharp": "language-csharp.md",
             "python": "language-python.md",
@@ -137,9 +151,9 @@ class ProfileContractTests(unittest.TestCase):
         }
         for profile in load_registry(ROOT):
             with self.subTest(profile=profile["id"]):
-                self.assertEqual("0.5.1", profile["suite_version"])
+                self.assertEqual("0.5.2", profile["suite_version"])
                 expected_status = (
-                    "experimental"
+                    ("beta" if outcomes[profile["id"]] == "passed" else "experimental")
                     if profile["id"] in expected_references
                     else "planned"
                 )
@@ -166,7 +180,10 @@ class ProfileContractTests(unittest.TestCase):
                 )
                 if profile["id"] in expected_references:
                     self.assertEqual(
-                        ["evals/manifests/v0.5.1-profile-pilot.json"],
+                        [
+                            "evals/manifests/v0.5.1-profile-pilot.json",
+                            "evals/manifests/v0.5.2-profile-pilot.json",
+                        ],
                         profile["evidence"]["manifests"],
                     )
                     self.assertEqual(
@@ -177,7 +194,14 @@ class ProfileContractTests(unittest.TestCase):
                                 "path": "evals/results/v0.5.1-profile-pilot.json",
                                 "sha256": result_digest,
                                 "public": True,
-                            }
+                            },
+                            {
+                                "stage": "pilot",
+                                "outcome": outcomes[profile["id"]],
+                                "path": "evals/results/v0.5.2-profile-pilot.json",
+                                "sha256": new_digest,
+                                "public": True,
+                            },
                         ],
                         profile["evidence"]["results"],
                     )

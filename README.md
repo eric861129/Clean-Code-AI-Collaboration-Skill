@@ -291,7 +291,9 @@ Skill 依下列順序解析：
 
 預設呼叫方式仍是 `$clean-code-ai-collaboration`。Repository Code Change 會以本次 Changed Module 為單位，依可驗證的檔案、最近 Owning Manifest 與 Dependency Marker，組合適用且可用的 Language／Framework Profile；找不到適用 Profile 時，Core Only 也是有效結果。Explicit Profile（明確指定 Profile）仍不能繞過 Availability、Applicability、相依、衝突、Repository Gate、風險或授權邊界。
 
-目前 C#、Python、TypeScript 與 React 是 Experimental，已完成單次 M2 Pilot 並保存 `pilot_recorded` 公開證據；四者 Outcome 都是 `inconclusive`，因此不能解讀為效果已獲證明，也不升為 Beta。Go、Rust、Java 與 Vue 仍是 Planned 不可用，不能 Routing 或 Packaging。
+目前開發版本的 [v0.5.2 M2 Pilot](evals/results/v0.5.2-profile-pilot.json) 已保存全新 34 組執行與匿名 Review：C# 為 `no_difference`、Python 為 `inconclusive`、TypeScript 為 `failed`，三者維持 Experimental；React 為 `passed`，升為 Beta。React 的改善只出現在本輪固定比較中的舊請求狀態覆寫防護，不能推論所有 React 任務都優於比較組。Go、Rust、Java 與 Vue 仍是 Planned 不可用，不能 Routing 或 Packaging。
+
+本輪受測 Skill 固定為已發布 v0.5.1；Candidate 僅更新協定與證據，未修改四份 Profile Reference 語意。Beta 是單次 Pilot 的證據成熟度，尚非 Stable／Full Run；[v0.5.1 歷史結果](evals/results/v0.5.1-profile-pilot.json) 原樣保留。協定、失敗原因與限制見 [Benchmark](evals/benchmark.md#v052-profile-evidence-remediation-pilot)。
 
 目前 Profile 狀態由下列 Generated Matrix 呈現；Generated Region 只能由 Repository Script 更新。
 
@@ -301,7 +303,7 @@ Skill 依下列順序解析：
 | C# / .NET | language | experimental | [Open](clean-code-ai-collaboration/references/language-csharp.md) | pilot_recorded |
 | Python | language | experimental | [Open](clean-code-ai-collaboration/references/language-python.md) | pilot_recorded |
 | TypeScript | language | experimental | [Open](clean-code-ai-collaboration/references/language-typescript.md) | pilot_recorded |
-| React | framework | experimental | [Open](clean-code-ai-collaboration/references/framework-react.md) | pilot_recorded |
+| React | framework | beta | [Open](clean-code-ai-collaboration/references/framework-react.md) | pilot_recorded |
 | Go | language | planned | Not available | not_started |
 | Rust | language | planned | Not available | not_started |
 | Java | language | planned | Not available | not_started |
@@ -323,7 +325,7 @@ Profile 貢獻入口只有 [Profile Authoring Guide](docs/profile-authoring.md)�
 
 ## 安裝
 
-此版本的固定安裝 Tag 為 `v0.5.1`，Skill 版本為 `0.5.1`。M2 Pilot 已記錄 C#、Python、TypeScript 與 React 的實證；四個 Profile 的 Outcome 皆為 `inconclusive`，成熟度維持 `experimental`。詳見[公開 Pilot 結果](evals/results/v0.5.1-profile-pilot.json)。
+目前開發來源為 `v0.5.2` Candidate，尚未 Merge、建立版本 Tag 或 GitHub Release。正式版固定安裝 Tag 為 `v0.5.1`，安裝後 Skill 版本仍為 `0.5.1`；以下安裝命令不會安裝 Candidate。正式版歷史證據見 [v0.5.1 Pilot 結果](evals/results/v0.5.1-profile-pilot.json)，四個 Profile 當時均為 `inconclusive`／`experimental`。
 
 先取得 Repository：
 

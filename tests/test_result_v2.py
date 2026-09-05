@@ -59,17 +59,19 @@ class PublicResultV2Tests(unittest.TestCase):
                 "LICENSE", ".gitattributes", "scripts/package-manifest.schema.json",
                 "evals/profile-pilot-result.schema.json", "evals/profile-pilot-result-v2.schema.json",
                 "evals/results/v0.5.1-profile-pilot.json", "evals/manifests/v0.5.1-profile-pilot.json",
+                "evals/results/v0.5.2-profile-pilot.json", "evals/manifests/v0.5.2-profile-pilot.json",
             ):
                 target = source / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(ROOT / relative, target)
             result_bytes = json.dumps(result).encode("utf-8")
-            (source / "evals/results/v0.5.2-profile-pilot.json").write_bytes(result_bytes)
+            (source / "evals/results/synthetic-v2-profile-pilot.json").write_bytes(result_bytes)
             profile_path = source / "profiles/csharp.yaml"
             profile = yaml.safe_load(profile_path.read_text("utf-8"))
+            profile["status"] = "experimental"
             profile["evidence"]["results"].append({
                 "stage": "pilot", "outcome": "inconclusive", "public": True,
-                "path": "evals/results/v0.5.2-profile-pilot.json",
+                "path": "evals/results/synthetic-v2-profile-pilot.json",
                 "sha256": hashlib.sha256(result_bytes).hexdigest(),
             })
             profile_path.write_text(yaml.safe_dump(profile, allow_unicode=True), "utf-8")
@@ -85,7 +87,7 @@ class PublicResultV2Tests(unittest.TestCase):
         manifest, source = public_v2_inputs()
         result = build_v2(manifest, source)
         profiles = load_registry(ROOT)
-        result_path = "evals/results/v0.5.2-profile-pilot.json"
+        result_path = "evals/results/synthetic-v2-profile-pilot.json"
         def diagnostics(candidate, schema_override=None):
             content = json.dumps(candidate).encode("utf-8")
             profiles[0]["evidence"]["results"] = [{
