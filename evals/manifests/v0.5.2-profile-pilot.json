@@ -1,0 +1,878 @@
+{
+  "schema_version": "1.0",
+  "benchmark_version": "0.5.2-profile-pilot",
+  "freeze_policy": "pre_execution",
+  "fixture_repository": {
+    "url": "https://github.com/eric861129/Clean-Code-AI-Collaboration-Benchmark-Fixtures.git",
+    "tag": "profile-pilot-v2",
+    "commit": "133e2f739e5d943e853f4c9106d8965ecfac3018"
+  },
+  "skill": {
+    "name": "clean-code-ai-collaboration",
+    "version": "0.5.1",
+    "tag": "v0.5.1",
+    "commit": "4ce3a697eb7eea36ecddd937ffa915f931e9524a"
+  },
+  "execution": {
+    "model": "gpt-5.6-sol",
+    "reasoning_effort": "high",
+    "client": "codex-desktop-collaboration",
+    "subject_executor": {
+      "kind": "codex-desktop-collaboration",
+      "protocol_version": "desktop-subject-v5",
+      "dispatch_mode": "external-collaboration-subagent",
+      "report_relative_path": ".benchmark-subject-report.json",
+      "network_enforcement": "not_available",
+      "telemetry": "not_available"
+    },
+    "subject_timeout_seconds": 480,
+    "fixture_timeout_seconds": 120,
+    "oracle_timeout_seconds": 120,
+    "repetitions": 1,
+    "random_seed": 560502,
+    "sandbox": "not_available",
+    "subject_network": "not_available",
+    "infrastructure_retry_limit": 1
+  },
+  "arms": [
+    {
+      "id": "control",
+      "instruction": "",
+      "required_skill_inspection_paths": [],
+      "inspection_policy": "required-subset/v1",
+      "applied_profiles": [],
+      "allowed_skill_inspection_paths": []
+    },
+    {
+      "id": "generic-clean-code",
+      "instruction": "請遵守 Clean Code 完成任務。",
+      "required_skill_inspection_paths": [],
+      "inspection_policy": "required-subset/v1",
+      "applied_profiles": [],
+      "allowed_skill_inspection_paths": []
+    },
+    {
+      "id": "core-only",
+      "skill": "clean-code-ai-collaboration",
+      "version": "v0.5.1",
+      "instruction": "請使用 $clean-code-ai-collaboration Core 完成任務。",
+      "required_skill_inspection_paths": [
+        ".agents/skills/clean-code-ai-collaboration/SKILL.md",
+        ".agents/skills/clean-code-ai-collaboration/references/profile-selection.md"
+      ],
+      "inspection_policy": "required-subset/v1",
+      "applied_profiles": [],
+      "allowed_skill_inspection_paths": [
+        ".agents/skills/clean-code-ai-collaboration/SKILL.md",
+        ".agents/skills/clean-code-ai-collaboration/references/clean-code-for-agent-legibility.md",
+        ".agents/skills/clean-code-ai-collaboration/references/code-readability.md",
+        ".agents/skills/clean-code-ai-collaboration/references/collaboration-and-estimation.md",
+        ".agents/skills/clean-code-ai-collaboration/references/design-and-dependency-boundaries.md",
+        ".agents/skills/clean-code-ai-collaboration/references/profile-selection.md",
+        ".agents/skills/clean-code-ai-collaboration/references/repository-context-template.md",
+        ".agents/skills/clean-code-ai-collaboration/references/review-output-contract.md",
+        ".agents/skills/clean-code-ai-collaboration/references/testing-and-change-safety.md"
+      ]
+    },
+    {
+      "id": "core-plus-csharp",
+      "skill": "clean-code-ai-collaboration",
+      "version": "v0.5.1",
+      "instruction": "請使用 $clean-code-ai-collaboration Core 與 C# Profile 完成任務。",
+      "required_skill_inspection_paths": [
+        ".agents/skills/clean-code-ai-collaboration/SKILL.md",
+        ".agents/skills/clean-code-ai-collaboration/references/language-csharp.md",
+        ".agents/skills/clean-code-ai-collaboration/references/profile-selection.md"
+      ],
+      "inspection_policy": "required-subset/v1",
+      "applied_profiles": [
+        "csharp"
+      ],
+      "allowed_skill_inspection_paths": [
+        ".agents/skills/clean-code-ai-collaboration/SKILL.md",
+        ".agents/skills/clean-code-ai-collaboration/references/clean-code-for-agent-legibility.md",
+        ".agents/skills/clean-code-ai-collaboration/references/code-readability.md",
+        ".agents/skills/clean-code-ai-collaboration/references/collaboration-and-estimation.md",
+        ".agents/skills/clean-code-ai-collaboration/references/design-and-dependency-boundaries.md",
+        ".agents/skills/clean-code-ai-collaboration/references/language-csharp.md",
+        ".agents/skills/clean-code-ai-collaboration/references/profile-selection.md",
+        ".agents/skills/clean-code-ai-collaboration/references/repository-context-template.md",
+        ".agents/skills/clean-code-ai-collaboration/references/review-output-contract.md",
+        ".agents/skills/clean-code-ai-collaboration/references/testing-and-change-safety.md"
+      ]
+    },
+    {
+      "id": "core-plus-python",
+      "skill": "clean-code-ai-collaboration",
+      "version": "v0.5.1",
+      "instruction": "請使用 $clean-code-ai-collaboration Core 與 Python Profile 完成任務。",
+      "required_skill_inspection_paths": [
+        ".agents/skills/clean-code-ai-collaboration/SKILL.md",
+        ".agents/skills/clean-code-ai-collaboration/references/language-python.md",
+        ".agents/skills/clean-code-ai-collaboration/references/profile-selection.md"
+      ],
+      "inspection_policy": "required-subset/v1",
+      "applied_profiles": [
+        "python"
+      ],
+      "allowed_skill_inspection_paths": [
+        ".agents/skills/clean-code-ai-collaboration/SKILL.md",
+        ".agents/skills/clean-code-ai-collaboration/references/clean-code-for-agent-legibility.md",
+        ".agents/skills/clean-code-ai-collaboration/references/code-readability.md",
+        ".agents/skills/clean-code-ai-collaboration/references/collaboration-and-estimation.md",
+        ".agents/skills/clean-code-ai-collaboration/references/design-and-dependency-boundaries.md",
+        ".agents/skills/clean-code-ai-collaboration/references/language-python.md",
+        ".agents/skills/clean-code-ai-collaboration/references/profile-selection.md",
+        ".agents/skills/clean-code-ai-collaboration/references/repository-context-template.md",
+        ".agents/skills/clean-code-ai-collaboration/references/review-output-contract.md",
+        ".agents/skills/clean-code-ai-collaboration/references/testing-and-change-safety.md"
+      ]
+    },
+    {
+      "id": "core-plus-typescript",
+      "skill": "clean-code-ai-collaboration",
+      "version": "v0.5.1",
+      "instruction": "請使用 $clean-code-ai-collaboration Core 與 TypeScript Profile 完成任務。",
+      "required_skill_inspection_paths": [
+        ".agents/skills/clean-code-ai-collaboration/SKILL.md",
+        ".agents/skills/clean-code-ai-collaboration/references/language-typescript.md",
+        ".agents/skills/clean-code-ai-collaboration/references/profile-selection.md"
+      ],
+      "inspection_policy": "required-subset/v1",
+      "applied_profiles": [
+        "typescript"
+      ],
+      "allowed_skill_inspection_paths": [
+        ".agents/skills/clean-code-ai-collaboration/SKILL.md",
+        ".agents/skills/clean-code-ai-collaboration/references/clean-code-for-agent-legibility.md",
+        ".agents/skills/clean-code-ai-collaboration/references/code-readability.md",
+        ".agents/skills/clean-code-ai-collaboration/references/collaboration-and-estimation.md",
+        ".agents/skills/clean-code-ai-collaboration/references/design-and-dependency-boundaries.md",
+        ".agents/skills/clean-code-ai-collaboration/references/language-typescript.md",
+        ".agents/skills/clean-code-ai-collaboration/references/profile-selection.md",
+        ".agents/skills/clean-code-ai-collaboration/references/repository-context-template.md",
+        ".agents/skills/clean-code-ai-collaboration/references/review-output-contract.md",
+        ".agents/skills/clean-code-ai-collaboration/references/testing-and-change-safety.md"
+      ]
+    },
+    {
+      "id": "core-plus-typescript-plus-react",
+      "skill": "clean-code-ai-collaboration",
+      "version": "v0.5.1",
+      "instruction": "請使用 $clean-code-ai-collaboration Core、TypeScript 與 React Profile 完成任務。",
+      "required_skill_inspection_paths": [
+        ".agents/skills/clean-code-ai-collaboration/SKILL.md",
+        ".agents/skills/clean-code-ai-collaboration/references/framework-react.md",
+        ".agents/skills/clean-code-ai-collaboration/references/language-typescript.md",
+        ".agents/skills/clean-code-ai-collaboration/references/profile-selection.md"
+      ],
+      "inspection_policy": "required-subset/v1",
+      "applied_profiles": [
+        "typescript",
+        "react"
+      ],
+      "allowed_skill_inspection_paths": [
+        ".agents/skills/clean-code-ai-collaboration/SKILL.md",
+        ".agents/skills/clean-code-ai-collaboration/references/clean-code-for-agent-legibility.md",
+        ".agents/skills/clean-code-ai-collaboration/references/code-readability.md",
+        ".agents/skills/clean-code-ai-collaboration/references/collaboration-and-estimation.md",
+        ".agents/skills/clean-code-ai-collaboration/references/design-and-dependency-boundaries.md",
+        ".agents/skills/clean-code-ai-collaboration/references/framework-react.md",
+        ".agents/skills/clean-code-ai-collaboration/references/language-typescript.md",
+        ".agents/skills/clean-code-ai-collaboration/references/profile-selection.md",
+        ".agents/skills/clean-code-ai-collaboration/references/repository-context-template.md",
+        ".agents/skills/clean-code-ai-collaboration/references/review-output-contract.md",
+        ".agents/skills/clean-code-ai-collaboration/references/testing-and-change-safety.md"
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "csharp-overdue-rule",
+      "language": "csharp",
+      "fixture_path": "fixtures/csharp-overdue-rule",
+      "evaluator_path": "evaluators/csharp-overdue-rule",
+      "task": "調整 High Priority 工作項目的逾期規則：到期後保留兩小時寬限，剛好到達兩小時邊界時才視為逾期。請保留 Normal Priority、Completed 與既有公開 API，完成後執行 Repository Gate。",
+      "must_preserve": [
+        "Normal Priority 到期時仍視為逾期",
+        "Completed Work Item 永遠不視為逾期",
+        "OverduePolicy.IsOverdue 公開 API",
+        "DateTimeOffset 與 Nullable Contract"
+      ],
+      "allowed_diff": [
+        "src/CsharpOverdueRule/OverduePolicy.cs",
+        "tests/CsharpOverdueRule.PublicTests/OverduePolicyPublicTests.cs"
+      ],
+      "allowed_diff_patterns": [
+        "^(?:src/CsharpOverdueRule/OverduePolicy|tests/CsharpOverdueRule[.]PublicTests/OverduePolicyPublicTests)[.]cs$"
+      ],
+      "prohibited_changes": [
+        "不得修改 csproj、packages.lock.json、Target Framework、Nullable 或工具鏈設定",
+        "不得改變 WorkItem 公開 Model 或建立第二套逾期模型"
+      ],
+      "commands": {
+        "public": [
+          [
+            "{dotnet}",
+            "test",
+            "tests/CsharpOverdueRule.PublicTests/CsharpOverdueRule.PublicTests.csproj",
+            "--nologo"
+          ],
+          [
+            "{dotnet}",
+            "format",
+            "tests/CsharpOverdueRule.PublicTests/CsharpOverdueRule.PublicTests.csproj",
+            "--verify-no-changes",
+            "--no-restore"
+          ]
+        ],
+        "preservation": [
+          [
+            "{dotnet}",
+            "test",
+            ".benchmark-oracle/CsharpOverdueRule.PreservationTests/CsharpOverdueRule.PreservationTests.csproj",
+            "--nologo"
+          ]
+        ],
+        "acceptance": [
+          [
+            "{dotnet}",
+            "test",
+            ".benchmark-oracle/CsharpOverdueRule.AcceptanceTests/CsharpOverdueRule.AcceptanceTests.csproj",
+            "--nologo"
+          ]
+        ]
+      },
+      "expected_baseline_red_markers": [
+        "HighPriorityItemIsOverdueAtTwoHourBoundary"
+      ],
+      "expected_baseline_failure_count": 1,
+      "comparison_arms": [
+        "control",
+        "generic-clean-code",
+        "core-only",
+        "core-plus-csharp"
+      ],
+      "profile_under_test": "csharp",
+      "scenario_type": "shared_business",
+      "direct_comparator": "core-only",
+      "treatment_arm": "core-plus-csharp",
+      "incremental_criteria": [
+        "DateTimeOffset comparison preserves the exact two-hour UTC boundary",
+        "Completed and Normal Priority branches retain their existing semantics"
+      ]
+    },
+    {
+      "id": "csharp-cancellation-cleanup",
+      "language": "csharp",
+      "fixture_path": "fixtures/csharp-cancellation-cleanup",
+      "evaluator_path": "evaluators/csharp-cancellation-cleanup",
+      "task": "讓 NotificationDispatchService 將呼叫端 CancellationToken 傳入既有 Provider 與 Session，保留 OperationCanceledException 的取消語意，並確保非取消成功或失敗時非同步資源恰好釋放一次。請保留公開 API 與既有 Accepted／ProviderUnavailable 行為。",
+      "must_preserve": [
+        "NotificationDispatchService.DispatchAsync 公開 API",
+        "Provider 接受通知時回傳 Accepted",
+        "Provider 非取消失敗時回傳 ProviderUnavailable",
+        "既有 INotificationProvider 與 INotificationSession 邊界"
+      ],
+      "allowed_diff": [
+        "src/CsharpCancellationCleanup/NotificationDispatchService.cs",
+        "tests/CsharpCancellationCleanup.PublicTests/NotificationDispatchServicePublicTests.cs"
+      ],
+      "allowed_diff_patterns": [
+        "^(?:src/CsharpCancellationCleanup/NotificationDispatchService|tests/CsharpCancellationCleanup[.]PublicTests/NotificationDispatchServicePublicTests)[.]cs$"
+      ],
+      "prohibited_changes": [
+        "不得修改 csproj、packages.lock.json、Target Framework、Nullable 或工具鏈設定",
+        "不得新增同義 Provider、第二套 Domain Model、同步 I/O 或改變公開 API"
+      ],
+      "commands": {
+        "public": [
+          [
+            "{dotnet}",
+            "test",
+            "tests/CsharpCancellationCleanup.PublicTests/CsharpCancellationCleanup.PublicTests.csproj",
+            "--nologo"
+          ],
+          [
+            "{dotnet}",
+            "format",
+            "tests/CsharpCancellationCleanup.PublicTests/CsharpCancellationCleanup.PublicTests.csproj",
+            "--verify-no-changes",
+            "--no-restore"
+          ]
+        ],
+        "preservation": [
+          [
+            "{dotnet}",
+            "test",
+            ".benchmark-oracle/CsharpCancellationCleanup.PreservationTests/CsharpCancellationCleanup.PreservationTests.csproj",
+            "--nologo"
+          ]
+        ],
+        "acceptance": [
+          [
+            "{dotnet}",
+            "test",
+            ".benchmark-oracle/CsharpCancellationCleanup.AcceptanceTests/CsharpCancellationCleanup.AcceptanceTests.csproj",
+            "--nologo"
+          ]
+        ]
+      },
+      "expected_baseline_red_markers": [
+        "DispatchAsyncForwardsCallerCancellationTokenToProvider",
+        "DispatchAsyncPreservesOperationCanceledException"
+      ],
+      "expected_baseline_failure_count": 2,
+      "comparison_arms": [
+        "control",
+        "generic-clean-code",
+        "core-only",
+        "core-plus-csharp"
+      ],
+      "profile_under_test": "csharp",
+      "scenario_type": "ecosystem_native",
+      "direct_comparator": "core-only",
+      "treatment_arm": "core-plus-csharp",
+      "incremental_criteria": [
+        "Caller CancellationToken reaches provider open and send operations",
+        "OperationCanceledException remains cancellation rather than provider failure",
+        "The asynchronous provider session is disposed exactly once"
+      ]
+    },
+    {
+      "id": "fastapi-overdue-rule",
+      "language": "python-fastapi",
+      "fixture_path": "fixtures/fastapi-overdue-rule",
+      "evaluator_path": "evaluators/fastapi-overdue-rule",
+      "task": "調整 High Priority 工作項目的逾期規則：到期後保留兩小時寬限，剛好到達兩小時邊界時才視為逾期。請保留既有 HTTP Status、Response Schema 與其他優先級行為，完成後執行 Repository Gate。",
+      "must_preserve": [
+        "POST /overdue 的 HTTP 200 與 Response Schema",
+        "Normal Priority 到期時仍視為逾期",
+        "Completed Work Item 永遠不進入逾期清單",
+        "與逾期規則無關的 Route 與 Model"
+      ],
+      "allowed_diff": [
+        "app/overdue.py",
+        "tests/test_public_api.py",
+        "tests/test_overdue.py"
+      ],
+      "allowed_diff_patterns": [
+        "^(?:app/overdue[.]py|tests/test_(?:public_api|overdue)[.]py)$"
+      ],
+      "prohibited_changes": [
+        "不得修改 requirements.lock、pyproject.toml 或工具鏈設定",
+        "不得改變 HTTP Contract 或建立第二套 WorkItem Model"
+      ],
+      "commands": {
+        "public": [
+          [
+            "{python}",
+            "-m",
+            "pytest",
+            "-q",
+            "tests"
+          ],
+          [
+            "{python}",
+            "-m",
+            "ruff",
+            "check",
+            "."
+          ],
+          [
+            "{python}",
+            "-m",
+            "ruff",
+            "format",
+            "--check",
+            "."
+          ]
+        ],
+        "preservation": [
+          [
+            "{python}",
+            "-m",
+            "pytest",
+            "-q",
+            ".benchmark-oracle/test_preservation.py"
+          ]
+        ],
+        "acceptance": [
+          [
+            "{python}",
+            "-m",
+            "pytest",
+            "-vv",
+            ".benchmark-oracle/test_acceptance.py"
+          ]
+        ]
+      },
+      "expected_baseline_red_markers": [
+        "test_high_priority_is_not_overdue_before_two_hour_boundary",
+        "test_high_priority_is_overdue_at_two_hour_boundary"
+      ],
+      "expected_baseline_failure_count": 1,
+      "comparison_arms": [
+        "control",
+        "generic-clean-code",
+        "core-only",
+        "core-plus-python"
+      ],
+      "profile_under_test": "python",
+      "scenario_type": "shared_business",
+      "direct_comparator": "core-only",
+      "treatment_arm": "core-plus-python",
+      "incremental_criteria": [
+        "High Priority applies the exact two-hour timezone-aware boundary",
+        "HTTP status, response schema, Completed, and Normal behavior remain unchanged"
+      ]
+    },
+    {
+      "id": "fastapi-provider-boundary",
+      "language": "python-fastapi",
+      "fixture_path": "fixtures/fastapi-provider-boundary",
+      "evaluator_path": "evaluators/fastapi-provider-boundary",
+      "task": "讓通知 Route 透過 FastAPI 原生 Dependency Injection 使用既有 NotificationSender Protocol，使測試能替換 Provider。請保留 202、404、502、503 與既有錯誤語意，不得新增同義 Protocol、第二套 Domain Model 或無需求支持的 Repository Layer。",
+      "must_preserve": [
+        "通知成功回傳 202",
+        "找不到 Work Item 回傳 404 與 work_item_not_found",
+        "Provider 回傳 false 時回傳 502 與 notification_failed",
+        "Provider 拋出例外時回傳 503 與 provider_unavailable",
+        "既有 Use Case 與 NotificationSender Protocol"
+      ],
+      "allowed_diff": [
+        "app/main.py",
+        "tests/test_public_api.py",
+        "tests/test_dependency_override.py"
+      ],
+      "allowed_diff_patterns": [
+        "^(?:app/main[.]py|tests/test_(?:public_api|dependency_override)[.]py)$"
+      ],
+      "prohibited_changes": [
+        "不得修改 requirements.lock、pyproject.toml 或工具鏈設定",
+        "不得新增同義 Protocol、第二套 Domain Model 或 Repository Layer",
+        "不得改變既有 HTTP Status、Response Schema 或失敗語意"
+      ],
+      "commands": {
+        "public": [
+          [
+            "{python}",
+            "-m",
+            "pytest",
+            "-q",
+            "tests"
+          ],
+          [
+            "{python}",
+            "-m",
+            "ruff",
+            "check",
+            "."
+          ],
+          [
+            "{python}",
+            "-m",
+            "ruff",
+            "format",
+            "--check",
+            "."
+          ]
+        ],
+        "preservation": [
+          [
+            "{python}",
+            "-m",
+            "pytest",
+            "-q",
+            ".benchmark-oracle/test_preservation.py"
+          ]
+        ],
+        "acceptance": [
+          [
+            "{python}",
+            "-m",
+            "pytest",
+            "-vv",
+            ".benchmark-oracle/test_acceptance.py"
+          ]
+        ]
+      },
+      "expected_baseline_red_markers": [
+        "test_route_uses_fastapi_dependency_override"
+      ],
+      "expected_baseline_failure_count": 1,
+      "comparison_arms": [
+        "control",
+        "generic-clean-code",
+        "core-only",
+        "core-plus-python"
+      ],
+      "profile_under_test": "python",
+      "scenario_type": "ecosystem_native",
+      "direct_comparator": "core-only",
+      "treatment_arm": "core-plus-python",
+      "incremental_criteria": [
+        "The route reuses NotificationSender through FastAPI dependency injection",
+        "Dependency override replaces the provider without duplicating the domain boundary",
+        "The 202, 404, 502, and 503 failure semantics remain distinct"
+      ]
+    },
+    {
+      "id": "typescript-overdue-rule",
+      "language": "typescript",
+      "fixture_path": "fixtures/react-overdue-rule",
+      "evaluator_path": "evaluators/react-overdue-rule",
+      "task": "調整 High Priority 工作項目的逾期規則：到期後保留兩小時寬限，剛好到達兩小時邊界時才視為逾期。請保留其他既有行為與公開 UI Contract，完成後執行 Repository Gate。",
+      "must_preserve": [
+        "Normal Priority 到期時仍視為逾期",
+        "Completed Work Item 永遠不進入逾期清單",
+        "WorkItemList Props 與顯示 Contract",
+        "與逾期規則無關的 Render 行為"
+      ],
+      "allowed_diff": [
+        "src/overdue.ts",
+        "src/overdue.public.test.tsx",
+        "src/overdue.test.ts",
+        "src/overdue.test.tsx"
+      ],
+      "allowed_diff_patterns": [
+        "^src/overdue(?:[.][A-Za-z0-9_-]+)?[.]tsx?$"
+      ],
+      "prohibited_changes": [
+        "不得修改 package.json、package-lock.json 或工具鏈設定",
+        "不得改變 WorkItemList Props 或建立第二套 WorkItem Model"
+      ],
+      "commands": {
+        "public": [
+          [
+            "npm",
+            "test",
+            "--",
+            "src/overdue.public.test.tsx"
+          ],
+          [
+            "npm",
+            "run",
+            "typecheck"
+          ],
+          [
+            "npm",
+            "run",
+            "lint"
+          ]
+        ],
+        "preservation": [
+          [
+            "npm",
+            "test",
+            "--",
+            ".benchmark-oracle/preservation.test.tsx"
+          ]
+        ],
+        "acceptance": [
+          [
+            "npm",
+            "test",
+            "--",
+            "--reporter=verbose",
+            ".benchmark-oracle/acceptance.test.ts"
+          ]
+        ]
+      },
+      "expected_baseline_red_markers": [
+        "is not overdue one minute before the two-hour boundary",
+        "is overdue exactly at the two-hour boundary"
+      ],
+      "expected_baseline_failure_count": 1,
+      "comparison_arms": [
+        "control",
+        "generic-clean-code",
+        "core-only",
+        "core-plus-typescript"
+      ],
+      "profile_under_test": "typescript",
+      "scenario_type": "shared_business",
+      "direct_comparator": "core-only",
+      "treatment_arm": "core-plus-typescript",
+      "incremental_criteria": [
+        "High Priority uses the exact two-hour boundary through the existing WorkItem model",
+        "Completed and Normal Priority branches remain typed and unchanged"
+      ]
+    },
+    {
+      "id": "typescript-runtime-validation",
+      "language": "typescript",
+      "fixture_path": "fixtures/typescript-runtime-validation",
+      "evaluator_path": "evaluators/typescript-runtime-validation",
+      "task": "強化 decodeWorkItem 對 unknown 外部 Payload 的 Runtime Validation，沿用既有 WorkItem Model，並以可窮舉的 Discriminated Union 處理 accepted 與 rejected。請保留既有成功與 invalid-payload Contract，不得使用 any 或不安全的型別斷言。",
+      "must_preserve": [
+        "完整合法 Work Item Payload 仍回傳 accepted",
+        "非法 Payload 仍回傳 rejected 與 invalid-payload",
+        "既有 WorkItem Model 與 WorkItemResult 公開 Contract",
+        "describeWorkItemResult 的既有輸出語意"
+      ],
+      "allowed_diff": [
+        "src/decodeWorkItem.ts",
+        "src/decodeWorkItem.public.test.ts"
+      ],
+      "allowed_diff_patterns": [
+        "^src/decodeWorkItem(?:[.]public[.]test)?[.]ts$"
+      ],
+      "prohibited_changes": [
+        "不得修改 package.json、package-lock.json 或工具鏈設定",
+        "不得使用 any、不安全 as Assertion 或建立第二套 WorkItem Model"
+      ],
+      "commands": {
+        "public": [
+          [
+            "npm",
+            "test",
+            "--",
+            "src/decodeWorkItem.public.test.ts"
+          ],
+          [
+            "npm",
+            "run",
+            "typecheck"
+          ],
+          [
+            "npm",
+            "run",
+            "lint"
+          ]
+        ],
+        "preservation": [
+          [
+            "npm",
+            "test",
+            "--",
+            ".benchmark-oracle/preservation.test.ts"
+          ]
+        ],
+        "acceptance": [
+          [
+            "npm",
+            "test",
+            "--",
+            "--reporter=verbose",
+            ".benchmark-oracle/acceptance.test.ts"
+          ]
+        ]
+      },
+      "expected_baseline_red_markers": [
+        "rejects objects whose fields do not meet the runtime contract",
+        "uses a runtime guard and exhaustive discriminated union handling"
+      ],
+      "expected_baseline_failure_count": 2,
+      "comparison_arms": [
+        "control",
+        "generic-clean-code",
+        "core-only",
+        "core-plus-typescript"
+      ],
+      "profile_under_test": "typescript",
+      "scenario_type": "ecosystem_native",
+      "direct_comparator": "core-only",
+      "treatment_arm": "core-plus-typescript",
+      "incremental_criteria": [
+        "The unknown payload is narrowed by runtime guards before WorkItem construction",
+        "The existing WorkItem type is reused without any or unsafe assertion",
+        "Accepted and rejected results use exhaustive discriminated-union handling"
+      ]
+    },
+    {
+      "id": "react-state-error-retention",
+      "language": "typescript-react",
+      "fixture_path": "fixtures/react-state-error-retention",
+      "evaluator_path": "evaluators/react-state-error-retention",
+      "task": "調整 WorkItemPanel 的非同步狀態：Retry 載入時保留仍有效內容，Work Item Identity 改變後舊請求的成功或失敗不得覆蓋最新狀態。請保留 Loading、Error、成功內容、Props 與 LoadWorkItem Contract。",
+      "must_preserve": [
+        "初次載入顯示 Loading work item",
+        "失敗顯示既有 Alert 與錯誤訊息",
+        "成功顯示 Work Item 標題",
+        "WorkItemPanel Props 與 LoadWorkItem Contract"
+      ],
+      "allowed_diff": [
+        "src/WorkItemPanel.tsx",
+        "src/WorkItemPanel.public.test.tsx",
+        "src/useWorkItemPanel.ts"
+      ],
+      "allowed_diff_patterns": [
+        "^src/(?:WorkItemPanel(?:[.][A-Za-z0-9_-]+)?[.]tsx|useWorkItemPanel[.]ts)$"
+      ],
+      "prohibited_changes": [
+        "不得修改 package.json、package-lock.json 或工具鏈設定",
+        "不得移除 Loading、Error、Retry 或 Props 行為來讓測試通過"
+      ],
+      "commands": {
+        "public": [
+          [
+            "npm",
+            "test",
+            "--",
+            "src/WorkItemPanel.public.test.tsx"
+          ],
+          [
+            "npm",
+            "run",
+            "typecheck"
+          ],
+          [
+            "npm",
+            "run",
+            "lint"
+          ]
+        ],
+        "preservation": [
+          [
+            "npm",
+            "test",
+            "--",
+            ".benchmark-oracle/preservation.test.tsx"
+          ]
+        ],
+        "acceptance": [
+          [
+            "npm",
+            "test",
+            "--",
+            "--reporter=verbose",
+            ".benchmark-oracle/acceptance.test.tsx"
+          ]
+        ]
+      },
+      "expected_baseline_red_markers": [
+        "keeps still-valid content visible while retrying"
+      ],
+      "expected_baseline_failure_count": 1,
+      "comparison_arms": [
+        "control",
+        "generic-clean-code",
+        "core-only",
+        "core-plus-typescript",
+        "core-plus-typescript-plus-react"
+      ],
+      "profile_under_test": "react",
+      "scenario_type": "shared_business",
+      "direct_comparator": "core-plus-typescript",
+      "treatment_arm": "core-plus-typescript-plus-react",
+      "incremental_criteria": [
+        "Still-valid content remains visible while retry is loading",
+        "Earlier success or failure cannot overwrite the latest request state",
+        "Public loading, error, success, and props contracts remain unchanged"
+      ]
+    },
+    {
+      "id": "react-effect-lifecycle",
+      "language": "typescript-react",
+      "fixture_path": "fixtures/react-effect-lifecycle",
+      "evaluator_path": "evaluators/react-effect-lifecycle",
+      "task": "調整 WorkItemPreview：Preview Request 的唯一 Key 是 workItemId；相同識別碼的普通重新 Render，即使 density 或 loadPreview Callback Identity 改變，也不得重複送出或取消請求。識別碼改變時，要取消舊請求、使用該次 Render 最新的 loadPreview 載入新資料，且已取消請求的成功或失敗結果都不得覆蓋目前狀態。請保留 Loading、Error、Props 與 API Response Contract。",
+      "must_preserve": [
+        "識別碼改變時取消舊請求並載入新資料",
+        "已取消請求的成功或失敗結果不得覆蓋目前狀態",
+        "Loading 與 Error UI 語意",
+        "Component Props 與 API Response Contract"
+      ],
+      "allowed_diff": [
+        "src/WorkItemPreview.tsx",
+        "src/WorkItemPreview.public.test.tsx",
+        "src/WorkItemPreview.test.tsx",
+        "src/useWorkItemPreview.ts"
+      ],
+      "allowed_diff_patterns": [
+        "^src/(?:WorkItemPreview(?:[.][A-Za-z0-9_-]+)?[.]tsx|useWorkItemPreview[.]ts)$"
+      ],
+      "prohibited_changes": [
+        "不得修改 package.json、package-lock.json 或工具鏈設定",
+        "不得移除 AbortSignal、Loading 或 Error 行為來讓測試通過"
+      ],
+      "commands": {
+        "public": [
+          [
+            "npm",
+            "test",
+            "--",
+            "src/WorkItemPreview.public.test.tsx"
+          ],
+          [
+            "npm",
+            "run",
+            "typecheck"
+          ],
+          [
+            "npm",
+            "run",
+            "lint"
+          ]
+        ],
+        "preservation": [
+          [
+            "npm",
+            "test",
+            "--",
+            ".benchmark-oracle/preservation.test.tsx"
+          ]
+        ],
+        "acceptance": [
+          [
+            "npm",
+            "test",
+            "--",
+            "--reporter=verbose",
+            ".benchmark-oracle/acceptance.test.tsx"
+          ]
+        ]
+      },
+      "expected_baseline_red_markers": [
+        "does not request the same preview again on an ordinary rerender",
+        "does not let an aborted request overwrite the latest preview"
+      ],
+      "expected_baseline_failure_count": 2,
+      "comparison_arms": [
+        "control",
+        "generic-clean-code",
+        "core-only",
+        "core-plus-typescript",
+        "core-plus-typescript-plus-react"
+      ],
+      "profile_under_test": "react",
+      "scenario_type": "ecosystem_native",
+      "direct_comparator": "core-plus-typescript",
+      "treatment_arm": "core-plus-typescript-plus-react",
+      "incremental_criteria": [
+        "Effect identity follows workItemId rather than callback or presentation props",
+        "An identity change aborts the prior request through AbortSignal",
+        "An aborted request cannot overwrite the current success or error state"
+      ]
+    }
+  ],
+  "pilot": {
+    "repetitions": [
+      1
+    ],
+    "invalidate_all_arms_when_contract_changes": true
+  },
+  "retry_policy": {
+    "allowed_reasons": [
+      "harness_error",
+      "dependency_cache_error",
+      "cli_runner_error",
+      "environment_error"
+    ],
+    "maximum_retries": 1,
+    "preserve_original_attempt": true
+  },
+  "rubrics": [
+    "evals/rubrics/context-and-locality.md",
+    "evals/rubrics/behavior-and-validation.md",
+    "evals/rubrics/decision-and-escalation.md",
+    "evals/rubrics/profile-increment.md"
+  ],
+  "anonymization": {
+    "candidate_ids": "cryptographically-random",
+    "private_mapping": true,
+    "reviewer_can_see_arm": false,
+    "reviewer_can_compare_candidates": false
+  }
+}
