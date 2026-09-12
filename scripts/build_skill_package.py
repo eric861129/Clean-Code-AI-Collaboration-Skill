@@ -6,7 +6,7 @@ import json
 from pathlib import Path, PurePosixPath
 import re
 import subprocess
-from typing import Any, Literal, Mapping, Sequence
+from typing import Any, Callable, Literal, Mapping, Sequence
 
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
@@ -19,7 +19,7 @@ if __package__:
         replace_generated_region,
     )
     from .validate_profiles import (
-        EVIDENCE_SCHEMA_PATH,
+        evidence_schema_path,
         profile_is_available,
         profile_sort_key,
         validate_loaded_profiles,
@@ -31,7 +31,7 @@ else:
         replace_generated_region,
     )
     from validate_profiles import (
-        EVIDENCE_SCHEMA_PATH,
+        evidence_schema_path,
         profile_is_available,
         profile_sort_key,
         validate_loaded_profiles,
@@ -388,6 +388,7 @@ def _load_registry(
 def _input_paths(
     profiles: Sequence[Mapping[str, Any]],
     metadata_paths: Sequence[str],
+    read_repository_file: Callable[[str], bytes],
 ) -> list[str]:
     paths = {
         "LICENSE",
@@ -408,7 +409,8 @@ def _input_paths(
             paths.add(manifest)
         for result in profile["evidence"]["results"]:
             paths.add(result["path"])
-            paths.add(EVIDENCE_SCHEMA_PATH)
+            document = json.loads(read_repository_file(result["path"]).decode("utf-8"))
+            paths.add(evidence_schema_path(document.get("schema_version")))
     return _sort_paths(list(paths))
 
 
@@ -702,7 +704,7 @@ def build_package(
         )
     suite_version = next(iter(suite_versions))
 
-    input_paths = _input_paths(profiles, metadata_paths)
+    input_paths = _input_paths(profiles, metadata_paths, reader.read)
     source_inputs = {path: reader.read(path) for path in input_paths}
     package_name = _package_name(composed_ids)
     files = _package_files(

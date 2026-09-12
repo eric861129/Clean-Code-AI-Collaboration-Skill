@@ -15,8 +15,13 @@ from evals.harness.models import (
 )
 from evals.harness.process import run_process
 from evals.harness.subject_runner import build_prompt, canonical_prompt_bytes
+from evals.harness.skill_inspection import POLICY, inspection_diagnostics, resolve_skill_file
+from evals.harness.manifest import PROFILE_ARM_ASSIGNMENTS, PROFILE_REFERENCE_FILES
 
 DISPATCH_SCHEMA_VERSION = "desktop-subject-dispatch/v4"
+V5_DISPATCH_SCHEMA_VERSION = "desktop-subject-dispatch/v5"
+V5_RESULT_SCHEMA_VERSION = "desktop-subject-result/v2"
+V5_REPORT_SCHEMA_VERSION = "desktop-subject-report/v3"
 LEGACY_DISPATCH_SCHEMA_VERSION = "desktop-subject-dispatch/v1"
 PROMPT_ENCODING = "utf-8"
 PROMPT_LINE_ENDINGS = "lf"
@@ -33,7 +38,7 @@ DESKTOP_DISPATCH_MODE = "external-collaboration-subagent"
 class DesktopSubjectValidationError(ValueError):
     """表示 Subject 證據違反不可重跑的候選契約。"""
 
-    def __init__(self, reason: str, message: str) -> None:
+    def __init__(self, reason: str, message: str, diagnostics: list[dict[str, str]] | None = None) -> None:
         super().__init__(message)
         if reason not in {
             "candidate_incomplete",
@@ -42,6 +47,7 @@ class DesktopSubjectValidationError(ValueError):
         }:
             raise ValueError(f"invalid desktop candidate failure reason: {reason}")
         self.reason = reason
+        self.diagnostics = diagnostics or []
 
 
 @dataclass(frozen=True)
@@ -123,11 +129,26 @@ def stage_desktop_subject(
     required_skill_inspection_paths = _required_skill_inspection_paths(
         manifest, slot.arm_id
     )
+    is_v5 = executor.get("protocol_version") == "desktop-subject-v5"
+    arm = next(arm for arm in manifest.arms if arm.id == slot.arm_id)
+    policy_fields = {}
+    if is_v5:
+        if arm.inspection_policy != POLICY:
+            raise ValueError("v5 requires an explicit inspection policy")
+        skill_root = f".agents/skills/{arm.skill}" if arm.skill else None
+        for allowed in arm.allowed_skill_inspection_paths:
+            resolve_skill_file(workspace.root, skill_root, allowed)
+        policy_fields = {
+            "inspection_policy": arm.inspection_policy,
+            "allowed_skill_inspection_paths": list(arm.allowed_skill_inspection_paths),
+            "applied_profiles": list(arm.applied_profiles),
+            "skill_root": skill_root,
+        }
     for required_path in required_skill_inspection_paths:
         _validate_required_skill_file(workspace.root, required_path)
 
     payload: dict[str, object] = {
-        "schema_version": DISPATCH_SCHEMA_VERSION,
+        "schema_version": V5_DISPATCH_SCHEMA_VERSION if is_v5 else DISPATCH_SCHEMA_VERSION,
         "dispatch_id": dispatch_id,
         "logical_run_id": slot.run_id,
         "physical_run_id": physical_run_id,
@@ -151,6 +172,7 @@ def stage_desktop_subject(
         "report_relative_path": report_relative_path,
         "report_template_relative_path": REPORT_TEMPLATE_FILENAME,
         "required_skill_inspection_paths": list(required_skill_inspection_paths),
+        **policy_fields,
     }
     dispatch_sha256 = _sha256_json(payload)
     payload["dispatch_sha256"] = dispatch_sha256
@@ -161,7 +183,7 @@ def stage_desktop_subject(
     )
     report_template_path.write_text(
         json.dumps(
-            _report_template(),
+            _report_template(is_v5),
             ensure_ascii=False,
             indent=2,
         ),
@@ -186,6 +208,10 @@ def stage_desktop_subject(
         scenario_contract_sha256=scenario_contract_sha256,
         required_skill_inspection_paths=required_skill_inspection_paths,
         dispatch_sha256=dispatch_sha256,
+        schema_version=str(payload["schema_version"]),
+        **({**policy_fields,
+            "allowed_skill_inspection_paths": tuple(arm.allowed_skill_inspection_paths),
+            "applied_profiles": tuple(arm.applied_profiles)} if is_v5 else {}),
     )
 
 
@@ -253,7 +279,18 @@ def desktop_subject_instruction(dispatch: SubjectDispatch) -> str:
             ),
         ]
     )
-    return "\n".join(lines)
+    instruction = "\n".join(lines)
+    if dispatch.schema_version == V5_DISPATCH_SCHEMA_VERSION:
+        instruction = instruction.replace(
+            "skill_inspection_claims 與 telemetry=not_available。",
+            "skill_inspection_claims、applied_profiles 與 telemetry=not_available。",
+        )
+        instruction += (
+            "\nPrompt 內的固定 Applied Profiles 與允許查閱清單優先於 Skill 自動 Routing。"
+            "不得讀取清單外的 Profile；完整回報所有實際查閱，不隱藏額外查閱。"
+            "\napplied_profiles 必須如實回報本次實際使用的 Profile ID 清單；Core Only 為 []。"
+        )
+    return instruction
 
 
 def validate_desktop_report(dispatch: SubjectDispatch) -> dict[str, object]:
@@ -289,30 +326,40 @@ def validate_desktop_report(dispatch: SubjectDispatch) -> dict[str, object]:
         "skill_inspection_claims",
         "telemetry",
     }
+    is_v5 = dispatch.schema_version == V5_DISPATCH_SCHEMA_VERSION
+    if is_v5:
+        required.add("applied_profiles")
+    diagnostics = inspection_diagnostics(report, dispatch) if is_v5 else []
     missing = required - set(report)
     if missing:
         raise DesktopSubjectValidationError(
             "candidate_incomplete",
             f"desktop subject report missing fields: {sorted(missing)}",
+            diagnostics,
         )
     extra = set(report) - required
     if extra:
         raise DesktopSubjectValidationError(
             "invalid_claim",
             f"desktop subject result contains controller-owned fields: {sorted(extra)}",
+            diagnostics,
         )
-    if report["schema_version"] != SUBJECT_RESULT_SCHEMA_VERSION:
+    if report["schema_version"] != (V5_RESULT_SCHEMA_VERSION if is_v5 else SUBJECT_RESULT_SCHEMA_VERSION):
         raise DesktopSubjectValidationError(
-            "invalid_claim", "desktop subject result schema is invalid"
+            "invalid_claim", "desktop subject result schema is invalid", diagnostics
         )
     if report["completion"] != "completed":
         raise DesktopSubjectValidationError(
-            "invalid_claim", "desktop subject report completion is invalid"
+            "invalid_claim", "desktop subject report completion is invalid", diagnostics
         )
     if not isinstance(report["summary"], str):
         raise DesktopSubjectValidationError(
-            "candidate_incomplete", "desktop subject report summary must be text"
+            "candidate_incomplete", "desktop subject report summary must be text", diagnostics
         )
+    if is_v5:
+        if diagnostics:
+            reason = "skill_not_used" if all(d["code"] == "missing_required_skill_file" for d in diagnostics) else "invalid_claim"
+            raise DesktopSubjectValidationError(reason, "desktop subject inspection evidence gate failed", diagnostics)
     try:
         _validate_workspace_relative_paths(
             report["files_inspected"], "files_inspected", dispatch.workspace.root
@@ -341,11 +388,12 @@ def validate_desktop_report(dispatch: SubjectDispatch) -> dict[str, object]:
                 f"{sorted(missing_skill_paths)}"
             ),
         )
-    skill_inspection_verified = _validate_skill_inspection_claims(
-        report["skill_inspection_claims"], dispatch
+    skill_inspection_verified = (
+        (True if dispatch.required_skill_inspection_paths else "not_applicable")
+        if is_v5 else _validate_skill_inspection_claims(report["skill_inspection_claims"], dispatch)
     )
     return {
-        "schema_version": REPORT_SCHEMA_VERSION,
+        "schema_version": V5_REPORT_SCHEMA_VERSION if is_v5 else REPORT_SCHEMA_VERSION,
         "dispatch_sha256": dispatch.dispatch_sha256,
         "baseline_commit": dispatch.workspace.baseline_commit,
         "prompt_sha256": dispatch.prompt_sha256,
@@ -362,6 +410,7 @@ def validate_desktop_report(dispatch: SubjectDispatch) -> dict[str, object]:
         "skill_inspection_claims": report["skill_inspection_claims"],
         "telemetry": report["telemetry"],
         "skill_inspection_verified": skill_inspection_verified,
+        **({"inspection_diagnostics": [], "applied_profiles": report["applied_profiles"]} if is_v5 else {}),
     }
 
 
@@ -478,8 +527,17 @@ def load_desktop_dispatch(path: Path) -> SubjectDispatch:
     unsigned.pop("dispatch_sha256", None)
     if not isinstance(expected_hash, str) or expected_hash != _sha256_json(unsigned):
         raise ValueError("desktop dispatch hash mismatch")
-    if payload.get("schema_version") != DISPATCH_SCHEMA_VERSION:
+    if payload.get("schema_version") not in {DISPATCH_SCHEMA_VERSION, V5_DISPATCH_SCHEMA_VERSION}:
         raise ValueError("desktop dispatch schema is unsupported; v4 is required")
+    is_v5 = payload["schema_version"] == V5_DISPATCH_SCHEMA_VERSION
+    policy_fields = {}
+    policy_keys = {"inspection_policy", "allowed_skill_inspection_paths", "applied_profiles", "skill_root"}
+    if is_v5:
+        if not policy_keys.issubset(payload) or payload["inspection_policy"] != POLICY:
+            raise ValueError("v5 dispatch requires an explicit inspection policy")
+        policy_fields = _dispatch_policy_fields(payload)
+    elif policy_keys & set(payload):
+        raise ValueError("v4 dispatch cannot declare v5 inspection policy fields")
     required_strings = (
         "dispatch_id",
         "logical_run_id",
@@ -582,9 +640,48 @@ def load_desktop_dispatch(path: Path) -> SubjectDispatch:
         scenario_contract_sha256=str(payload["scenario_contract_sha256"]),
         required_skill_inspection_paths=tuple(required_skill_inspection_paths),
         dispatch_sha256=str(expected_hash),
+        schema_version=str(payload["schema_version"]),
+        **policy_fields,
     )
     _validate_report_template(dispatch)
     return dispatch
+
+
+def _dispatch_policy_fields(payload: dict[str, object]) -> dict[str, object]:
+    """重載 v5 時同樣檢查政策欄位，不由缺欄位推定寬鬆政策。"""
+    allowed = payload["allowed_skill_inspection_paths"]
+    profiles = payload["applied_profiles"]
+    required = payload.get("required_skill_inspection_paths")
+    root = payload["skill_root"]
+    if not isinstance(allowed, list) or not all(isinstance(p, str) for p in allowed) or allowed != sorted(set(allowed)):
+        raise ValueError("invalid v5 allowed inspection paths")
+    if not isinstance(profiles, list) or not all(isinstance(p, str) for p in profiles) or len(profiles) != len(set(profiles)):
+        raise ValueError("invalid v5 applied profiles")
+    if not isinstance(required, list) or not all(isinstance(p, str) for p in required) or not set(required).issubset(allowed):
+        raise ValueError("v5 required paths must be allowed")
+    if root is not None and (not isinstance(root, str) or re.fullmatch(r"\.agents/skills/[a-z0-9.-]+", root) is None):
+        raise ValueError("invalid v5 Skill root")
+    if root is None and (allowed or required or profiles):
+        raise ValueError("non-Skill v5 Arm cannot declare inspection")
+    arm_id = payload.get("arm_id")
+    if tuple(profiles) != PROFILE_ARM_ASSIGNMENTS.get(arm_id):
+        raise ValueError("v5 dispatch applied profiles do not match fixed Arm")
+    if (root is None) != (arm_id in {"control", "generic-clean-code"}):
+        raise ValueError("v5 dispatch Skill presence does not match fixed Arm")
+    if required != sorted(set(required)):
+        raise ValueError("v5 required paths must be unique and sorted")
+    if root:
+        profile_paths = {f"{root}/references/{PROFILE_REFERENCE_FILES[p]}" for p in profiles}
+        if not ({f"{root}/SKILL.md", f"{root}/references/profile-selection.md"} | profile_paths).issubset(required):
+            raise ValueError("v5 dispatch is missing required Skill references")
+        if any(PurePosixPath(p).name.lower().startswith(("language-", "framework-")) and p not in profile_paths for p in allowed):
+            raise ValueError("v5 dispatch permits unassigned Profile")
+    for path in allowed:
+        resolve_skill_file(Path(str(payload["workspace_root"])), root, path)
+    executor = payload.get("executor")
+    if not isinstance(executor, dict) or executor.get("protocol_version") != "desktop-subject-v5":
+        raise ValueError("v5 dispatch executor protocol mismatch")
+    return {"inspection_policy": POLICY, "allowed_skill_inspection_paths": tuple(allowed), "applied_profiles": tuple(profiles), "skill_root": root}
 
 
 def inspect_legacy_pending_newline_defect(
@@ -850,9 +947,9 @@ def _validate_workspace_baseline(workspace: Workspace) -> None:
         )
 
 
-def _report_template() -> dict[str, object]:
+def _report_template(is_v5: bool = False) -> dict[str, object]:
     return {
-        "schema_version": SUBJECT_RESULT_SCHEMA_VERSION,
+        "schema_version": V5_RESULT_SCHEMA_VERSION if is_v5 else SUBJECT_RESULT_SCHEMA_VERSION,
         "completion": "completed",
         "summary": "",
         "files_inspected": [],
@@ -860,6 +957,7 @@ def _report_template() -> dict[str, object]:
         "commands_claimed": [],
         "skill_inspection_claims": [],
         "telemetry": "not_available",
+        **({"applied_profiles": []} if is_v5 else {}),
     }
 
 
@@ -870,7 +968,7 @@ def _validate_report_template(dispatch: SubjectDispatch) -> None:
         raise ValueError("desktop dispatch report template is invalid JSON") from error
     if not isinstance(template, dict):
         raise ValueError("desktop dispatch report template must be an object")
-    expected = _report_template()
+    expected = _report_template(dispatch.schema_version == V5_DISPATCH_SCHEMA_VERSION)
     if template != expected:
         raise ValueError("desktop dispatch report template does not match contract")
 

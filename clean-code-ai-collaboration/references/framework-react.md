@@ -77,4 +77,4 @@ For each React Changed Module, report the applied framework profile, React versi
 
 ## Evidence Status
 
-Status: Experimental. Repository contract tests cover the profile structure, required renderer-neutral semantics, metadata, dependency routing, TypeScript composition, JavaScript non-composition, and supporting-renderer boundaries. No M2 pilot or M3 full run has been recorded, so this profile does not prove better outcomes across React versions, renderers, repositories, clients, or models.
+Current maturity is published in the generated [Runtime Profile Index](profile-selection.md#runtime-profile-index). Repository contract tests cover structure, selection, and required semantic topics. Versioned metadata records the v0.5.1 and v0.5.2 M2 pilots, including unfavorable outcomes; the latter tested the unchanged technical guidance from Skill v0.5.1. No M3 full run has been recorded. Pilot evidence does not establish general improvement across versions, runtimes, renderers, repositories, clients, or models.

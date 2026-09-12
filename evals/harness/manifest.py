@@ -20,6 +20,21 @@ PROFILE_COMPARISON_ARMS = {
         "core-plus-typescript-plus-react",
     ),
 }
+PROFILE_ARM_ASSIGNMENTS = {
+    "control": (),
+    "generic-clean-code": (),
+    "core-only": (),
+    "core-plus-csharp": ("csharp",),
+    "core-plus-python": ("python",),
+    "core-plus-typescript": ("typescript",),
+    "core-plus-typescript-plus-react": ("typescript", "react"),
+}
+PROFILE_REFERENCE_FILES = {
+    "csharp": "language-csharp.md",
+    "python": "language-python.md",
+    "typescript": "language-typescript.md",
+    "react": "framework-react.md",
+}
 IDENTIFIER_PATTERN = r"[a-z0-9]+(?:[.-][a-z0-9]+)*"
 REQUIRED_SCENARIO_FIELDS = {
     "id",
@@ -56,6 +71,7 @@ def validate_manifest(raw: dict[str, object]) -> BenchmarkManifest:
     arms = _arm_definitions(
         _required_mapping_sequence(raw, "arms"),
         require_explicit_inspection_paths=requires_profile_contract,
+        protocol_version=subject_executor.get("protocol_version"),
     )
     _validate_arm_skill_contract(arms, skill)
     scenarios = _scenario_definitions(
@@ -78,7 +94,9 @@ def validate_manifest(raw: dict[str, object]) -> BenchmarkManifest:
         raise ValueError("cross-language benchmark requires Desktop collaboration")
     if subject_executor.get("kind") != DESKTOP_EXECUTOR_KIND:
         raise ValueError("subject executor must be Desktop collaboration")
-    if subject_executor.get("protocol_version") != "desktop-subject-v4":
+    if subject_executor.get("protocol_version") not in (
+        "desktop-subject-v4", "desktop-subject-v5"
+    ):
         raise ValueError("subject executor protocol version is invalid")
     if subject_executor.get("dispatch_mode") != DESKTOP_DISPATCH_MODE:
         raise ValueError("subject executor dispatch mode is invalid")
@@ -120,10 +138,22 @@ def _arm_definitions(
     raw_arms: list[dict[str, object]],
     *,
     require_explicit_inspection_paths: bool,
+    protocol_version: object,
 ) -> tuple[ArmDefinition, ...]:
     arms: list[ArmDefinition] = []
     seen_ids: set[str] = set()
     for raw_arm in raw_arms:
+        policy_fields = {
+            "inspection_policy", "allowed_skill_inspection_paths", "applied_profiles"
+        }
+        if protocol_version == "desktop-subject-v5":
+            missing = (policy_fields | {"required_skill_inspection_paths"}) - raw_arm.keys()
+            if missing:
+                raise ValueError(f"v5 arm is missing inspection policy fields: {sorted(missing)}")
+            if raw_arm["inspection_policy"] != "required-subset/v1":
+                raise ValueError("v5 arm inspection policy is invalid")
+        elif policy_fields & raw_arm.keys():
+            raise ValueError("legacy arm cannot declare v5 inspection policy fields")
         arm_id = raw_arm.get("id")
         if not isinstance(arm_id, str) or re.fullmatch(IDENTIFIER_PATTERN, arm_id) is None:
             raise ValueError("arm ID is invalid")
@@ -151,6 +181,23 @@ def _arm_definitions(
             skill,
             require_explicit=require_explicit_inspection_paths,
         )
+        allowed_skill_inspection_paths: tuple[str, ...] = ()
+        applied_profiles: tuple[str, ...] = ()
+        if protocol_version == "desktop-subject-v5":
+            allowed_skill_inspection_paths = _arm_inspection_paths(
+                {"required_skill_inspection_paths": raw_arm["allowed_skill_inspection_paths"]},
+                arm_id,
+                skill,
+                require_explicit=True,
+            )
+            for paths in (required_skill_inspection_paths, allowed_skill_inspection_paths):
+                _validate_canonical_policy_paths(paths, arm_id)
+            if not set(required_skill_inspection_paths) <= set(allowed_skill_inspection_paths):
+                raise ValueError(f"required Skill inspection paths must be allowed: {arm_id}")
+            applied_profiles = _arm_applied_profiles(
+                raw_arm["applied_profiles"], arm_id, skill,
+                required_skill_inspection_paths, allowed_skill_inspection_paths,
+            )
         arms.append(
             ArmDefinition(
                 id=arm_id,
@@ -158,12 +205,56 @@ def _arm_definitions(
                 skill=skill,
                 version=version,
                 required_skill_inspection_paths=required_skill_inspection_paths,
+                inspection_policy=raw_arm.get("inspection_policy") if protocol_version == "desktop-subject-v5" else None,
+                allowed_skill_inspection_paths=allowed_skill_inspection_paths,
+                applied_profiles=applied_profiles,
             )
         )
         seen_ids.add(arm_id)
     if "control" not in seen_ids:
         raise ValueError("manifest must define a control arm")
     return tuple(arms)
+
+
+def _validate_canonical_policy_paths(paths: tuple[str, ...], arm_id: str) -> None:
+    """新協定使用跨平台一致、已展開且排序的精確檔案路徑。"""
+    if paths != tuple(sorted(paths)):
+        raise ValueError(f"v5 inspection paths must be sorted: {arm_id}")
+    for path in paths:
+        if any(character in path for character in ':*?[]<>|"') or any(
+            ord(character) < 32 or ord(character) == 127 for character in path
+        ):
+            raise ValueError(f"v5 inspection path is invalid: {arm_id}")
+
+
+def _arm_applied_profiles(
+    value: object,
+    arm_id: str,
+    skill: str | None,
+    required_paths: tuple[str, ...],
+    allowed_paths: tuple[str, ...],
+) -> tuple[str, ...]:
+    """固定 Pilot 組別、Profile 相依順序與查閱 Reference 的同一份契約。"""
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise ValueError(f"applied profiles must be a string array: {arm_id}")
+    profiles = tuple(value)
+    if profiles != PROFILE_ARM_ASSIGNMENTS.get(arm_id):
+        raise ValueError(f"applied profiles do not match the fixed pilot arm: {arm_id}")
+    if (skill is None) != (arm_id in {"control", "generic-clean-code"}):
+        raise ValueError(f"Skill presence does not match the fixed pilot arm: {arm_id}")
+    if skill is None:
+        if profiles:
+            raise ValueError(f"arm without a Skill cannot apply profiles: {arm_id}")
+        return profiles
+    reference_root = f".agents/skills/{skill}/references"
+    profile_paths = {f"{reference_root}/{PROFILE_REFERENCE_FILES[profile]}" for profile in profiles}
+    minimum_paths = profile_paths | {f"{reference_root}/profile-selection.md"}
+    if not minimum_paths <= set(required_paths):
+        raise ValueError(f"required inspection paths are missing assigned profile references: {arm_id}")
+    for path in allowed_paths:
+        if PurePosixPath(path).name.lower().startswith(("language-", "framework-")) and path not in profile_paths:
+            raise ValueError(f"allowed inspection paths contain an unassigned profile reference: {arm_id}")
+    return profiles
 
 
 def _validate_arm_skill_contract(

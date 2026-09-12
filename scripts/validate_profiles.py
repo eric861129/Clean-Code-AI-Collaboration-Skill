@@ -17,6 +17,17 @@ import yaml
 CATALOG_PATH = Path("profiles/catalog.yaml")
 SCHEMA_PATH = Path("profiles/profile.schema.json")
 EVIDENCE_SCHEMA_PATH = "evals/profile-pilot-result.schema.json"
+EVIDENCE_SCHEMA_PATHS = {
+    "profile-pilot-result/v1": EVIDENCE_SCHEMA_PATH,
+    "profile-pilot-result/v2": "evals/profile-pilot-result-v2.schema.json",
+}
+
+
+def evidence_schema_path(schema_version: object) -> str:
+    """只依已知版本挑選 Repository 內的 Schema，不接受外部 URL。"""
+    if not isinstance(schema_version, str) or schema_version not in EVIDENCE_SCHEMA_PATHS:
+        raise ValueError("public result schema version is unsupported")
+    return EVIDENCE_SCHEMA_PATHS[schema_version]
 
 
 @dataclass(frozen=True, order=True)
@@ -840,8 +851,11 @@ def _evidence_result_diagnostics(
         ]
     diagnostics: list[Diagnostic] = []
     try:
-        schema = json.loads(read_repository_file(EVIDENCE_SCHEMA_PATH).decode("utf-8"))
+        schema_path = evidence_schema_path(result.get("schema_version"))
+        schema = json.loads(read_repository_file(schema_path).decode("utf-8"))
         Draft202012Validator.check_schema(schema)
+        if not isinstance(schema, Mapping) or schema.get("properties", {}).get("schema_version", {}).get("const") != result.get("schema_version"):
+            raise ValueError("public result schema does not match the selected version")
         errors = sorted(
             Draft202012Validator(schema).iter_errors(result),
             key=lambda error: tuple(str(part) for part in error.absolute_path),
@@ -852,7 +866,7 @@ def _evidence_result_diagnostics(
                     profile_path,
                     f"{field}.path",
                     "evidence-result-schema-invalid",
-                    f"public result does not match {EVIDENCE_SCHEMA_PATH}: "
+                    f"public result does not match {schema_path}: "
                     f"{errors[0].message}",
                 )
             )

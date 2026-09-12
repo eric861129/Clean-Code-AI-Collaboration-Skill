@@ -60,6 +60,10 @@ Evidence Result 的四種 Outcome 必須全部保留：`passed`、`failed`、`no
 
 ## Suite SemVer and Profile Maturity
 
+同一 Profile 的不同 Campaign Evidence 必須追加保存，不能覆蓋原有 Result 或 Outcome。結果 Schema 僅接受 Repository 白名單中的 `profile-pilot-result/v1` 與 `profile-pilot-result/v2`，Package Input Hash 應包含實際使用的 Schema。v2 另保存 `execution_commit`、執行輸入 Hash、查閱診斷與 Oracle 未執行原因；詳細執行契約見 [Benchmark](../evals/benchmark.md)。
+
+v0.5.2 Campaign 受測來源固定為已發布 Skill v0.5.1，不是 Candidate 的持續修改內容。Suite Metadata 更新不代表重新測過不同的 Profile 語意；Canary 只驗證協定，不參與成熟度判定。未完成正式發布前，安裝命令保持指向已發布 Tag。
+
 **Suite SemVer** 與 Profile Maturity 分開管理：
 
 - 純相容修正、錯字或不改變選擇契約的澄清使用 Patch。

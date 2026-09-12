@@ -86,7 +86,7 @@ Standard output records Profiles Applied and Profile Basis per Changed Module. F
 
 - ID: `react`
 - Kind: `framework`
-- Status / Availability: `experimental` / `available`
+- Status / Availability: `beta` / `available`
 - Reference: [framework-react.md](framework-react.md)
 - Load Order: `200`
 - Owning Manifests: `package.json` (package)

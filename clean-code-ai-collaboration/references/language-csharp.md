@@ -75,4 +75,4 @@ For each affected C# Changed Module, report the applied profile and the observed
 
 ## Evidence Status
 
-Status: Experimental. The profile structure, metadata, selection behavior, and semantic terms have repository contract tests. No M2 pilot or M3 full run has been recorded, so the guidance is not evidence of improved implementation quality across C# repositories, frameworks, clients, or models.
+Current maturity is published in the generated [Runtime Profile Index](profile-selection.md#runtime-profile-index). Repository contract tests cover structure, selection, and required semantic topics. Versioned metadata records the v0.5.1 and v0.5.2 M2 pilots, including unfavorable outcomes; the latter tested the unchanged technical guidance from Skill v0.5.1. No M3 full run has been recorded. Pilot evidence does not establish general improvement across versions, runtimes, renderers, repositories, clients, or models.

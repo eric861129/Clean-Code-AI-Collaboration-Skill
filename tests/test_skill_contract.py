@@ -572,7 +572,7 @@ class SkillContractTests(unittest.TestCase):
         required = {
             "license: MIT",
             "compatibility:",
-            'version: "0.5.1"',
+            'version: "0.5.2"',
             "C — Context-Aware Code",
             "L — Localized Change",
             "E — Explicit Intent and Boundaries",
@@ -596,11 +596,12 @@ class SkillContractTests(unittest.TestCase):
             r'^  version: "([^"]+)"$', skill, re.MULTILINE
         ).group(1)
 
-        self.assertEqual("0.5.1", source_version)
+        self.assertEqual("0.5.2", source_version)
         self.assertIn(f"固定安裝 Tag 為 `v{source_version}`", readme)
         self.assertIn(f"git checkout v{source_version}", readme)
         self.assertIn(f'version: "{source_version}"', readme)
-        self.assertNotIn("0.5.1` Candidate", readme)
+        self.assertNotIn(f"`v{source_version}` Candidate", readme)
+        self.assertNotIn("git checkout v0.5.1", readme)
 
     def test_v040_readme_documents_strategy_configuration(self) -> None:
         readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")

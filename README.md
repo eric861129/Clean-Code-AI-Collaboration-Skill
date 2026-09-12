@@ -291,7 +291,9 @@ Skill 依下列順序解析：
 
 預設呼叫方式仍是 `$clean-code-ai-collaboration`。Repository Code Change 會以本次 Changed Module 為單位，依可驗證的檔案、最近 Owning Manifest 與 Dependency Marker，組合適用且可用的 Language／Framework Profile；找不到適用 Profile 時，Core Only 也是有效結果。Explicit Profile（明確指定 Profile）仍不能繞過 Availability、Applicability、相依、衝突、Repository Gate、風險或授權邊界。
 
-目前 C#、Python、TypeScript 與 React 是 Experimental，已完成單次 M2 Pilot 並保存 `pilot_recorded` 公開證據；四者 Outcome 都是 `inconclusive`，因此不能解讀為效果已獲證明，也不升為 Beta。Go、Rust、Java 與 Vue 仍是 Planned 不可用，不能 Routing 或 Packaging。
+[v0.5.2 M2 Pilot](evals/results/v0.5.2-profile-pilot.json) 已保存全新 34 組執行與匿名 Review：C# 為 `no_difference`、Python 為 `inconclusive`、TypeScript 為 `failed`，三者維持 Experimental；React 為 `passed`，升為 Beta。React 的改善只出現在本輪固定比較中的舊請求狀態覆寫防護，不能推論所有 React 任務都優於比較組。Go、Rust、Java 與 Vue 仍是 Planned 不可用，不能 Routing 或 Packaging。
+
+本輪受測 Skill 固定為已發布 v0.5.1；v0.5.2 僅更新協定與證據，未修改四份 Profile Reference 的技術指引語意。Beta 是單次 Pilot 的證據成熟度，尚非 Stable／Full Run；[v0.5.1 歷史結果](evals/results/v0.5.1-profile-pilot.json) 原樣保留。協定、失敗原因與限制見 [Benchmark](evals/benchmark.md#v052-profile-evidence-remediation-pilot)。
 
 目前 Profile 狀態由下列 Generated Matrix 呈現；Generated Region 只能由 Repository Script 更新。
 
@@ -301,7 +303,7 @@ Skill 依下列順序解析：
 | C# / .NET | language | experimental | [Open](clean-code-ai-collaboration/references/language-csharp.md) | pilot_recorded |
 | Python | language | experimental | [Open](clean-code-ai-collaboration/references/language-python.md) | pilot_recorded |
 | TypeScript | language | experimental | [Open](clean-code-ai-collaboration/references/language-typescript.md) | pilot_recorded |
-| React | framework | experimental | [Open](clean-code-ai-collaboration/references/framework-react.md) | pilot_recorded |
+| React | framework | beta | [Open](clean-code-ai-collaboration/references/framework-react.md) | pilot_recorded |
 | Go | language | planned | Not available | not_started |
 | Rust | language | planned | Not available | not_started |
 | Java | language | planned | Not available | not_started |
@@ -323,7 +325,7 @@ Profile 貢獻入口只有 [Profile Authoring Guide](docs/profile-authoring.md)�
 
 ## 安裝
 
-此版本的固定安裝 Tag 為 `v0.5.1`，Skill 版本為 `0.5.1`。M2 Pilot 已記錄 C#、Python、TypeScript 與 React 的實證；四個 Profile 的 Outcome 皆為 `inconclusive`，成熟度維持 `experimental`。詳見[公開 Pilot 結果](evals/results/v0.5.1-profile-pilot.json)。
+此版本的固定安裝 Tag 為 `v0.5.2`，Skill 版本為 `0.5.2`。React 為 Beta；C#、Python 與 TypeScript 維持 Experimental。正式發布不代表所有 Profile 效果通過；實際 Outcome 與限制見 [v0.5.2 Pilot 結果](evals/results/v0.5.2-profile-pilot.json)。
 
 先取得 Repository：
 
@@ -339,11 +341,11 @@ git clone https://github.com/eric861129/Clean-Code-AI-Collaboration-Skill.git
 cd Clean-Code-AI-Collaboration-Skill
 ```
 
-如果要安裝此正式版本 `v0.5.1`，請先切換到對應 Tag，避免日後 `main` 更新時安裝到不同版本：
+如果要安裝此正式版本 `v0.5.2`，請先切換到對應 Tag，避免日後 `main` 更新時安裝到不同版本：
 
 ```shell
 git fetch --tags
-git checkout v0.5.1
+git checkout v0.5.2
 ```
 
 接著確認 Skill Frontmatter 的版本：
@@ -351,13 +353,13 @@ git checkout v0.5.1
 Windows PowerShell：
 
 ```powershell
-Select-String -LiteralPath ".\clean-code-ai-collaboration\SKILL.md" -Pattern 'version: "0.5.1"'
+Select-String -LiteralPath ".\clean-code-ai-collaboration\SKILL.md" -Pattern 'version: "0.5.2"'
 ```
 
 macOS／Linux：
 
 ```bash
-grep 'version: "0.5.1"' ./clean-code-ai-collaboration/SKILL.md
+grep 'version: "0.5.2"' ./clean-code-ai-collaboration/SKILL.md
 ```
 
 真正需要安裝的只有 `clean-code-ai-collaboration` 資料夾；`evals`、`tests`、`docs` 與 `.github` 是評測、驗證與維護資料。

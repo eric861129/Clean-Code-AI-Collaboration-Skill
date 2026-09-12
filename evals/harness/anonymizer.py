@@ -64,6 +64,22 @@ def build_review_packet(
         sensitive_tokens.update(
             arm.skill for arm in manifest.arms if arm.skill is not None
         )
+        if manifest.subject_executor.get("protocol_version") == "desktop-subject-v5":
+            packet.pop("profile_under_test", None)
+            reasons = packet["automatic_failure_reasons"]
+            if isinstance(reasons, list) and any(
+                reason in {"invalid_claim", "skill_not_used"} for reason in reasons
+            ):
+                packet["automatic_failure_reasons"] = list(dict.fromkeys(
+                    "evidence_gate_failed" if reason in {"invalid_claim", "skill_not_used"} else reason
+                    for reason in reasons
+                ))
+                packet["blind_spots"] = [
+                    "Controller evidence gate failed; behavior oracle was not executed."
+                ]
+            for arm in manifest.arms:
+                sensitive_tokens.update(arm.allowed_skill_inspection_paths)
+                sensitive_tokens.update(Path(path).name for path in arm.allowed_skill_inspection_paths)
     redacted = _redact_for_review(packet, sensitive_tokens)
     if not isinstance(redacted, dict):  # pragma: no cover - packet is a dictionary
         raise TypeError("review packet must remain a dictionary")

@@ -3,7 +3,7 @@ id: go
 kind: language
 display_name: Go
 status: planned
-suite_version: "0.5.1"
+suite_version: "0.5.2"
 detection:
   owning_manifests:
     - pattern: go.mod
